@@ -757,9 +757,27 @@
 
 .file-view-metadata {
   border-top: 1px solid #ddd;
-  padding: 12px 16px;
   background: #fafafa;
   font-size: 13px;
+}
+
+.file-view-metadata-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f5f5f5;
+}
+
+.file-view-metadata-title {
+  font-weight: 500;
+  font-size: 13px;
+  color: #666;
+}
+
+.file-view-metadata > :not(.file-view-metadata-header) {
+  padding: 12px 16px;
 }
 
 .metadata-row {
@@ -778,5 +796,123 @@
 .metadata-value {
   color: #333;
   word-break: break-all;
+}
+
+.file-view-edit-mongo-button {
+  padding: 3px 8px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 2px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.file-view-edit-mongo-button:hover:not(:disabled) {
+  background: #1976D2;
+}
+
+.file-view-edit-mongo-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.file-view-mongo-error {
+  padding: 8px 12px;
+  background: #fee;
+  border-bottom: 1px solid #fcc;
+  color: #c33;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.file-view-mongo-error-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c33;
+  flex-shrink: 0;
+}
+
+.file-view-mongo-error-close:hover {
+  color: #a00;
+}
+
+.file-view-mongo-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+
+.file-view-mongo-panel {
+  background: white;
+  border-radius: 4px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.file-view-mongo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ddd;
+  background: #f8f8f8;
+}
+
+.file-view-mongo-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.file-view-mongo-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+.file-view-mongo-close:hover {
+  color: #333;
+}
+
+.file-view-mongo-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
 }
 

@@ -178,6 +178,17 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
   const handleShow = (file) => {
     setViewingFile(file);
   };
+  
+  const handleFileUpdate = (updatedFile) => {
+    // Update the file in the local files array
+    setFiles(prevFiles => 
+      prevFiles.map(f => {
+        const fId = f.id || f.path;
+        const updatedId = updatedFile.id || updatedFile.path;
+        return fId === updatedId ? { ...f, ...updatedFile } : f;
+      })
+    );
+  };
 
   const handleRenameStart = (file) => {
     setRenamingFile(file);
@@ -263,16 +274,17 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
     const fileId = file.id || file.path;
     const cachedFile = getCachedFile(fileCache, accessPoint.id, fileId);
     
-    if (cachedFile && cachedFile.size != null) {
+    // If cached and size has been fetched (>= 0), show it
+    if (cachedFile && cachedFile.size >= 0) {
       return formatFileSize(cachedFile.size);
     }
     
-    // Fall back to file.size if it exists and is not 0
-    if (file.size != null && file.size > 0) {
+    // Fall back to file.size if it has been fetched (>= 0)
+    if (file.size >= 0) {
       return formatFileSize(file.size);
     }
     
-    // Otherwise, show '-' to indicate not fetched
+    // Otherwise, show '-' to indicate not fetched (size is -1 or undefined/null)
     return '-';
   };
 
@@ -451,6 +463,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
           file={viewingFile}
           accessPointId={accessPoint.id}
           onClose={() => setViewingFile(null)}
+          onFileUpdate={handleFileUpdate}
         />
       )}
     </div>

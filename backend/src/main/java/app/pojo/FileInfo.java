@@ -4,11 +4,11 @@ public class FileInfo {
     private String id;
     private String path;
     private String name;
-    private long size;
+    private long size = -1; // -1 means not fetched, 0 means empty file
     private byte[] fileBytes;
     private String contentType;
     private boolean isDirectory;
-    private long lastModified;
+    private long lastModified = -1; // -1 means not fetched
 
     public FileInfo() {
     }

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAtom } from 'jotai';
-import { SpinningCircle, EditableValueComp, KeyValuesComp } from '@wwf971/react-comp-misc';
+import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonComp } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
 import { fileCacheAtom, fetchFileData, renameFile } from './fileStore';
+import { useMongoDocEditor, getBackendServerUrl } from '../remote/dataStore';
 import './file.css';
 
 /**
@@ -11,8 +12,9 @@ import './file.css';
  * @param {Object} file - The file object to display
  * @param {string} accessPointId - The file access point ID
  * @param {Function} onClose - Callback to close the popup
+ * @param {Function} onFileUpdate - Callback when file is updated (renamed, etc.)
  */
-const FileView = ({ file, accessPointId, onClose }) => {
+const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
@@ -20,6 +22,17 @@ const FileView = ({ file, accessPointId, onClose }) => {
   const [metadata, setMetadata] = useState(null);
   const [, setFileCache] = useAtom(fileCacheAtom);
   const [copied, setCopied] = useState(false);
+  const [showMongoDoc, setShowMongoDoc] = useState(false);
+  const [mongoDoc, setMongoDoc] = useState(null);
+  const [loadingMongoDoc, setLoadingMongoDoc] = useState(false);
+  const [mongoDocError, setMongoDocError] = useState(null);
+  
+  // MongoDB document editor (only used for local/internal files)
+  const { handleChange: handleMongoDocChange, isUpdating } = useMongoDocEditor(
+    'main',
+    'note',
+    mongoDoc || {}
+  );
 
   useEffect(() => {
     const loadFile = async () => {
@@ -86,12 +99,22 @@ const FileView = ({ file, accessPointId, onClose }) => {
     if (result.code === 0 && result.data) {
       // Update local metadata state with the new data from the server
       // This is crucial for local/external files where the path changes
-      setMetadata(prev => ({
-        ...prev,
+      const updatedMetadata = {
+        ...metadata,
         name: newValue,
-        path: result.data.path || prev.path, // Update path if it changed
-        id: result.data.id || prev.id
-      }));
+        path: result.data.path || metadata.path, // Update path if it changed
+        id: result.data.id || metadata.id
+      };
+      setMetadata(updatedMetadata);
+      
+      // Notify parent component (ListFiles) about the update
+      if (onFileUpdate) {
+        onFileUpdate({
+          ...file,
+          ...result.data,
+          name: newValue
+        });
+      }
     }
     
     return result;
@@ -114,6 +137,33 @@ const FileView = ({ file, accessPointId, onClose }) => {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy URL:', err);
+    }
+  };
+  
+  const handleEditMongoDoc = async () => {
+    if (!file.id) {
+      setMongoDocError('Cannot edit MongoDB document: file has no ID (may be local/external type)');
+      return;
+    }
+    
+    setLoadingMongoDoc(true);
+    setMongoDocError(null);
+    try {
+      const backendUrl = getBackendServerUrl();
+      const response = await fetch(`${backendUrl}/mongo/db/main/coll/note/docs/?id=${file.id}`);
+      const result = await response.json();
+      
+      if (result.code === 0 && result.data) {
+        setMongoDoc(result.data);
+        setShowMongoDoc(true);
+        setMongoDocError(null);
+      } else {
+        setMongoDocError('Failed to load MongoDB document: ' + (result.message || 'Unknown error'));
+      }
+    } catch (error) {
+      setMongoDocError('Failed to load MongoDB document: ' + error.message);
+    } finally {
+      setLoadingMongoDoc(false);
     }
   };
 
@@ -210,6 +260,18 @@ const FileView = ({ file, accessPointId, onClose }) => {
           </div>
           <button className="file-view-close" onClick={onClose}>×</button>
         </div>
+        
+        {mongoDocError && (
+          <div className="file-view-mongo-error">
+            {mongoDocError}
+            <button 
+              className="file-view-mongo-error-close"
+              onClick={() => setMongoDocError(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         <div className="file-view-content">
           {loading && (
@@ -254,6 +316,19 @@ const FileView = ({ file, accessPointId, onClose }) => {
 
         {!loading && !error && metadata && (
           <div className="file-view-metadata">
+            <div className="file-view-metadata-header">
+              <span className="file-view-metadata-title">Metadata</span>
+              {file.id && (
+                <button 
+                  className="file-view-edit-mongo-button" 
+                  onClick={handleEditMongoDoc}
+                  disabled={loadingMongoDoc}
+                  title="Edit MongoDB document"
+                >
+                  {loadingMongoDoc ? '...' : 'Edit Mongo Doc'}
+                </button>
+              )}
+            </div>
             <KeyValuesComp
               data={metadataItems}
               isEditable={false}
@@ -264,6 +339,35 @@ const FileView = ({ file, accessPointId, onClose }) => {
           </div>
         )}
       </div>
+      
+      {showMongoDoc && mongoDoc && (
+        <div 
+          className="file-view-mongo-overlay"
+          onClick={() => setShowMongoDoc(false)}
+        >
+          <div 
+            className="file-view-mongo-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="file-view-mongo-header">
+              <h3>Edit MongoDB Document</h3>
+              <button 
+                className="file-view-mongo-close"
+                onClick={() => setShowMongoDoc(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="file-view-mongo-content">
+              <JsonComp
+                data={mongoDoc}
+                onChange={handleMongoDocChange}
+                isLoading={isUpdating}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

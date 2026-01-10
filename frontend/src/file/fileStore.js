@@ -30,10 +30,17 @@ export async function fetchFileAccessPoints() {
   try {
     // Get MongoDB document location info
     const backendUrl = getBackendServerUrl();
+    console.log('Fetching file access points from:', `${backendUrl}/file_access_point/mongo_docs/`);
     const mongoDocsResponse = await fetch(`${backendUrl}/file_access_point/mongo_docs/`);
+    
+    console.log('Response status:', mongoDocsResponse.status);
+    console.log('Response headers:', mongoDocsResponse.headers.get('content-type'));
     
     const contentType = mongoDocsResponse.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
+      // Log the actual response text for debugging
+      const responseText = await mongoDocsResponse.text();
+      console.error('Non-JSON response received:', responseText.substring(0, 500));
       throw new Error('Server returned non-JSON response. Endpoint may not exist or server error occurred.');
     }
     
@@ -47,7 +54,7 @@ export async function fetchFileAccessPoints() {
     
     // Fetch each document by ID
     const fetchPromises = ids.map(id => 
-      fetch(`/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/?id=${id}`)
+      fetch(`${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/?id=${id}`)
         .then(res => res.json())
         .then(result => result.code === 0 ? result.data : null)
     );

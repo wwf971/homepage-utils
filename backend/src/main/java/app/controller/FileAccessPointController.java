@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -52,10 +53,14 @@ public class FileAccessPointController {
     public ApiResponse<List<FileAccessPoint>> listAccessPoints() {
         try {
             List<FileAccessPoint> accessPoints = fileAccessPointService.getAllFileAccessPoints();
+            if (accessPoints == null) {
+                accessPoints = new ArrayList<>();
+            }
             return new ApiResponse<>(0, accessPoints, "File access points retrieved successfully");
         } catch (Exception e) {
             System.err.println("Failed to list file access points: " + e.getMessage());
-            return new ApiResponse<>(-1, null, "Failed to list access points: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, new ArrayList<>(), "Failed to list access points: " + e.getMessage());
         }
     }
 
@@ -63,6 +68,15 @@ public class FileAccessPointController {
     public ApiResponse<Map<String, Object>> getMongoDocs() {
         try {
             List<FileAccessPoint> accessPoints = fileAccessPointService.getAllFileAccessPoints();
+            
+            if (accessPoints == null || accessPoints.isEmpty()) {
+                // Return empty but valid response when no access points or MongoDB not connected
+                Map<String, Object> metadata = new java.util.HashMap<>();
+                metadata.put("database", "main");
+                metadata.put("collection", "note");
+                metadata.put("ids", new ArrayList<>());
+                return new ApiResponse<>(0, metadata, "No file access points configured or MongoDB not connected");
+            }
             
             List<String> ids = accessPoints.stream()
                     .map(FileAccessPoint::getId)
@@ -76,6 +90,7 @@ public class FileAccessPointController {
             return new ApiResponse<>(0, metadata, "File access point mongo docs info retrieved successfully");
         } catch (Exception e) {
             System.err.println("Failed to get file access point mongo docs info: " + e.getMessage());
+            e.printStackTrace();
             return new ApiResponse<>(-1, null, "Failed to get mongo docs info: " + e.getMessage());
         }
     }

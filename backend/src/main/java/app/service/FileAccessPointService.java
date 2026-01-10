@@ -5,6 +5,7 @@ import app.pojo.FileInfo;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -30,26 +31,32 @@ public class FileAccessPointService {
     }
 
     private void loadFileAccessPoints() {
-        MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
-        if (mongoTemplate == null) {
-            System.err.println("Cannot load file access points - MongoDB not connected");
-            return;
+        try {
+            MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
+            if (mongoTemplate == null) {
+                System.err.println("Cannot load file access points - MongoDB not connected");
+                return;
+            }
+            
+            Query query = new Query(Criteria.where("type").is("file_access_point"));
+            List<FileAccessPoint> accessPoints = mongoTemplate.find(query, FileAccessPoint.class, "note");
+            
+            for (FileAccessPoint doc : accessPoints) {
+                cachedFileAccessPoints.put(doc.getId(), doc);
+            }
+            System.out.println("FileAccessPointService loaded " + cachedFileAccessPoints.size() + " access points from MongoDB");
+        } catch (Exception e) {
+            System.err.println("Error loading file access points: " + e.getMessage());
+            e.printStackTrace();
         }
-        
-        Query query = new Query(Criteria.where("type").is("file_access_point"));
-        List<FileAccessPoint> accessPoints = mongoTemplate.find(query, FileAccessPoint.class, "note");
-        
-        for (FileAccessPoint doc : accessPoints) {
-            cachedFileAccessPoints.put(doc.getId(), doc);
-        }
-        System.out.println("FileAccessPointService loaded " + cachedFileAccessPoints.size() + " access points from MongoDB");
     }
 
     public FileAccessPoint getFileAccessPoint(String id) {
         // Ensure MongoDB connection is initialized
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
-            throw new IllegalStateException("MongoDB connection not available. Please check MongoDB configuration and ensure MongoDB is running.");
+            System.err.println("MongoDB connection not available for file access point: " + id);
+            return null;
         }
         
         if (cachedFileAccessPoints.isEmpty()) {
@@ -76,7 +83,8 @@ public class FileAccessPointService {
         // Ensure MongoDB connection is initialized
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
-            throw new IllegalStateException("MongoDB connection not available. Please check MongoDB configuration and ensure MongoDB is running.");
+            System.err.println("MongoDB connection not available for refreshing file access point: " + id);
+            return null;
         }
         
         // Query MongoDB directly to get fresh data
@@ -142,22 +150,124 @@ public class FileAccessPointService {
         }
         return path;
     }
+    
+    /**
+     * Search for file using ID-based directory patterns
+     * Tries: ./, ./oc/, ./oc/rc/, ./oc/rc/ob/, etc.
+     */
+    private Path searchFileInDirectoryPatterns(String basePath, String fileId, String fileName) {
+        System.out.println("Searching for file: " + fileName + " (ID: " + fileId + ")");
+        
+        // Try root directory first
+        Path candidatePath = Paths.get(basePath, fileName);
+        System.out.println("  Trying: " + candidatePath);
+        if (Files.exists(candidatePath)) {
+            return candidatePath;
+        }
+        
+        // Try patterns based on fileId: first 2 chars, then next 2, etc.
+        String id = fileId.toLowerCase();
+        int maxDepth = Math.min(id.length() / 2, 4); // Max 4 levels deep
+        
+        for (int depth = 1; depth <= maxDepth; depth++) {
+            StringBuilder pathBuilder = new StringBuilder();
+            
+            for (int i = 0; i < depth; i++) {
+                int startIdx = i * 2;
+                int endIdx = Math.min(startIdx + 2, id.length());
+                if (startIdx < id.length()) {
+                    if (pathBuilder.length() > 0) {
+                        pathBuilder.append("/");
+                    }
+                    pathBuilder.append(id.substring(startIdx, endIdx));
+                }
+            }
+            
+            pathBuilder.append("/").append(fileName);
+            candidatePath = Paths.get(basePath, pathBuilder.toString());
+            System.out.println("  Trying: " + candidatePath);
+            
+            if (Files.exists(candidatePath)) {
+                return candidatePath;
+            }
+        }
+        
+        // If still not found, try a broader search in subdirectories
+        System.out.println("  File not found in standard patterns, trying subdirectory search...");
+        try {
+            Path result = searchFileInSubdirectories(Paths.get(basePath), fileName, 3);
+            if (result != null) {
+                System.out.println("  Found in subdirectory: " + result);
+                return result;
+            }
+        } catch (Exception e) {
+            System.err.println("Error during subdirectory search: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Recursively search for file in subdirectories up to maxDepth
+     */
+    private Path searchFileInSubdirectories(Path directory, String fileName, int maxDepth) throws IOException {
+        if (maxDepth < 0 || !Files.isDirectory(directory)) {
+            return null;
+        }
+        
+        try (var stream = Files.list(directory)) {
+            for (Path entry : stream.toList()) {
+                if (Files.isDirectory(entry)) {
+                    // Recursively search subdirectories
+                    Path result = searchFileInSubdirectories(entry, fileName, maxDepth - 1);
+                    if (result != null) {
+                        return result;
+                    }
+                } else if (entry.getFileName().toString().equals(fileName)) {
+                    return entry;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Update the file path in MongoDB document
+     */
+    private void updateFilePathInMongoDB(MongoTemplate mongoTemplate, String fileId, String newRelativePath) {
+        try {
+            Query query = new Query(Criteria.where("type").is("file").and("id").is(fileId));
+            Update update = new Update().set("path", newRelativePath);
+            mongoTemplate.updateFirst(query, update, "note");
+            System.out.println("Updated MongoDB path for file " + fileId + " to: " + newRelativePath);
+        } catch (Exception e) {
+            System.err.println("Failed to update MongoDB path: " + e.getMessage());
+        }
+    }
 
     public List<FileAccessPoint> getAllFileAccessPoints() {
-        // Ensure MongoDB connection is initialized
-        MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
-        if (mongoTemplate == null) {
-            throw new IllegalStateException("MongoDB connection not available. Please check MongoDB configuration and ensure MongoDB is running.");
+        try {
+            // Ensure MongoDB connection is initialized
+            MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
+            if (mongoTemplate == null) {
+                System.err.println("MongoDB connection not available for file access points");
+                return new ArrayList<>();
+            }
+            
+            // Load from cache if available
+            if (cachedFileAccessPoints.isEmpty()) {
+                loadFileAccessPoints();
+            }
+            
+            // Query directly from MongoDB to get latest data
+            Query query = new Query(Criteria.where("type").is("file_access_point"));
+            return mongoTemplate.find(query, FileAccessPoint.class, "note");
+        } catch (Exception e) {
+            System.err.println("Error getting all file access points: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
         }
-        
-        // Load from cache if available
-        if (cachedFileAccessPoints.isEmpty()) {
-            loadFileAccessPoints();
-        }
-        
-        // Query directly from MongoDB to get latest data
-        Query query = new Query(Criteria.where("type").is("file_access_point"));
-        return mongoTemplate.find(query, FileAccessPoint.class, "note");
     }
 
     public void reloadFileAccessPoints() {
@@ -228,6 +338,15 @@ public class FileAccessPointService {
      * Get file metadata from MongoDB for local/internal type
      */
     private FileInfo getFileMetadataFromMongoDB(FileAccessPoint accessPoint, String fileId) throws Exception {
+        System.out.println("=== getFileMetadataFromMongoDB ===");
+        System.out.println("File ID (original): " + fileId);
+        
+        // Strip leading slash if present (file IDs in MongoDB don't have leading slashes)
+        if (fileId.startsWith("/")) {
+            fileId = fileId.substring(1);
+            System.out.println("File ID (cleaned): " + fileId);
+        }
+        
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
             throw new IllegalStateException("MongoDB connection not available");
@@ -250,7 +369,8 @@ public class FileAccessPointService {
         FileInfo fileInfo = new FileInfo();
         fileInfo.setId(fileId);
         fileInfo.setName(doc.getString("name"));
-        fileInfo.setPath(doc.getString("path"));
+        String relativePath = doc.getString("path");
+        fileInfo.setPath(relativePath);
         fileInfo.setContentType(doc.getString("file_type"));
         
         // Get size from MongoDB if available
@@ -265,6 +385,37 @@ public class FileAccessPointService {
             long timeUploadUs = timeUpload instanceof Long ? (Long) timeUpload : 
                                timeUpload instanceof Integer ? ((Integer) timeUpload).longValue() : 0;
             fileInfo.setLastModified(timeUploadUs / 1000);
+        }
+        
+        // Verify file exists on filesystem, search if not found
+        String basePath = accessPoint.resolveBaseDirPath();
+        if (basePath != null) {
+            basePath = expandHomePath(basePath);
+            Path fullPath = null;
+            boolean foundFile = false;
+            
+            // Try the path from MongoDB first
+            if (relativePath != null && !relativePath.isEmpty()) {
+                fullPath = Paths.get(basePath, relativePath);
+                if (Files.exists(fullPath)) {
+                    foundFile = true;
+                }
+            }
+            
+            // If not found, search for the file
+            if (!foundFile) {
+                String fileName = doc.getString("name");
+                if (fileName != null && !fileName.isEmpty()) {
+                    fullPath = searchFileInDirectoryPatterns(basePath, fileId, fileName);
+                    
+                    if (fullPath != null && Files.exists(fullPath)) {
+                        // Calculate new relative path and update MongoDB
+                        String newRelativePath = Paths.get(basePath).relativize(fullPath).toString();
+                        updateFilePathInMongoDB(mongoTemplate, fileId, newRelativePath);
+                        fileInfo.setPath(newRelativePath);
+                    }
+                }
+            }
         }
         
         return fileInfo;
@@ -303,6 +454,17 @@ public class FileAccessPointService {
      * Get file content for local/internal type - query MongoDB by custom id field
      */
     private FileInfo getFileContentFromMongoDB(FileAccessPoint accessPoint, String fileId) throws Exception {
+        System.out.println("=== getFileContentFromMongoDB ===");
+        System.out.println("File ID (original): " + fileId);
+        
+        // Strip leading slash if present (file IDs in MongoDB don't have leading slashes)
+        if (fileId.startsWith("/")) {
+            fileId = fileId.substring(1);
+            System.out.println("File ID (cleaned): " + fileId);
+        }
+        
+        System.out.println("Access Point ID: " + accessPoint.getId());
+        
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
             throw new IllegalStateException("MongoDB connection not available");
@@ -313,8 +475,14 @@ public class FileAccessPointService {
         org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
         
         if (doc == null) {
-            throw new IllegalArgumentException("File not found: " + fileId);
+            throw new IllegalArgumentException("File not found in database: " + fileId);
         }
+
+        System.out.println("MongoDB document found:");
+        System.out.println("  - name: " + doc.getString("name"));
+        System.out.println("  - path: " + doc.getString("path"));
+        System.out.println("  - path: " + doc.getString("id"));
+        System.out.println("  - file_access_point_id: " + doc.getString("file_access_point_id"));
 
         // Verify it belongs to this file access point
         String docAccessPointId = doc.getString("file_access_point_id");
@@ -337,19 +505,66 @@ public class FileAccessPointService {
 
         // Read file from filesystem
         String basePath = accessPoint.resolveBaseDirPath();
+        System.out.println("Base path (before expansion): " + basePath);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured");
         }
         
         basePath = expandHomePath(basePath);
+        System.out.println("Base path (after expansion): " + basePath);
+        
         String relativePath = doc.getString("path");
-        if (relativePath == null) {
-            throw new IllegalArgumentException("File path not found in database");
+        String originalRelativePath = relativePath;
+        System.out.println("Relative path from MongoDB: " + relativePath);
+        
+        Path fullPath = null;
+        boolean foundFile = false;
+        
+        // Try the path from MongoDB first
+        if (relativePath != null && !relativePath.isEmpty()) {
+            fullPath = Paths.get(basePath, relativePath);
+            System.out.println("Trying path from MongoDB: " + fullPath);
+            if (Files.exists(fullPath)) {
+                foundFile = true;
+                System.out.println("File found at MongoDB path!");
+            }
         }
         
-        Path fullPath = Paths.get(basePath, relativePath);
-        if (!Files.exists(fullPath)) {
-            throw new IOException("File not found on filesystem: " + fullPath);
+        // If not found, search for the file using ID-based directory patterns
+        if (!foundFile) {
+            System.out.println("File not found at MongoDB path, searching...");
+            String fileName = doc.getString("name");
+            if (fileName == null || fileName.isEmpty()) {
+                // Try to construct filename from ID
+                fileName = fileId;
+                String fileType = doc.getString("file_type");
+                if (fileType != null && fileType.contains("/")) {
+                    String extension = fileType.substring(fileType.lastIndexOf("/") + 1);
+                    if (!fileName.endsWith("." + extension)) {
+                        fileName = fileName + "." + extension;
+                    }
+                }
+            }
+            
+            fullPath = searchFileInDirectoryPatterns(basePath, fileId, fileName);
+            
+            if (fullPath != null && Files.exists(fullPath)) {
+                foundFile = true;
+                // Calculate new relative path
+                relativePath = Paths.get(basePath).relativize(fullPath).toString();
+                System.out.println("File found at: " + fullPath);
+                System.out.println("New relative path: " + relativePath);
+                
+                // Update MongoDB document with correct path
+                if (!relativePath.equals(originalRelativePath)) {
+                    updateFilePathInMongoDB(mongoTemplate, fileId, relativePath);
+                    fileInfo.setPath(relativePath);
+                }
+            }
+        }
+        
+        if (!foundFile || fullPath == null) {
+            throw new IOException("File not found: " + fileId + " (tried MongoDB path: " + originalRelativePath + ")");
         }
         
         fileInfo.setFileBytes(Files.readAllBytes(fullPath));
@@ -400,6 +615,11 @@ public class FileAccessPointService {
      * @return Updated FileInfo
      */
     public FileInfo renameFile(String fileAccessPointId, String filePathOrId, String newName) throws Exception {
+        System.out.println("=== renameFile ===");
+        System.out.println("Access Point ID: " + fileAccessPointId);
+        System.out.println("File Path or ID: " + filePathOrId);
+        System.out.println("New Name: " + newName);
+        
         // Refresh cache to get latest config (e.g., updated base directory)
         FileAccessPoint accessPoint = refreshFileAccessPointCache(fileAccessPointId);
         if (accessPoint == null) {
@@ -407,6 +627,7 @@ public class FileAccessPointService {
         }
 
         String settingType = accessPoint.getSettingType();
+        System.out.println("Setting Type: " + settingType);
         if (settingType == null) {
             throw new IllegalArgumentException("File access point type not configured: " + fileAccessPointId);
         }
@@ -425,6 +646,15 @@ public class FileAccessPointService {
      * Rename file for local/internal type - update MongoDB and rename on filesystem
      */
     private FileInfo renameFileInMongoDB(FileAccessPoint accessPoint, String fileId, String newName) throws Exception {
+        System.out.println("=== renameFileInMongoDB ===");
+        System.out.println("File ID (original): " + fileId);
+        
+        // Strip leading slash if present (file IDs in MongoDB don't have leading slashes)
+        if (fileId.startsWith("/")) {
+            fileId = fileId.substring(1);
+            System.out.println("File ID (cleaned): " + fileId);
+        }
+        
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
             throw new IllegalStateException("MongoDB connection not available");
@@ -438,44 +668,40 @@ public class FileAccessPointService {
             throw new IllegalArgumentException("File not found: " + fileId);
         }
 
-        String basePath = accessPoint.resolveBaseDirPath();
-        if (basePath == null) {
-            throw new IllegalArgumentException("dir_path_base not configured");
-        }
-        basePath = expandHomePath(basePath);
-
-        String oldPath = doc.getString("path");
-        String oldName = doc.getString("name");
+        // For local/internal files, only update the name in MongoDB
+        // The physical file remains at its ID-based path (e.g., vy/vy5n8h.png)
+        // The 'name' field is just metadata for display purposes
         
-        // Calculate new path
-        Path oldFullPath = Paths.get(basePath, oldPath);
-        Path parentDir = oldFullPath.getParent();
-        Path newFullPath = parentDir != null ? parentDir.resolve(newName) : Paths.get(basePath, newName);
-        String newPath = Paths.get(basePath).relativize(newFullPath).toString();
-
-        // Rename file on filesystem
-        if (Files.exists(oldFullPath)) {
-            Files.move(oldFullPath, newFullPath);
-        }
-
-        // Update MongoDB
+        String oldName = doc.getString("name");
+        System.out.println("Renaming in MongoDB only: '" + oldName + "' -> '" + newName + "'");
+        
+        // Update only the name field in MongoDB
         org.springframework.data.mongodb.core.query.Update update = 
             new org.springframework.data.mongodb.core.query.Update();
         update.set("name", newName);
-        update.set("path", newPath);
         
         mongoTemplate.updateFirst(query, update, "note");
 
-        // Return updated file info
+        // Return updated file info (path remains unchanged)
         FileInfo fileInfo = new FileInfo();
+        fileInfo.setId(fileId);
         fileInfo.setName(newName);
-        fileInfo.setPath(newPath);
+        fileInfo.setPath(doc.getString("path")); // Path stays the same
         fileInfo.setDirectory(false);
         fileInfo.setContentType(doc.getString("file_type"));
         
-        if (Files.exists(newFullPath)) {
-            fileInfo.setSize(Files.size(newFullPath));
-            fileInfo.setLastModified(Files.getLastModifiedTime(newFullPath).toMillis());
+        // Get size from filesystem if available
+        String basePath = accessPoint.resolveBaseDirPath();
+        if (basePath != null) {
+            basePath = expandHomePath(basePath);
+            String filePath = doc.getString("path");
+            if (filePath != null) {
+                Path fullPath = Paths.get(basePath, filePath);
+                if (Files.exists(fullPath)) {
+                    fileInfo.setSize(Files.size(fullPath));
+                    fileInfo.setLastModified(Files.getLastModifiedTime(fullPath).toMillis());
+                }
+            }
         }
         
         return fileInfo;
@@ -579,9 +805,13 @@ public class FileAccessPointService {
         List<FileInfo> fileInfoList = new ArrayList<>();
         for (org.bson.Document doc : docs) {
             FileInfo fileInfo = new FileInfo();
-            fileInfo.setId(doc.getString("id")); // Set the custom id field
+            String docId = doc.getString("id");
+            String docPath = doc.getString("path");
+            System.out.println("MongoDB doc - id: '" + docId + "', path: '" + docPath + "'");
+            
+            fileInfo.setId(docId); // Set the custom id field
             fileInfo.setName(doc.getString("name"));
-            fileInfo.setPath(doc.getString("path"));
+            fileInfo.setPath(docPath);
             fileInfo.setDirectory(false); // Files from MongoDB are always files, not directories
             fileInfo.setContentType(doc.getString("file_type"));
             
