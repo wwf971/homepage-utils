@@ -1,0 +1,253 @@
+/* Database and Collection Tags */
+.mongo-tag {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  user-select: none;
+}
+
+.mongo-tag-clickable {
+  cursor: pointer;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  transition: all 0.2s;
+}
+
+.mongo-tag-clickable:hover {
+  background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.mongo-tag-selected {
+  background-color: #e3f2fd;
+  border: 1px solid #2196F3;
+}
+
+.mongo-tag-selected:hover {
+  background-color: #e3f2fd;
+  border-color: #2196F3;
+}
+
+.mongo-tag-static {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+}
+
+.mongo-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Section Headers with Refresh Button */
+.mongo-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mongo-section-header h4 {
+  flex: 0 0 auto;
+}
+
+.mongo-section-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mongo-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+  border-radius: 4px;
+}
+
+.mongo-refresh-button:hover:not(:disabled) {
+  color: #2196F3;
+  background: #f0f0f0;
+}
+
+.mongo-refresh-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Document Cards */
+.docs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc-card {
+  position: relative;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.doc-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #e8e8e8;
+  border-bottom: 1px solid #ddd;
+}
+
+.doc-card-index {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+}
+
+.doc-card-edit-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.doc-card-edit-button:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.doc-card-edit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doc-card-delete-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.doc-card-delete-button:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.doc-card-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doc-card-content {
+  padding: 12px;
+  font-size: 12px;
+  overflow: auto;
+  margin: 0;
+  background-color: #f5f5f5;
+  max-height: 400px;
+}
+
+/* Document Editor Overlay */
+.doc-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.doc-editor-panel {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  height: 90%;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.doc-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+}
+
+.doc-editor-header > h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.doc-editor-close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.doc-editor-close-button:hover {
+  color: #333;
+}
+
+.doc-editor-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+/* Popup Overlay */
+.mongo-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.mongo-popup {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.mongo-popup h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+}

@@ -1,0 +1,17 @@
+node_modules/
+/backend/data/
+/backend/.mvn/
+/backend/.settings/
+/backend/bin/
+/backend/target/
+/backend/.project
+/backend/.classpath
+
+
+/frontend/build/
+/frontend/dist/
+
+
+*.sqlite
+config.0.js
+setup.sh

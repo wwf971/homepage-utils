@@ -1,0 +1,456 @@
+.app {
+  width: 100%;
+  height: 100%;
+}
+
+/* Reset default styles for h3/h4 */
+h3, h4 {
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+/* Database Configuration Styles */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 16px;
+  color: #666;
+}
+
+.config-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.config-section {
+  padding: 8px;
+  height: 100%;
+  overflow: auto;
+}
+
+.config-section > h3 {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+}
+
+.empty-message {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  border: 1px dashed #ddd;
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.connection-test {
+  padding: 20px;
+}
+
+.connection-test > h3 {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+}
+
+.test-config-section > h4 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+}
+
+.connection-test p {
+  color: #666;
+  font-size: 14px;
+}
+
+.test-config-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.test-action-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.test-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.test-button {
+  padding: 8px 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.test-button:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.test-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.abort-button {
+  padding: 8px 16px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.abort-button:hover {
+  background: #c82333;
+}
+
+.test-result {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.test-result.success {
+  background: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+.test-result.error {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.test-result strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.test-result .result-message {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.config-hint {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #e7f3ff;
+  border-left: 3px solid #2196F3;
+  color: #0d47a1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.editable-value-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+  flex: 1;
+  min-width: 0;
+}
+
+.editable-value-text {
+  word-break: break-word;
+  display: inline-block;
+  outline: none;
+  min-height: 1em;
+}
+
+.editable-value-text.not-set {
+  color: #999;
+  font-style: italic;
+}
+
+.editable-value-text.editing {
+  background: #ffffff;
+  border: 1px solid #2196F3;
+  border-radius: 1px;
+  margin: -1px;
+  padding: 0px;
+  min-width: 100px;
+}
+
+.editable-value-text.editing:focus {
+  outline: none;
+}
+
+.editable-value-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.edit-icon-button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 2px;
+  transition: background 0.2s;
+  line-height: 1;
+}
+
+.edit-icon-button:hover {
+  background: #f0f0f0;
+}
+
+.edit-icon-button svg {
+  display: block;
+}
+
+.editable-value-boolean {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.radio-label.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.radio-label input[type="radio"] {
+  cursor: pointer;
+  margin: 0;
+}
+
+.radio-label input[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+.radio-label span {
+  user-select: none;
+}
+
+/* Remote Config Settings */
+.remote-config-settings {
+  margin-top: 16px;
+}
+
+.remote-config-settings > h4 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.remote-config-data {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.remote-config-header {
+  margin-bottom: 4px;
+}
+
+.remote-config-header > h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #333;
+}
+
+.refresh-button:hover:not(:disabled) {
+  color: #2196F3;
+}
+
+.refresh-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Remote Config Status Table */
+.remote-config-status {
+  margin-bottom: 20px;
+  padding: 6px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.remote-config-status-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.remote-config-status-header > h4 {
+  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-timestamp {
+  font-size: 0.85em;
+  color: #666;
+  margin-left: auto;
+}
+
+.status-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.status-table td {
+  padding: 4px;
+  border: none;
+}
+
+.status-label {
+  font-weight: 500;
+  color: #555;
+  width: 120px;
+  font-size: 0.95em;
+}
+
+.status-value {
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-unknown {
+  color: #999;
+  font-style: italic;
+}
+
+.status-success {
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+.status-error {
+  color: #f44336;
+}
+
+.status-na {
+  color: #999;
+  font-style: italic;
+}
+
+.create-button {
+  padding: 4px 4px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-button:hover {
+  background-color: #1976D2;
+}
+
+.create-button:active {
+  background-color: #0D47A1;
+}
+
+.editable-value-text.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Selectable Value Dropdown Styles */
+.selectable-value-dropdown {
+  display: inline-block;
+  outline: none;
+  background: #ffffff;
+  border: 1px solid #2196F3;
+  border-radius: 1px;
+  padding: 0px 4px;
+  margin: -1px 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  line-height: inherit;
+  min-width: 150px;
+  cursor: pointer;
+  height: auto;
+  vertical-align: baseline;
+  box-sizing: border-box;
+}
+
+.selectable-value-dropdown:focus {
+  outline: 1px solid #2196F3;
+  outline-offset: 0;
+}
+
+.selectable-value-dropdown:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.selectable-value-text {
+  display: inline-block;
+  vertical-align: baseline;
+  line-height: inherit;
+}
+
+
