@@ -68,7 +68,7 @@ export async function fetchFileAccessPoints() {
       metadata: { database, collection, ids }
     };
   } catch (error) {
-    console.error('Failed to fetch file access points:', error);
+    console.log('[ERROR] Failed to fetch file access points:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -112,7 +112,7 @@ export async function fetchComputedBaseDir(accessPointId) {
     
     return { code: 0, data: result.data, message: result.message };
   } catch (error) {
-    console.error('Failed to fetch computed base directory:', error);
+    console.log('[ERROR] Failed to fetch computed base directory:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -195,7 +195,7 @@ export async function fetchFileList(accessPointId, path = '', page = 0, pageSize
       return { code: -1, message: result.message || 'Failed to load files' };
     }
   } catch (error) {
-    console.error('Failed to fetch file list:', error);
+    console.log('[ERROR] Failed to fetch file list:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -248,7 +248,7 @@ export async function fetchFileData(accessPointId, fileId, setCache) {
     
     return { code: 0, data: { metadata, fileBytes } };
   } catch (error) {
-    console.error('Failed to fetch file data:', error);
+    console.log('[ERROR] Failed to fetch file data:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -289,7 +289,7 @@ export async function renameFile(accessPointId, fileId, newName, setCache) {
       return { code: -1, message: result.message || 'Failed to rename file' };
     }
   } catch (error) {
-    console.error('Failed to rename file:', error);
+    console.log('[ERROR] Failed to rename file:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }

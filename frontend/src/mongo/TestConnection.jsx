@@ -1,10 +1,31 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
-import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
+import { KeyValues, SpinningCircle, TabsOnTop } from '@wwf971/react-comp-misc';
 import { mongoComputedConfigAtom, mongoSelectedDatabaseAtom, mongoSelectedCollectionAtom, getBackendServerUrl } from '../remote/dataStore';
 import ListDatabases from './ListDatabases';
 import ListCollections from './ListCollections';
+import SearchDoc from './SearchDoc';
 import ListDocs from './ListDocs';
+
+/**
+ * Wrapper component for ListDocs that handles tab focus logic and connection test requirements
+ */
+const ListDocsTabWrapper = ({ hasSuccessfulTest, tabsState, tabKey }) => {
+  const [hasBeenFocused, setHasBeenFocused] = useState(false);
+  
+  const isTabFocused = tabKey && tabsState ? tabsState[tabKey]?.isFocused : false;
+  
+  useEffect(() => {
+    if (isTabFocused && !hasBeenFocused) {
+      setHasBeenFocused(true);
+    }
+  }, [isTabFocused, hasBeenFocused]);
+  
+  // Only allow loading if both conditions are met: connection test passed AND tab has been focused
+  const shouldLoad = hasSuccessfulTest && hasBeenFocused;
+  
+  return <ListDocs shouldLoad={shouldLoad} />;
+};
 
 const ConnectionTest = ({ showDatabaseList = false }) => {
   const selectedDatabase = useAtomValue(mongoSelectedDatabaseAtom);
@@ -145,9 +166,24 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
           )}
           
           {selectedCollection && (
-            <ListDocs
-              hasSuccessfulTest={result?.success || false}
-            />
+            <div style={{ marginTop: '8px' }}>
+              <TabsOnTop defaultTab="Search Docs" autoSwitchToNewTab={false}>
+                <TabsOnTop.Tab label="Search Docs">
+                  <SearchDoc
+                    selectedDatabase={selectedDatabase}
+                    selectedCollection={selectedCollection}
+                  />
+                </TabsOnTop.Tab>
+                
+                
+                <TabsOnTop.Tab label="All Docs">
+                  <ListDocsTabWrapper
+                    hasSuccessfulTest={result?.success || false}
+                  />
+                </TabsOnTop.Tab>
+                
+              </TabsOnTop>
+            </div>
           )}
         </>
       )}

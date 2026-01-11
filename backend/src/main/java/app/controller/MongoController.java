@@ -126,8 +126,37 @@ public class MongoController {
         }
     }
 
+    // Query single document (first match) with optional path extraction
+    @GetMapping({"db/{databaseName}/coll/{collectionName}/doc/", "db/{databaseName}/coll/{collectionName}/doc"})
+    public ApiResponse<Object> querySingleDocument(
+            @PathVariable String databaseName,
+            @PathVariable String collectionName,
+            @RequestParam java.util.Map<String, String> allParams) {
+        try {
+            java.util.Map<String, String> params = new java.util.HashMap<>(allParams);
+            String extractPath = params.remove("path");
+            String sortBy = params.remove("sort");
+            String sortOrder = params.remove("sortOrder");
+            
+            if (params.isEmpty()) {
+                return new ApiResponse<>(-1, null, "At least one filter parameter is required for document query");
+            }
+            
+            // Query for first matching document
+            // Example url: /mongo/db/test/coll/test/doc?key1=value1&path=.&sort=field1&sortOrder=asc
+            Object result = mongoService.queryDocument(
+                databaseName, collectionName, params, extractPath, sortBy, sortOrder);
+            
+            return new ApiResponse<>(0, result, "Document query executed successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to query document: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to query document: " + e.getMessage());
+        }
+    }
+
+    // Query all matching documents or list with pagination
     @GetMapping({"db/{databaseName}/coll/{collectionName}/docs/", "db/{databaseName}/coll/{collectionName}/docs"})
-    public ApiResponse<Object> listOrQueryDocuments(
+    public ApiResponse<Object> listOrQueryAllDocuments(
             @PathVariable String databaseName,
             @PathVariable String collectionName,
             @RequestParam(defaultValue = "1") int page,
@@ -137,7 +166,9 @@ public class MongoController {
             java.util.Map<String, String> params = new java.util.HashMap<>(allParams);
             params.remove("page");
             params.remove("pageSize");
-            String extractPath = params.remove("path");
+            params.remove("path");  // path is for single doc query with extraction, not for filtering
+            String sortBy = params.remove("sort");
+            String sortOrder = params.remove("sortOrder");
             
             if (params.isEmpty()) {
                 // No filter params: list all documents with pagination
@@ -145,10 +176,10 @@ public class MongoController {
                     databaseName, collectionName, page, pageSize);
                 return new ApiResponse<>(0, result, "Documents retrieved successfully");
             } else {
-                // Has filter params: query for specific document(s)
-                // All remaining params are treated as filter key-value pairs
-                Object result = mongoService.queryDocument(
-                    databaseName, collectionName, params, extractPath);
+                // Has filter params: query all matching documents with pagination
+                // Example url: /mongo/db/test/coll/test/docs?key1=value1&sort=field1,field2&sortOrder=asc&page=1&pageSize=20
+                java.util.Map<String, Object> result = mongoService.queryAllDocuments(
+                    databaseName, collectionName, params, sortBy, sortOrder, page, pageSize);
                 
                 return new ApiResponse<>(0, result, "Query executed successfully");
             }

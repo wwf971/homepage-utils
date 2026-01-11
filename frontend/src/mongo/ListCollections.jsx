@@ -155,7 +155,7 @@ const ListCollections = ({ hasSuccessfulTest }) => {
 
       {Array.isArray(collections) && !loading && (
         <div style={{ marginTop: '12px' }}>
-          <h4 style={{ marginBottom: '8px' }}>
+          <h4 style={{ marginBottom: '6px' }}>
             Found {collections.length} collection{collections.length !== 1 ? 's' : ''}:
           </h4>
           {collections.length === 0 ? (

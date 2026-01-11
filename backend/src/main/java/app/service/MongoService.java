@@ -680,16 +680,19 @@ public class MongoService {
      * 
      * @param databaseName Database name
      * @param collectionName Collection name
-     * @param filterKey The field name to filter on
-     * @param filterValue The value to match
+     * @param filterParams Map of filter key-value pairs
      * @param extractPath Path to extract from the document (dot notation, e.g., "aa.0.1" for doc.aa[0][1])
+     * @param sortBy Comma-separated list of fields to sort by (e.g., "field1,field2")
+     * @param sortOrder Sort order: "asc" for ascending, "desc" for descending (default: "asc")
      * @return The extracted value from the first matching document
      */
     public Object queryDocument(
             String databaseName,
             String collectionName,
             java.util.Map<String, String> filterParams,
-            String extractPath) {
+            String extractPath,
+            String sortBy,
+            String sortOrder) {
         
         if (mongoClient == null) {
             if (currentConfig != null) {
@@ -714,10 +717,28 @@ public class MongoService {
             filter.put(key, value);
         }
 
-        System.out.println("MongoDB query filter: " + filter.toJson());
+        // Build sort document if sortBy is provided
+        org.bson.Document sortDoc = null;
+        if (sortBy != null && !sortBy.trim().isEmpty()) {
+            sortDoc = new org.bson.Document();
+            String[] sortFields = sortBy.split(",");
+            int sortDirection = (sortOrder != null && sortOrder.equalsIgnoreCase("desc")) ? -1 : 1;
+            
+            for (String field : sortFields) {
+                field = field.trim();
+                if (!field.isEmpty()) {
+                    sortDoc.put(field, sortDirection);
+                }
+            }
+            System.out.println("MongoDB sort: " + sortDoc.toJson());
+        }
 
-        // Find first matching document
-        org.bson.Document doc = collection.find(filter).first();
+        // Find first matching document with optional sorting
+        com.mongodb.client.FindIterable<org.bson.Document> findIterable = collection.find(filter);
+        if (sortDoc != null) {
+            findIterable = findIterable.sort(sortDoc);
+        }
+        org.bson.Document doc = findIterable.first();
         
         if (doc == null) {
             throw new RuntimeException("No document found matching filter " + filter.toJson() + " (collection: " + collectionName + ", database: " + databaseName + ")");
@@ -775,6 +796,94 @@ public class MongoService {
         }
 
         return current;
+    }
+
+    /**
+     * Query all documents matching filters with pagination
+     * Returns matching documents with pagination info
+     * 
+     * @param databaseName Database name
+     * @param collectionName Collection name
+     * @param filterParams Map of filter key-value pairs
+     * @param sortBy Comma-separated list of fields to sort by (e.g., "field1,field2")
+     * @param sortOrder Sort order: "asc" for ascending, "desc" for descending (default: "asc")
+     * @param page Page number (1-based)
+     * @param pageSize Number of documents per page
+     * @return Map containing documents, total count, page info
+     */
+    public java.util.Map<String, Object> queryAllDocuments(
+            String databaseName,
+            String collectionName,
+            java.util.Map<String, String> filterParams,
+            String sortBy,
+            String sortOrder,
+            int page,
+            int pageSize) {
+        
+        if (mongoClient == null) {
+            if (currentConfig != null) {
+                initializeConnection(currentConfig);
+            } else {
+                throw new RuntimeException("MongoDB client is not initialized");
+            }
+        }
+
+        com.mongodb.client.MongoDatabase database = mongoClient.getDatabase(databaseName);
+        com.mongodb.client.MongoCollection<org.bson.Document> collection = database.getCollection(collectionName);
+
+        // Create filter from multiple key-value pairs
+        org.bson.Document filter = new org.bson.Document();
+        for (java.util.Map.Entry<String, String> entry : filterParams.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            filter.put(key, value);
+        }
+
+        // Build sort document if sortBy is provided
+        org.bson.Document sortDoc = null;
+        if (sortBy != null && !sortBy.trim().isEmpty()) {
+            sortDoc = new org.bson.Document();
+            String[] sortFields = sortBy.split(",");
+            int sortDirection = (sortOrder != null && sortOrder.equalsIgnoreCase("desc")) ? -1 : 1;
+            
+            for (String field : sortFields) {
+                field = field.trim();
+                if (!field.isEmpty()) {
+                    sortDoc.put(field, sortDirection);
+                }
+            }
+        }
+
+        // Get total count of matching documents
+        long totalCount = collection.countDocuments(filter);
+
+        // Calculate pagination
+        int skip = (page - 1) * pageSize;
+
+        // Find matching documents with optional sorting and pagination
+        com.mongodb.client.FindIterable<org.bson.Document> findIterable = collection.find(filter);
+        if (sortDoc != null) {
+            findIterable = findIterable.sort(sortDoc);
+        }
+        findIterable = findIterable.skip(skip).limit(pageSize);
+
+        // Convert to list and process ObjectIds
+        java.util.List<org.bson.Document> results = new java.util.ArrayList<>();
+        for (org.bson.Document doc : findIterable) {
+            if (doc.get("_id") instanceof org.bson.types.ObjectId) {
+                doc.put("_id", doc.getObjectId("_id").toHexString());
+            }
+            results.add(doc);
+        }
+        
+        // Build result map with pagination info
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("documents", results);
+        result.put("total", totalCount);
+        result.put("page", page);
+        result.put("pageSize", pageSize);
+        
+        return result;
     }
 
     /**

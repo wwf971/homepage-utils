@@ -11,15 +11,15 @@ import {
   fetchMongoDocuments,
   createMongoDocument
 } from '../remote/dataStore';
-import DocCard from './DocCard';
+import DocList from './DocList';
 import './mongo.css';
 
 /**
  * ListDocs - Component for listing documents in a selected MongoDB collection with pagination
  * 
- * @param {boolean} hasSuccessfulTest - Whether a successful test result exists
+ * @param {boolean} shouldLoad - Whether to load documents (controlled by parent)
  */
-const ListDocs = ({ hasSuccessfulTest }) => {
+const ListDocs = ({ shouldLoad = true }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -36,7 +36,7 @@ const ListDocs = ({ hasSuccessfulTest }) => {
   const setTotal = useSetAtom(mongoDocsTotalAtom);
 
   useEffect(() => {
-    if (selectedDatabase && selectedCollection && hasSuccessfulTest) {
+    if (selectedDatabase && selectedCollection && shouldLoad) {
       setDocs([]);
       setPage(1);
       loadDocuments(1);
@@ -46,7 +46,7 @@ const ListDocs = ({ hasSuccessfulTest }) => {
       setPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDatabase, selectedCollection, hasSuccessfulTest]);
+  }, [selectedDatabase, selectedCollection, shouldLoad]);
 
   const loadDocuments = async (targetPage) => {
     if (!selectedDatabase || !selectedCollection) return;
@@ -68,7 +68,7 @@ const ListDocs = ({ hasSuccessfulTest }) => {
   };
 
   const handleRefresh = () => {
-    if (selectedDatabase && selectedCollection && hasSuccessfulTest) {
+    if (selectedDatabase && selectedCollection && shouldLoad) {
       setDocs([]);
       loadDocuments(page);
     }
@@ -130,7 +130,7 @@ const ListDocs = ({ hasSuccessfulTest }) => {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="mongo-docs-section" style={{ marginTop: '24px' }}>
+    <div className="mongo-all-docs-section" style={{ marginTop: '8px' }}>
       <div className="mongo-section-header">
         <h3>Documents in "{selectedCollection}"</h3>
         <div className="mongo-section-buttons">
@@ -154,72 +154,31 @@ const ListDocs = ({ hasSuccessfulTest }) => {
       </div>
       
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
           <SpinningCircle width={16} height={16} color="#666" />
           <span>Loading documents...</span>
         </div>
       )}
 
       {error && (
-        <div className="test-result error" style={{ marginTop: '12px' }}>
+        <div className="test-result error" style={{ marginTop: '6px' }}>
           <strong>✗ Error</strong>
           <div className="result-message">{error}</div>
         </div>
       )}
 
       {Array.isArray(docs) && !loading && (
-        <div style={{ marginTop: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <h4>
-              Showing {docs.length} of {total} document{total !== 1 ? 's' : ''}
-            </h4>
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <button
-                  onClick={() => handlePageChange(page - 1)}
-                  disabled={page <= 1}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '14px',
-                    cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                    opacity: page <= 1 ? 0.5 : 1
-                  }}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: '14px' }}>
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  onClick={() => handlePageChange(page + 1)}
-                  disabled={page >= totalPages}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '14px',
-                    cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                    opacity: page >= totalPages ? 0.5 : 1
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-          
-          {docs.length === 0 ? (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>No documents in this collection</p>
-          ) : (
-            <div className="docs-container">
-              {docs.map((doc, index) => (
-                <DocCard 
-                  key={doc._id || index} 
-                  doc={doc} 
-                  index={(page - 1) * pageSize + index}
-                  onDelete={handleDeleteDocument}
-                />
-              ))}
-            </div>
-          )}
+        <div style={{ marginTop: '6px' }}>
+          <DocList
+            docs={docs}
+            paginated={true}
+            page={page}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onDelete={handleDeleteDocument}
+            emptyMessage="No documents in this collection"
+          />
         </div>
       )}
     </div>
