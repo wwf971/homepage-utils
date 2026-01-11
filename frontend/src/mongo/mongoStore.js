@@ -308,6 +308,124 @@ export async function removeArrayItem(database, collection, docId, path) {
 }
 
 /**
+ * List all databases in the MongoDB instance
+ * Cached to avoid repeated calls
+ * 
+ * @returns {Promise<{code: number, data?: string[], message?: string}>}
+ */
+let databaseListCache = null;
+let databaseListTimestamp = 0;
+const CACHE_DURATION = 30000; // 30 seconds
+
+export async function listDatabases() {
+  try {
+    // Return cached result if fresh
+    const now = Date.now();
+    if (databaseListCache && (now - databaseListTimestamp) < CACHE_DURATION) {
+      return { code: 0, data: databaseListCache };
+    }
+
+    const backendUrl = getBackendServerUrl();
+    const response = await fetch(`${backendUrl}/mongo/db/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      databaseListCache = result.data;
+      databaseListTimestamp = now;
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'Failed to list databases' };
+  } catch (error) {
+    console.error('Failed to list databases:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
+ * List all collections in a database
+ * Cached per database to avoid repeated calls
+ * 
+ * @param {string} databaseName - Database name
+ * @returns {Promise<{code: number, data?: string[], message?: string}>}
+ */
+const collectionListCache = new Map();
+const collectionListTimestamps = new Map();
+
+export async function listCollections(databaseName) {
+  try {
+    if (!databaseName) {
+      return { code: -1, message: 'Database name is required' };
+    }
+
+    // Return cached result if fresh
+    const now = Date.now();
+    const cached = collectionListCache.get(databaseName);
+    const timestamp = collectionListTimestamps.get(databaseName) || 0;
+    
+    if (cached && (now - timestamp) < CACHE_DURATION) {
+      return { code: 0, data: cached };
+    }
+
+    const backendUrl = getBackendServerUrl();
+    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      collectionListCache.set(databaseName, result.data);
+      collectionListTimestamps.set(databaseName, now);
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'Failed to list collections' };
+  } catch (error) {
+    console.error('Failed to list collections:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
+ * Search databases by query string (client-side filtering)
+ * 
+ * @param {string} query - Search query
+ * @returns {Promise<{code: number, data?: string[], message?: string}>}
+ */
+export async function searchDatabases(query) {
+  const result = await listDatabases();
+  if (result.code !== 0) {
+    return result;
+  }
+  
+  if (!query || query.trim() === '') {
+    return { code: 0, data: result.data };
+  }
+  
+  const lowerQuery = query.toLowerCase();
+  const filtered = result.data.filter(db => db.toLowerCase().includes(lowerQuery));
+  return { code: 0, data: filtered };
+}
+
+/**
+ * Search collections by query string (client-side filtering)
+ * 
+ * @param {string} databaseName - Database name
+ * @param {string} query - Search query
+ * @returns {Promise<{code: number, data?: string[], message?: string}>}
+ */
+export async function searchCollections(databaseName, query) {
+  const result = await listCollections(databaseName);
+  if (result.code !== 0) {
+    return result;
+  }
+  
+  if (!query || query.trim() === '') {
+    return { code: 0, data: result.data };
+  }
+  
+  const lowerQuery = query.toLowerCase();
+  const filtered = result.data.filter(coll => coll.toLowerCase().includes(lowerQuery));
+  return { code: 0, data: filtered };
+}
+
+/**
  * Custom hook for editing MongoDB documents
  * 
  * @param {string} database - Database name

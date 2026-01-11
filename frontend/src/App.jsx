@@ -56,6 +56,12 @@ function App() {
                   <MongoTestConnection showDatabaseList={true} />
                 </Panel>
               </SubTab>
+              
+              <SubTab label="ES Index">
+                <Panel>
+                  <MongoTestConnection showDatabaseList={false} />
+                </Panel>
+              </SubTab>
             </SubTab>
           </Tab>
           

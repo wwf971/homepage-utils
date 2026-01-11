@@ -343,6 +343,10 @@ public class MongoService {
         }
     }
 
+    public MongoConfig getCurrentConfig() {
+        return this.currentConfig;
+    }
+
     public MongoConnectionStatus getStatus() {
         MongoConnectionStatus status = new MongoConnectionStatus();
         status.setCurrentUri(currentConfig != null ? currentConfig.getUri() : null);

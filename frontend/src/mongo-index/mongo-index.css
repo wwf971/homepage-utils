@@ -1,0 +1,331 @@
+.mongo-index-create-form {
+  margin-bottom: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  overflow: visible;
+}
+
+.mongo-index-create-form h4 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mongo-index-form-group {
+  margin-top: 6px;
+  overflow: visible;
+  position: relative;
+}
+
+/* Ensure dropdown can overflow - override KeyValuesComp default overflow:hidden */
+.mongo-index-create-form .keyvalues-container {
+  overflow: visible !important;
+}
+
+.mongo-index-create-form .keyvalues-list {
+  overflow: visible !important;
+}
+
+.mongo-index-create-form .keyvalues-row {
+  overflow: visible !important;
+}
+
+.mongo-index-create-form .keyvalues-cell {
+  overflow: visible !important;
+}
+
+.mongo-index-form-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mongo-index-form-input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.mongo-index-form-hint {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.mongo-index-add-collection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #666;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 12px;
+  width: fit-content;
+}
+
+.mongo-index-form-error {
+  margin-top: 6px;
+  padding: 6px;
+  background-color: #ffebee;
+  color: #d32f2f;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.mongo-index-form-buttons {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+}
+
+.mongo-index-btn-create {
+  padding: 6px 16px;
+  font-size: 13px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mongo-index-btn-create:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.mongo-index-btn-cancel {
+  padding: 6px 16px;
+  font-size: 13px;
+  background-color: #666;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mongo-index-btn-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Collections list layout */
+.mongo-index-collections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mongo-index-collection-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.mongo-index-collection-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.mongo-index-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 80px;
+  color: #555;
+  flex-shrink: 0;
+}
+
+/* Validation status messages */
+.mongo-index-validation-message {
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mongo-index-validation-valid {
+  color: #4caf50;
+}
+
+.mongo-index-validation-invalid {
+  color: #ff9800;
+}
+
+.mongo-index-validation-disabled {
+  color: #999;
+}
+
+/* MongoIndexCard styles */
+.mongo-index-card {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.mongo-index-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mongo-index-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mongo-index-card-button {
+  padding: 4px 8px;
+  font-size: 12px;
+  background-color: transparent;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mongo-index-card-button:hover {
+  background-color: #f0f0f0;
+}
+
+.mongo-index-card-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.mongo-index-card-button-delete {
+  color: #d32f2f;
+  border-color: #d32f2f;
+}
+
+.mongo-index-card-button-delete:hover {
+  background-color: #ffebee;
+}
+
+.mongo-index-card-button-save {
+  background-color: #2196F3;
+  color: white;
+  border-color: #2196F3;
+}
+
+.mongo-index-card-button-save:hover {
+  background-color: #1976D2;
+}
+
+.mongo-index-card-button-cancel {
+  background-color: #666;
+  color: white;
+  border-color: #666;
+}
+
+.mongo-index-card-button-cancel:hover {
+  background-color: #555;
+}
+
+.mongo-index-card-field {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.mongo-index-card-section-title {
+  font-size: 12px;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.mongo-index-card-empty {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  padding: 8px;
+}
+
+.mongo-index-card-error {
+  margin-top: 8px;
+  padding: 6px;
+  background-color: #ffebee;
+  color: #d32f2f;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+/* Delete confirmation dialog */
+.mongo-index-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.mongo-index-confirm-dialog {
+  background-color: white;
+  padding: 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  min-width: 300px;
+}
+
+.mongo-index-confirm-message {
+  font-size: 13px;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.mongo-index-confirm-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.mongo-index-confirm-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mongo-index-confirm-button-delete {
+  background-color: #d32f2f;
+  color: white;
+}
+
+.mongo-index-confirm-button-delete:hover {
+  background-color: #b71c1c;
+}
+
+.mongo-index-confirm-button-cancel {
+  background-color: #666;
+  color: white;
+}
+
+.mongo-index-confirm-button-cancel:hover {
+  background-color: #555;
+}
+

@@ -6,6 +6,7 @@ import ListDatabases from './ListDatabases';
 import ListCollections from './ListCollections';
 import SearchDoc from './SearchDoc';
 import ListDocs from './ListDocs';
+import MongoIndex from '../mongo-index/MongoIndex';
 
 /**
  * Wrapper component for ListDocs that handles tab focus logic and connection test requirements
@@ -151,7 +152,7 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
         )}
       </div>
       
-      {showDatabaseList && (
+      {showDatabaseList ? (
         <>
           <ListDatabases 
             onTestConnection={handleTest}
@@ -175,17 +176,17 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
                   />
                 </TabsOnTop.Tab>
                 
-                
                 <TabsOnTop.Tab label="All Docs">
                   <ListDocsTabWrapper
                     hasSuccessfulTest={result?.success || false}
                   />
                 </TabsOnTop.Tab>
-                
               </TabsOnTop>
             </div>
           )}
         </>
+      ) : (
+        <MongoIndex />
       )}
     </div>
   );
