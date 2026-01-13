@@ -178,8 +178,8 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
                 
                 <TabsOnTop.Tab label="All Docs">
                   <ListDocsTabWrapper
-                    hasSuccessfulTest={result?.success || false}
-                  />
+              hasSuccessfulTest={result?.success || false}
+            />
                 </TabsOnTop.Tab>
               </TabsOnTop>
             </div>

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon } from '@wwf971/react-comp-misc';
-import { getBackendServerUrl } from '../remote/dataStore';
+import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonComp } from '@wwf971/react-comp-misc';
+import { getBackendServerUrl, useMongoDocEditor } from '../remote/dataStore';
+import MongoIndexDashboard from './MongoIndexDashboard';
+import MongoIndexSearch from './MongoIndexSearch';
 import '../mongo/mongo.css';
 import './mongo-index.css';
 
@@ -65,12 +67,45 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType }) 
 /**
  * MongoIndexCard - Display and edit a MongoDB-ES index
  */
-const MongoIndexCard = ({ index, onUpdate, onDelete }) => {
+const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedIndex, setEditedIndex] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRawJson, setShowRawJson] = useState(false);
+  const [showJsonEditor, setShowJsonEditor] = useState(false);
+  const [isRebuilding, setIsRebuilding] = useState(false);
+  
+  // Use doc editor for this specific index document
+  // Note: mongo-index collection is stored in the main configured database (usually 'main'), not 'metadata'
+  const { handleChange: handleDocChange, isUpdating } = useMongoDocEditor(
+    'main',
+    'mongo-index',
+    index
+  );
+  
+  // Wrap handleDocChange to notify parent of updates
+  const handleDocChangeWithNotify = async (path, changeData) => {
+    const result = await handleDocChange(path, changeData);
+    
+    if (result.code === 0 && onJsonEdit) {
+      // Fetch the updated document from backend to get the latest state
+      try {
+        const backendUrl = getBackendServerUrl();
+        const response = await fetch(`${backendUrl}/mongo/index/${encodeURIComponent(index.name)}`);
+        const fetchResult = await response.json();
+        
+        if (fetchResult.code === 0) {
+          onJsonEdit(fetchResult.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch updated index:', err);
+      }
+    }
+    
+    return result;
+  };
   
   const handleEditClick = () => {
     setEditedIndex({
@@ -221,13 +256,23 @@ const MongoIndexCard = ({ index, onUpdate, onDelete }) => {
             <>
               <button
                 onClick={handleEditClick}
+                disabled={isRebuilding}
                 className="mongo-index-card-button"
                 title="Edit index"
               >
                 <EditIcon width={13} height={13} />
               </button>
               <button
+                onClick={() => setShowRawJson(true)}
+                disabled={isRebuilding}
+                className="mongo-index-card-button"
+                title="View raw JSON metadata"
+              >
+                JSON
+              </button>
+              <button
                 onClick={handleDeleteClick}
+                disabled={isRebuilding}
                 className="mongo-index-card-button mongo-index-card-button-delete"
                 title="Delete index"
               >
@@ -238,14 +283,14 @@ const MongoIndexCard = ({ index, onUpdate, onDelete }) => {
             <>
               <button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isRebuilding}
                 className="mongo-index-card-button mongo-index-card-button-save"
               >
                 {isSaving ? <SpinningCircle width={12} height={12} color="white" /> : 'Save'}
               </button>
               <button
                 onClick={handleCancel}
-                disabled={isSaving}
+                disabled={isSaving || isRebuilding}
                 className="mongo-index-card-button mongo-index-card-button-cancel"
               >
                 Cancel
@@ -287,6 +332,96 @@ const MongoIndexCard = ({ index, onUpdate, onDelete }) => {
       {error && (
         <div className="mongo-index-card-error">
           {error}
+        </div>
+      )}
+
+      {/* Dashboard - only shown when not editing */}
+      {!isEditing && (
+        <MongoIndexDashboard index={index} onRebuildingChange={setIsRebuilding} />
+      )}
+
+      {/* Search Panel - only shown when not editing */}
+      {!isEditing && (
+        <MongoIndexSearch indexName={index.name} />
+      )}
+      
+      {showRawJson && (
+        <div className="doc-editor-overlay" onClick={() => setShowRawJson(false)}>
+          <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-editor-header">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: 0 }}>MongoDB Index Metadata</h3>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                    Index: {index.name}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    className="doc-card-edit-button"
+                    onClick={() => setShowJsonEditor(true)}
+                    title="Edit in structured format"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="doc-editor-close-button"
+                    onClick={() => setShowRawJson(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="doc-editor-content">
+              <pre className="doc-card-content">
+                {JSON.stringify(index, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {showJsonEditor && (
+        <div className="doc-editor-overlay" onClick={() => setShowJsonEditor(false)}>
+          <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-editor-header">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: 0 }}>Edit MongoDB Index Metadata</h3>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                    Index: {index.name}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {isUpdating && (
+                    <span style={{ 
+                      fontSize: '13px',
+                      color: '#856404',
+                      fontWeight: '500'
+                    }}>
+                      Updating...
+                    </span>
+                  )}
+                  <button
+                    className="doc-editor-close-button"
+                    onClick={() => setShowJsonEditor(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="doc-editor-content">
+              <JsonComp 
+                data={index} 
+                isEditable={true}
+                isKeyEditable={true}
+                isValueEditable={true}
+                onChange={handleDocChangeWithNotify}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
