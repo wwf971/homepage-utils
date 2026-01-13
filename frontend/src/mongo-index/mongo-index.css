@@ -143,11 +143,12 @@
 }
 
 .mongo-index-field-label {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 600;
-  min-width: 80px;
   color: #555;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 3px 0;
 }
 
 /* Validation status messages */
@@ -329,3 +330,359 @@
   background-color: #555;
 }
 
+/* MongoIndexDashboard styles */
+.mongo-index-dashboard {
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+}
+
+.mongo-index-dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mongo-index-dashboard-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.mongo-index-dashboard-button {
+  padding: 4px 8px;
+  font-size: 12px;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mongo-index-dashboard-button:hover {
+  background-color: #f0f0f0;
+}
+
+.mongo-index-dashboard-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.mongo-index-dashboard-button-rebuild {
+  background-color: #4caf50;
+  color: white;
+  border-color: #4caf50;
+}
+
+.mongo-index-dashboard-button-rebuild:hover {
+  background-color: #45a049;
+}
+
+.mongo-index-dashboard-button-rebuild-test {
+  background-color: #ff9800;
+  color: white;
+  border-color: #ff9800;
+}
+
+.mongo-index-dashboard-button-rebuild-test:hover {
+  background-color: #f57c00;
+}
+
+.mongo-index-dashboard-error {
+  padding: 6px;
+  background-color: #ffebee;
+  color: #d32f2f;
+  font-size: 11px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+}
+
+.mongo-index-dashboard-rebuild-result {
+  padding: 6px;
+  background-color: #e8f5e9;
+  font-size: 11px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+}
+
+.mongo-index-dashboard-rebuild-errors {
+  color: #d32f2f;
+  margin-top: 4px;
+}
+
+.mongo-index-dashboard-rebuild-errors-list {
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 11px;
+  color: #d32f2f;
+}
+
+.mongo-index-dashboard-rebuild-error-item {
+  padding: 2px 4px;
+  margin-bottom: 2px;
+  background-color: #ffebee;
+  border-left: 2px solid #d32f2f;
+  word-break: break-word;
+}
+
+.mongo-index-dashboard-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+  padding: 8px;
+}
+
+.mongo-index-dashboard-stats {
+  font-size: 12px;
+}
+
+.mongo-index-dashboard-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.mongo-index-dashboard-stat-row:last-child {
+  border-bottom: none;
+}
+
+.mongo-index-dashboard-stat-label {
+  font-weight: 600;
+  color: #666;
+}
+
+.mongo-index-dashboard-stat-value {
+  color: #333;
+}
+
+.mongo-index-dashboard-collections {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.mongo-index-dashboard-collections-title {
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.mongo-index-dashboard-collections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mongo-index-dashboard-collection-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background-color: white;
+  border-radius: 3px;
+}
+
+.mongo-index-dashboard-collection-name {
+  color: #555;
+  font-size: 11px;
+}
+
+.mongo-index-dashboard-collection-count {
+  color: #2196F3;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ============================================
+   MongoDB Index Search Styles
+   ============================================ */
+
+.mongo-index-search-section {
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background-color: #fafafa;
+}
+
+.mongo-index-search-header h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.mongo-index-search-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.mongo-index-search-input {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 2px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.mongo-index-search-input:focus {
+  outline: none;
+  border-color: #2196F3;
+}
+
+.mongo-index-button-primary {
+  padding: 4px 12px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 2px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mongo-index-button-primary:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.mongo-index-button-primary:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.mongo-index-search-options {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.mongo-index-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #555;
+  cursor: pointer;
+}
+
+.mongo-index-checkbox-label input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.mongo-index-error-message {
+  padding: 6px 8px;
+  background-color: #ffebee;
+  border: 1px solid #ef5350;
+  border-radius: 2px;
+  color: #c62828;
+  font-size: 11px;
+}
+
+.mongo-index-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mongo-index-search-result-card {
+  padding: 8px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 2px;
+}
+
+.mongo-index-search-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #eee;
+  font-size: 11px;
+}
+
+.mongo-index-match-count {
+  padding: 2px 6px;
+  background-color: #e3f2fd;
+  color: #1976D2;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mongo-index-search-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mongo-index-search-match {
+  padding: 6px;
+  background-color: #fafafa;
+  border-left: 2px solid #2196F3;
+  font-size: 11px;
+}
+
+.mongo-index-match-location {
+  margin-bottom: 4px;
+  color: #666;
+  font-size: 10px;
+}
+
+.mongo-index-match-fields-container {
+  display: flex;
+  gap: 6px;
+}
+
+.mongo-index-match-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mongo-index-match-labels .mongo-index-field-label {
+  height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+.mongo-index-match-values {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.mongo-index-field-value {
+  height: 22px;
+  padding: 2px 4px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  font-size: 10px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.mongo-index-search-highlight {
+  background-color: #ffeb3b;
+  font-weight: 600;
+  padding: 0 2px;
+  border-radius: 1px;
+}

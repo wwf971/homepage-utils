@@ -2,6 +2,7 @@ package app.controller;
 
 import app.pojo.ApiResponse;
 import app.service.MongoIndexService;
+import app.service.ElasticSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,9 @@ public class MongoIndexController {
 
     @Autowired
     private MongoIndexService mongoIndexService;
+
+    @Autowired
+    private ElasticSearchService elasticSearchService;
 
     /**
      * List all MongoDB-ES indices
@@ -154,6 +158,190 @@ public class MongoIndexController {
         } catch (Exception e) {
             System.err.println("Failed to search collections: " + e.getMessage());
             return new ApiResponse<>(-1, null, "Failed to search collections: " + e.getMessage());
+        }
+    }
+
+    // ============================================================================
+    // Document Operations
+    // ============================================================================
+
+    /**
+     * Update a document in the indexed collections
+     * Request body: {
+     *   "updateDict": {"field.path": value, ...},
+     *   "updateIndex": true/false (optional, default true)
+     * }
+     */
+    @PutMapping("/{indexName}/doc/{docId}")
+    public ApiResponse<Map<String, Object>> updateDoc(
+            @PathVariable String indexName,
+            @PathVariable String docId,
+            @RequestBody Map<String, Object> requestBody) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> updateDict = (Map<String, Object>) requestBody.get("updateDict");
+            Boolean updateIndex = (Boolean) requestBody.get("updateIndex");
+            if (updateIndex == null) {
+                updateIndex = true;
+            }
+
+            if (updateDict == null || updateDict.isEmpty()) {
+                return new ApiResponse<>(-1, null, "updateDict is required");
+            }
+
+            Map<String, Object> result = mongoIndexService.updateDoc(indexName, docId, updateDict, updateIndex);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, (String) result.get("message"));
+        } catch (Exception e) {
+            System.err.println("Failed to update document: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to update document: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get a document (returns content only)
+     */
+    @GetMapping("/{indexName}/doc/{docId}")
+    public ApiResponse<Object> getDoc(
+            @PathVariable String indexName,
+            @PathVariable String docId) {
+        try {
+            Map<String, Object> result = mongoIndexService.getDoc(indexName, docId);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            return new ApiResponse<>(0, result.get("data"), "Document retrieved successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to get document: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to get document: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Delete a document (soft delete)
+     */
+    @DeleteMapping("/{indexName}/doc/{docId}")
+    public ApiResponse<Void> deleteDoc(
+            @PathVariable String indexName,
+            @PathVariable String docId) {
+        try {
+            Map<String, Object> result = mongoIndexService.deleteDoc(indexName, docId);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            return new ApiResponse<>(0, null, (String) result.get("message"));
+        } catch (Exception e) {
+            System.err.println("Failed to delete document: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to delete document: " + e.getMessage());
+        }
+    }
+
+    // ============================================================================
+    // Index Management Operations
+    // ============================================================================
+
+    /**
+     * Rebuild an index (clear and reindex all documents)
+     * Optional query param: maxDocs (e.g., ?maxDocs=10 to rebuild only 10 docs)
+     */
+    @PostMapping("/{indexName}/rebuild")
+    public ApiResponse<Map<String, Object>> rebuildIndex(
+            @PathVariable String indexName,
+            @RequestParam(required = false) Integer maxDocs) {
+        try {
+            Map<String, Object> result = mongoIndexService.rebuildIndex(indexName, maxDocs);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, (String) result.get("message"));
+        } catch (Exception e) {
+            System.err.println("Failed to rebuild index: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to rebuild index: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get statistics for an index
+     */
+    @GetMapping("/{indexName}/stats")
+    public ApiResponse<Map<String, Object>> getIndexStats(@PathVariable String indexName) {
+        try {
+            Map<String, Object> result = mongoIndexService.getIndexStats(indexName);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, "Stats retrieved successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to get stats: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to get stats: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Search documents in the Elasticsearch index
+     * Request body: {
+     *   "query": "search text",
+     *   "search_in_paths": true/false,
+     *   "search_in_values": true/false
+     * }
+     */
+    @PostMapping("/{indexName}/search")
+    public ApiResponse<List<Map<String, Object>>> searchIndex(
+            @PathVariable String indexName,
+            @RequestBody Map<String, Object> searchParams) {
+        try {
+            // Get the index configuration to find the ES index name
+            Map<String, Object> index = mongoIndexService.getIndex(indexName);
+            if (index == null) {
+                return new ApiResponse<>(-1, null, "Index not found: " + indexName);
+            }
+
+            String esIndexName = (String) index.get("esIndex");
+            if (esIndexName == null || esIndexName.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "ES index name not configured for: " + indexName);
+            }
+
+            // Delegate to ElasticSearchService for the search
+            String query = (String) searchParams.get("query");
+            Boolean searchInPaths = (Boolean) searchParams.get("search_in_paths");
+            Boolean searchInValues = (Boolean) searchParams.get("search_in_values");
+
+            if (query == null || query.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "Query parameter is required");
+            }
+
+            if (searchInPaths == null) searchInPaths = false;
+            if (searchInValues == null) searchInValues = true;
+
+            List<Map<String, Object>> results = elasticSearchService.searchCharIndex(
+                esIndexName, query, searchInPaths, searchInValues
+            );
+
+            return new ApiResponse<>(0, results, "Search completed successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to search index: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to search index: " + e.getMessage());
         }
     }
 }

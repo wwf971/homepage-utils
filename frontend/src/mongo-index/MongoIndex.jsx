@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { SpinningCircle, RefreshIcon, PlusIcon, JsonComp } from '@wwf971/react-comp-misc';
+import { SpinningCircle, RefreshIcon, PlusIcon } from '@wwf971/react-comp-misc';
 import { getBackendServerUrl } from '../remote/dataStore';
-import { useMongoDocEditor } from '../mongo/mongoStore';
 import MongoIndexCard from './MongoIndexCard';
 import CreateMongoIndex from './CreateMongoIndex';
 import '../mongo/mongo.css';
-import './mongo-index.css';
 
 /**
  * MongoIndex - Main component for managing MongoDB-ES indices
@@ -15,9 +13,6 @@ const MongoIndex = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showRawJson, setShowRawJson] = useState(false);
-  const [rawDocs, setRawDocs] = useState([]);
-  const [selectedDocIndex, setSelectedDocIndex] = useState(0);
   
   const loadIndices = async () => {
     setLoading(true);
@@ -29,9 +24,7 @@ const MongoIndex = () => {
       const result = await response.json();
       
       if (result.code === 0) {
-        const docs = result.data || [];
-        setIndices(docs);
-        setRawDocs(docs); // Store raw docs for JSON view
+        setIndices(result.data || []);
       } else {
         setError(result.message || 'Failed to load indices');
       }
@@ -40,11 +33,6 @@ const MongoIndex = () => {
     } finally {
       setLoading(false);
     }
-  };
-  
-  const handleViewRawJson = () => {
-    setShowRawJson(true);
-    setSelectedDocIndex(0);
   };
   
   useEffect(() => {
@@ -56,33 +44,19 @@ const MongoIndex = () => {
   };
   
   const handleIndexCreated = (newIndex) => {
-    const updated = [...indices, newIndex];
-    setIndices(updated);
-    setRawDocs(updated);
+    setIndices(prev => [...prev, newIndex]);
     setShowCreateForm(false);
   };
   
   const handleIndexUpdated = (updatedIndex) => {
-    const updated = indices.map(idx => 
+    setIndices(prev => prev.map(idx => 
       idx.name === updatedIndex.name ? updatedIndex : idx
-    );
-    setIndices(updated);
-    setRawDocs(updated);
+    ));
   };
   
   const handleIndexDeleted = (indexName) => {
-    const updated = indices.filter(idx => idx.name !== indexName);
-    setIndices(updated);
-    setRawDocs(updated);
+    setIndices(prev => prev.filter(idx => idx.name !== indexName));
   };
-  
-  // Use doc editor for the currently selected raw doc
-  const currentDoc = rawDocs[selectedDocIndex] || {};
-  const { handleChange: handleDocChange, isUpdating } = useMongoDocEditor(
-    'metadata',
-    'mongo-index',
-    currentDoc
-  );
   
   return (
     <div className="mongo-index-section" style={{ marginTop: '8px' }}>
@@ -104,14 +78,6 @@ const MongoIndex = () => {
             title={showCreateForm ? "Cancel" : "Create new index"}
           >
             <PlusIcon width={16} height={16} />
-          </button>
-          <button
-            className="mongo-refresh-button"
-            onClick={handleViewRawJson}
-            disabled={loading || indices.length === 0}
-            title="View raw JSON metadata"
-          >
-            JSON
           </button>
         </div>
       </div>
@@ -161,80 +127,9 @@ const MongoIndex = () => {
               index={index}
               onUpdate={handleIndexUpdated}
               onDelete={handleIndexDeleted}
+              onJsonEdit={handleIndexUpdated}
             />
           ))}
-        </div>
-      )}
-      
-      {showRawJson && rawDocs.length > 0 && (
-        <div className="doc-editor-overlay" onClick={() => setShowRawJson(false)}>
-          <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="doc-editor-header">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0 }}>MongoDB Index Metadata</h3>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                    metadata.mongo-index collection
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {rawDocs.length > 1 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        onClick={() => setSelectedDocIndex(prev => Math.max(0, prev - 1))}
-                        disabled={selectedDocIndex === 0}
-                        style={{
-                          padding: '2px 6px',
-                          fontSize: '12px',
-                          cursor: selectedDocIndex === 0 ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        ←
-                      </button>
-                      <span style={{ fontSize: '12px' }}>
-                        {selectedDocIndex + 1} / {rawDocs.length}
-                      </span>
-                      <button
-                        onClick={() => setSelectedDocIndex(prev => Math.min(rawDocs.length - 1, prev + 1))}
-                        disabled={selectedDocIndex === rawDocs.length - 1}
-                        style={{
-                          padding: '2px 6px',
-                          fontSize: '12px',
-                          cursor: selectedDocIndex === rawDocs.length - 1 ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        →
-                      </button>
-                    </div>
-                  )}
-                  {isUpdating && (
-                    <span style={{ 
-                      fontSize: '13px',
-                      color: '#856404',
-                      fontWeight: '500'
-                    }}>
-                      Updating...
-                    </span>
-                  )}
-                  <button
-                    className="doc-editor-close-button"
-                    onClick={() => setShowRawJson(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="doc-editor-content">
-              <JsonComp 
-                data={currentDoc} 
-                isEditable={true}
-                isKeyEditable={true}
-                isValueEditable={true}
-                onChange={handleDocChange}
-              />
-            </div>
-          </div>
         </div>
       )}
     </div>
