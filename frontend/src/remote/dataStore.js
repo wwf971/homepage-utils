@@ -569,8 +569,8 @@ export async function deleteMongoDocument(databaseName, collectionName, docId) {
 // ========== MongoDB Document Operations ==========
 // Re-export from mongoStore for convenience
 export const {
-  updateDocumentField,
-  deleteDocumentField,
+  updateDocField,
+  deleteDocField,
   createDocField,
   addArrayItem,
   removeArrayItem

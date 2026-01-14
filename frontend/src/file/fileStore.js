@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import { updateDocumentField } from '../mongo/mongoStore';
+import { updateDocField } from '../mongo/mongoStore';
 import { getBackendServerUrl } from '../remote/dataStore';
 
 // File access points atom - stores array of file access point documents
@@ -54,7 +54,7 @@ export async function fetchFileAccessPoints() {
     
     // Fetch each document by ID
     const fetchPromises = ids.map(id => 
-      fetch(`${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/?id=${id}`)
+      fetch(`${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/doc/?id=${id}`)
         .then(res => res.json())
         .then(result => result.code === 0 ? result.data : null)
     );
@@ -84,7 +84,7 @@ export async function fetchFileAccessPoints() {
  * @param {any} value - New value
  */
 export async function updateFileAccessPointField(database, collection, docId, fieldPath, value) {
-  return await updateDocumentField(database, collection, docId, fieldPath, value);
+  return await updateDocField(database, collection, docId, fieldPath, value);
 }
 
 /**
