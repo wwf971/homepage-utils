@@ -111,7 +111,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
   // Extract settingType for use in component
   const settingType = useMemo(() => {
     const flattened = flattenObject(accessPoint);
-    return flattened['setting.type'] || 'NOT SET';
+    return flattened['content.setting.type'] || 'NOT SET';
   }, [accessPoint]);
 
   // Prepare data for KeyValuesComp with editable fields
@@ -120,37 +120,37 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
     
     // Define recognized editable fields (key stays as-is, just add edit component)
     const editableFields = {
-      'name': (props, value) => (
+      'content.name': (props, value) => (
         <EditableValueComp
           {...props}
-          configKey="name"
+          configKey="content.name"
           valueType="text"
           isNotSet={!value || value === 'NOT SET'}
-          onUpdate={(key, val) => handleFieldUpdate('name', val)}
+          onUpdate={(key, val) => handleFieldUpdate('content.name', val)}
         />
       ),
-      'setting.type': (props, value) => (
+      'content.setting.type': (props, value) => (
         <SelectableValueComp
           {...props}
-          configKey="setting.type"
+          configKey="content.setting.type"
           isNotSet={!value || value === 'NOT SET'}
           options={fileAccessPointTypeOptions}
-          onUpdate={(key, val) => handleFieldUpdate('setting.type', val)}
+          onUpdate={(key, val) => handleFieldUpdate('content.setting.type', val)}
         />
       ),
-      'setting.dir_path_base': (props, value) => (
+      'content.setting.dir_path_base': (props, value) => (
         <EditableValueComp
           {...props}
-          configKey="setting.dir_path_base"
+          configKey="content.setting.dir_path_base"
           valueType="text"
           isNotSet={!value || value === 'NOT SET'}
-          onUpdate={(key, val) => handleFieldUpdate('setting.dir_path_base', val)}
+          onUpdate={(key, val) => handleFieldUpdate('content.setting.dir_path_base', val)}
         />
       ),
-      'setting.dir_path_base_index': (props, value) => (
+      'content.setting.dir_path_base_index': (props, value) => (
         <EditableValueComp
           {...props}
-          configKey="setting.dir_path_base_index"
+          configKey="content.setting.dir_path_base_index"
           valueType="text"
           isNotSet={value === undefined || value === null || value === 'NOT SET'}
           onUpdate={(key, val) => {
@@ -158,10 +158,10 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
             const parsed = parseInt(val, 10);
             if (!isNaN(parsed)) {
               // Valid integer - use as numeric index for array
-              return handleFieldUpdate('setting.dir_path_base_index', parsed);
+              return handleFieldUpdate('content.setting.dir_path_base_index', parsed);
             }
             // Not a valid integer - use as string key for object/map
-            return handleFieldUpdate('setting.dir_path_base_index', val);
+            return handleFieldUpdate('content.setting.dir_path_base_index', val);
           }}
         />
       )
@@ -176,8 +176,8 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
     // 2. If fails, try: dirs_path_base as object/map with string/numeric key dir_path_base_index
     // 3. Fall back to dir_path_base
     const resolveBaseDirPath = () => {
-      const index = flattened['setting.dir_path_base_index'];
-      const dirs = flattened['setting.dirs_path_base'];
+      const index = flattened['content.setting.dir_path_base_index'];
+      const dirs = flattened['content.setting.dirs_path_base'];
       
       if (index != null && dirs != null) {
         // Attempt 1: Try dirs_path_base as array with numeric index
@@ -202,7 +202,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
       }
       
       // Fall back to dir_path_base
-      return flattened['setting.dir_path_base'] || 'NOT SET';
+      return flattened['content.setting.dir_path_base'] || 'NOT SET';
     };
 
     // Build the data array - iterate through all flattened keys
@@ -212,17 +212,17 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
     // Define preferred order for known keys
     const orderedKeys = [
       'id', 
-      'name', 
-      'setting.type', 
-      'setting.dirs_path_base',
-      'setting.dir_path_base_index',
-      'setting.dir_path_base',
-      'server_id', 
-      'serverId', 
-      'time_create', 
-      'timeCreate', 
-      'create_time', 
-      'mtime'
+      'content.name', 
+      'content.setting.type', 
+      'content.setting.dirs_path_base',
+      'content.setting.dir_path_base_index',
+      'content.setting.dir_path_base',
+      'content.server_id', 
+      'content.serverId', 
+      'content.time_create', 
+      'content.timeCreate', 
+      'content.create_time', 
+      'content.mtime'
     ];
     
     // Process ordered keys first
@@ -255,29 +255,29 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
       processedKeys.add(key);
     });
 
-    // Add type description after setting.type
+    // Add type description after content.setting.type
     if (settingType && settingType !== 'NOT SET') {
-      const typeIndex = dataArray.findIndex(item => item.key === 'setting.type');
+      const typeIndex = dataArray.findIndex(item => item.key === 'content.setting.type');
       if (typeIndex >= 0) {
         dataArray.splice(typeIndex + 1, 0, {
-          key: 'setting.type_description',
+          key: 'content.setting.type_description',
           value: getTypeDescription(settingType)
         });
       }
     }
 
     // Add resolved base directory path after dir_path_base (computed read-only field)
-    const dirPathBaseIndex = dataArray.findIndex(item => item.key === 'setting.dir_path_base');
+    const dirPathBaseIndex = dataArray.findIndex(item => item.key === 'content.setting.dir_path_base');
     if (dirPathBaseIndex >= 0) {
       const resolvedPath = resolveBaseDirPath();
       // Only show resolved path if it's different from dir_path_base or if using indexed path
-      const dirPathBase = flattened['setting.dir_path_base'];
-      const usingIndexedPath = flattened['setting.dir_path_base_index'] != null && 
-                                flattened['setting.dirs_path_base'] != null;
+      const dirPathBase = flattened['content.setting.dir_path_base'];
+      const usingIndexedPath = flattened['content.setting.dir_path_base_index'] != null && 
+                                flattened['content.setting.dirs_path_base'] != null;
       
       if (usingIndexedPath || resolvedPath !== dirPathBase) {
         dataArray.splice(dirPathBaseIndex + 1, 0, {
-          key: 'setting.dir_path_base_resolved',
+          key: 'content.setting.dir_path_base_resolved',
           value: resolvedPath
         });
       }
@@ -368,7 +368,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
       <div className="file-access-point-card">
         <div className="card-title">
           <span className="card-title-text">
-            {accessPoint.name || 'Unnamed Access Point'}
+            {accessPoint.content?.name || 'Unnamed Access Point'}
           </span>
         </div>
 
@@ -510,7 +510,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
         <div className="doc-editor-overlay" onClick={() => setShowJsonView(false)}>
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
-              <h3>{accessPoint.name || 'File Access Point'}</h3>
+              <h3>{accessPoint.content?.name || 'File Access Point'}</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {isUpdating && (
                   <span style={{ 
@@ -546,7 +546,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
         <div className="doc-editor-overlay" onClick={() => setShowRawJson(false)}>
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
-              <h3>Raw JSON - {accessPoint.name || 'File Access Point'}</h3>
+              <h3>Raw JSON - {accessPoint.content?.name || 'File Access Point'}</h3>
               <button
                 className="doc-editor-close-button"
                 onClick={() => setShowRawJson(false)}

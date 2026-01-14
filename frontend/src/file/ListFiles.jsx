@@ -35,7 +35,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
   // Get unified file cache
   const [fileCache, setFileCache] = useAtom(fileCacheAtom);
 
-  const settingType = accessPoint?.setting?.type || 'NOT SET';
+  const settingType = accessPoint?.content?.setting?.type || 'NOT SET';
 
   // Get this tab's state
   const myTabState = tabsState && tabKey ? tabsState[tabKey] : null;

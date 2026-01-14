@@ -150,7 +150,7 @@ const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
     setMongoDocError(null);
     try {
       const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo/db/main/coll/note/docs/?id=${file.id}`);
+      const response = await fetch(`${backendUrl}/mongo/db/main/coll/note/doc/?id=${file.id}`);
       const result = await response.json();
       
       if (result.code === 0 && result.data) {

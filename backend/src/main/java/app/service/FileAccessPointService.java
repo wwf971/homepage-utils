@@ -38,17 +38,64 @@ public class FileAccessPointService {
                 return;
             }
             
+            // Query for type="file_access_point" at top level, data is in content
             Query query = new Query(Criteria.where("type").is("file_access_point"));
-            List<FileAccessPoint> accessPoints = mongoTemplate.find(query, FileAccessPoint.class, "note");
+            List<org.bson.Document> docs = mongoTemplate.find(query, org.bson.Document.class, "note");
             
-            for (FileAccessPoint doc : accessPoints) {
-                cachedFileAccessPoints.put(doc.getId(), doc);
+            for (org.bson.Document doc : docs) {
+                String topLevelId = doc.getString("id");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> content = (Map<String, Object>) doc.get("content");
+                if (content != null) {
+                    FileAccessPoint accessPoint = convertToFileAccessPoint(content);
+                    if (accessPoint != null) {
+                        // Set id from top level
+                        accessPoint.setId(topLevelId);
+                        if (topLevelId != null) {
+                            cachedFileAccessPoints.put(topLevelId, accessPoint);
+                        }
+                    }
+                }
             }
             System.out.println("FileAccessPointService loaded " + cachedFileAccessPoints.size() + " access points from MongoDB");
         } catch (Exception e) {
             System.err.println("Error loading file access points: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Convert content map to FileAccessPoint object
+     * Note: id and type are at top level, not in content - must be set separately
+     */
+    @SuppressWarnings("unchecked")
+    private FileAccessPoint convertToFileAccessPoint(Map<String, Object> content) {
+        FileAccessPoint accessPoint = new FileAccessPoint();
+        // Note: id and type should be set from top level by caller
+        accessPoint.setName((String) content.get("name"));
+        accessPoint.setServerId((String) content.get("server_id"));
+        
+        // Extract setting map from content
+        Object settingObj = content.get("setting");
+        if (settingObj instanceof Map) {
+            accessPoint.setSetting((Map<String, Object>) settingObj);
+        }
+        
+        // Extract time_create if present
+        Object timeCreateObj = content.get("time_create");
+        if (timeCreateObj instanceof Long) {
+            accessPoint.setTimeCreate((Long) timeCreateObj);
+        } else if (timeCreateObj instanceof Integer) {
+            accessPoint.setTimeCreate(((Integer) timeCreateObj).longValue());
+        }
+        
+        // Extract no_index if present
+        Object noIndexObj = content.get("no_index");
+        if (noIndexObj instanceof Boolean) {
+            accessPoint.setNoIndex((Boolean) noIndexObj);
+        }
+        
+        return accessPoint;
     }
 
     public FileAccessPoint getFileAccessPoint(String id) {
@@ -68,8 +115,20 @@ public class FileAccessPointService {
             return cached;
         }
         
+        // Query for type and id at top level
         Query query = new Query(Criteria.where("type").is("file_access_point").and("id").is(id));
-        return mongoTemplate.findOne(query, FileAccessPoint.class, "note");
+        org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
+        if (doc != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> content = (Map<String, Object>) doc.get("content");
+            if (content != null) {
+                FileAccessPoint accessPoint = convertToFileAccessPoint(content);
+                // Set id from top level
+                accessPoint.setId(doc.getString("id"));
+                return accessPoint;
+            }
+        }
+        return null;
     }
 
     /**
@@ -87,9 +146,20 @@ public class FileAccessPointService {
             return null;
         }
         
-        // Query MongoDB directly to get fresh data
+        // Query MongoDB directly using type and id at top level
         Query query = new Query(Criteria.where("type").is("file_access_point").and("id").is(id));
-        FileAccessPoint accessPoint = mongoTemplate.findOne(query, FileAccessPoint.class, "note");
+        org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
+        
+        FileAccessPoint accessPoint = null;
+        if (doc != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> content = (Map<String, Object>) doc.get("content");
+            if (content != null) {
+                accessPoint = convertToFileAccessPoint(content);
+                // Set id from top level
+                accessPoint.setId(doc.getString("id"));
+            }
+        }
         
         // Update cache with fresh data
         if (accessPoint != null) {
@@ -233,12 +303,13 @@ public class FileAccessPointService {
     }
     
     /**
-     * Update the file path in MongoDB document
+     * Update the file path in MongoDB document (in content field)
      */
     private void updateFilePathInMongoDB(MongoTemplate mongoTemplate, String fileId, String newRelativePath) {
         try {
+            // Query using type and id at top level
             Query query = new Query(Criteria.where("type").is("file").and("id").is(fileId));
-            Update update = new Update().set("path", newRelativePath);
+            Update update = new Update().set("content.path", newRelativePath);
             mongoTemplate.updateFirst(query, update, "note");
             System.out.println("Updated MongoDB path for file " + fileId + " to: " + newRelativePath);
         } catch (Exception e) {
@@ -260,9 +331,27 @@ public class FileAccessPointService {
                 loadFileAccessPoints();
             }
             
-            // Query directly from MongoDB to get latest data
+            // Query directly from MongoDB using type at top level
             Query query = new Query(Criteria.where("type").is("file_access_point"));
-            return mongoTemplate.find(query, FileAccessPoint.class, "note");
+            List<org.bson.Document> docs = mongoTemplate.find(query, org.bson.Document.class, "note");
+            
+            List<FileAccessPoint> accessPoints = new ArrayList<>();
+            for (org.bson.Document doc : docs) {
+                String topLevelId = doc.getString("id");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> content = (Map<String, Object>) doc.get("content");
+                if (content != null) {
+                    FileAccessPoint accessPoint = convertToFileAccessPoint(content);
+                    if (accessPoint != null) {
+                        // Set id from top level
+                        accessPoint.setId(topLevelId);
+                        // Set type from top level
+                        accessPoint.setType(doc.getString("type"));
+                        accessPoints.add(accessPoint);
+                    }
+                }
+            }
+            return accessPoints;
         } catch (Exception e) {
             System.err.println("Error getting all file access points: " + e.getMessage());
             e.printStackTrace();
@@ -352,7 +441,7 @@ public class FileAccessPointService {
             throw new IllegalStateException("MongoDB connection not available");
         }
 
-        // Query MongoDB by custom id field
+        // Query MongoDB using type and id at top level
         Query query = new Query(Criteria.where("type").is("file").and("id").is(fileId));
         org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
         
@@ -360,27 +449,33 @@ public class FileAccessPointService {
             throw new IllegalArgumentException("File not found in database: " + fileId);
         }
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) doc.get("content");
+        if (content == null) {
+            throw new IllegalArgumentException("Document has no content field: " + fileId);
+        }
+
         // Verify it belongs to this file access point
-        String docAccessPointId = doc.getString("file_access_point_id");
+        String docAccessPointId = (String) content.get("file_access_point_id");
         if (docAccessPointId == null || !docAccessPointId.equals(accessPoint.getId())) {
             throw new IllegalArgumentException("File does not belong to this access point");
         }
 
         FileInfo fileInfo = new FileInfo();
         fileInfo.setId(fileId);
-        fileInfo.setName(doc.getString("name"));
-        String relativePath = doc.getString("path");
+        fileInfo.setName((String) content.get("name"));
+        String relativePath = (String) content.get("path");
         fileInfo.setPath(relativePath);
-        fileInfo.setContentType(doc.getString("file_type"));
+        fileInfo.setContentType((String) content.get("file_type"));
         
         // Get size from MongoDB if available
-        Object sizeObj = doc.get("size");
+        Object sizeObj = content.get("size");
         if (sizeObj != null) {
             fileInfo.setSize(sizeObj instanceof Long ? (Long) sizeObj : 
                            sizeObj instanceof Integer ? ((Integer) sizeObj).longValue() : 0);
         }
         
-        Object timeUpload = doc.get("time_upload");
+        Object timeUpload = content.get("time_upload");
         if (timeUpload != null) {
             long timeUploadUs = timeUpload instanceof Long ? (Long) timeUpload : 
                                timeUpload instanceof Integer ? ((Integer) timeUpload).longValue() : 0;
@@ -404,7 +499,7 @@ public class FileAccessPointService {
             
             // If not found, search for the file
             if (!foundFile) {
-                String fileName = doc.getString("name");
+                String fileName = (String) content.get("name");
                 if (fileName != null && !fileName.isEmpty()) {
                     fullPath = searchFileInDirectoryPatterns(basePath, fileId, fileName);
                     
@@ -470,7 +565,7 @@ public class FileAccessPointService {
             throw new IllegalStateException("MongoDB connection not available");
         }
 
-        // Query MongoDB by custom id field
+        // Query MongoDB using type and id at top level
         Query query = new Query(Criteria.where("type").is("file").and("id").is(fileId));
         org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
         
@@ -478,25 +573,31 @@ public class FileAccessPointService {
             throw new IllegalArgumentException("File not found in database: " + fileId);
         }
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) doc.get("content");
+        if (content == null) {
+            throw new IllegalArgumentException("Document has no content field: " + fileId);
+        }
+
         System.out.println("MongoDB document found:");
-        System.out.println("  - name: " + doc.getString("name"));
-        System.out.println("  - path: " + doc.getString("path"));
-        System.out.println("  - path: " + doc.getString("id"));
-        System.out.println("  - file_access_point_id: " + doc.getString("file_access_point_id"));
+        System.out.println("  - name: " + content.get("name"));
+        System.out.println("  - path: " + content.get("path"));
+        System.out.println("  - id: " + fileId + " (from top level)");
+        System.out.println("  - file_access_point_id: " + content.get("file_access_point_id"));
 
         // Verify it belongs to this file access point
-        String docAccessPointId = doc.getString("file_access_point_id");
+        String docAccessPointId = (String) content.get("file_access_point_id");
         if (docAccessPointId == null || !docAccessPointId.equals(accessPoint.getId())) {
             throw new IllegalArgumentException("File does not belong to this access point");
         }
 
         FileInfo fileInfo = new FileInfo();
         fileInfo.setId(fileId);
-        fileInfo.setName(doc.getString("name"));
-        fileInfo.setPath(doc.getString("path"));
-        fileInfo.setContentType(doc.getString("file_type"));
+        fileInfo.setName((String) content.get("name"));
+        fileInfo.setPath((String) content.get("path"));
+        fileInfo.setContentType((String) content.get("file_type"));
         
-        Object timeUpload = doc.get("time_upload");
+        Object timeUpload = content.get("time_upload");
         if (timeUpload != null) {
             long timeUploadUs = timeUpload instanceof Long ? (Long) timeUpload : 
                                timeUpload instanceof Integer ? ((Integer) timeUpload).longValue() : 0;
@@ -513,7 +614,7 @@ public class FileAccessPointService {
         basePath = expandHomePath(basePath);
         System.out.println("Base path (after expansion): " + basePath);
         
-        String relativePath = doc.getString("path");
+        String relativePath = (String) content.get("path");
         String originalRelativePath = relativePath;
         System.out.println("Relative path from MongoDB: " + relativePath);
         
@@ -533,11 +634,11 @@ public class FileAccessPointService {
         // If not found, search for the file using ID-based directory patterns
         if (!foundFile) {
             System.out.println("File not found at MongoDB path, searching...");
-            String fileName = doc.getString("name");
+            String fileName = (String) content.get("name");
             if (fileName == null || fileName.isEmpty()) {
                 // Try to construct filename from ID
                 fileName = fileId;
-                String fileType = doc.getString("file_type");
+                String fileType = (String) content.get("file_type");
                 if (fileType != null && fileType.contains("/")) {
                     String extension = fileType.substring(fileType.lastIndexOf("/") + 1);
                     if (!fileName.endsWith("." + extension)) {
@@ -660,7 +761,7 @@ public class FileAccessPointService {
             throw new IllegalStateException("MongoDB connection not available");
         }
 
-        // Query MongoDB by custom id field
+        // Query MongoDB using type and id at top level
         Query query = new Query(Criteria.where("type").is("file").and("id").is(fileId));
         org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
         
@@ -668,17 +769,23 @@ public class FileAccessPointService {
             throw new IllegalArgumentException("File not found: " + fileId);
         }
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) doc.get("content");
+        if (content == null) {
+            throw new IllegalArgumentException("Document has no content field: " + fileId);
+        }
+
         // For local/internal files, only update the name in MongoDB
         // The physical file remains at its ID-based path (e.g., vy/vy5n8h.png)
         // The 'name' field is just metadata for display purposes
         
-        String oldName = doc.getString("name");
+        String oldName = (String) content.get("name");
         System.out.println("Renaming in MongoDB only: '" + oldName + "' -> '" + newName + "'");
         
-        // Update only the name field in MongoDB
+        // Update only the name field in MongoDB (in content)
         org.springframework.data.mongodb.core.query.Update update = 
             new org.springframework.data.mongodb.core.query.Update();
-        update.set("name", newName);
+        update.set("content.name", newName);
         
         mongoTemplate.updateFirst(query, update, "note");
 
@@ -686,15 +793,15 @@ public class FileAccessPointService {
         FileInfo fileInfo = new FileInfo();
         fileInfo.setId(fileId);
         fileInfo.setName(newName);
-        fileInfo.setPath(doc.getString("path")); // Path stays the same
+        fileInfo.setPath((String) content.get("path")); // Path stays the same
         fileInfo.setDirectory(false);
-        fileInfo.setContentType(doc.getString("file_type"));
+        fileInfo.setContentType((String) content.get("file_type"));
         
         // Get size from filesystem if available
         String basePath = accessPoint.resolveBaseDirPath();
         if (basePath != null) {
             basePath = expandHomePath(basePath);
-            String filePath = doc.getString("path");
+            String filePath = (String) content.get("path");
             if (filePath != null) {
                 Path fullPath = Paths.get(basePath, filePath);
                 if (Files.exists(fullPath)) {
@@ -784,14 +891,14 @@ public class FileAccessPointService {
             throw new IllegalStateException("MongoDB connection not available");
         }
 
-        // Query for files belonging to this file access point
+        // Query for files belonging to this file access point (type at top level, file_access_point_id in content)
         Query query = new Query();
         query.addCriteria(Criteria.where("type").is("file"));
-        query.addCriteria(Criteria.where("file_access_point_id").is(accessPoint.getId()));
+        query.addCriteria(Criteria.where("content.file_access_point_id").is(accessPoint.getId()));
         
-        // Sort by upload time (most recent first)
+        // Sort by upload time (most recent first) - in content field
         query.with(org.springframework.data.domain.Sort.by(
-            org.springframework.data.domain.Sort.Direction.DESC, "time_upload"
+            org.springframework.data.domain.Sort.Direction.DESC, "content.time_upload"
         ));
         
         // Apply pagination
@@ -804,19 +911,27 @@ public class FileAccessPointService {
         // Convert to FileInfo objects
         List<FileInfo> fileInfoList = new ArrayList<>();
         for (org.bson.Document doc : docs) {
-            FileInfo fileInfo = new FileInfo();
+            // Get id from top level
             String docId = doc.getString("id");
-            String docPath = doc.getString("path");
-            System.out.println("MongoDB doc - id: '" + docId + "', path: '" + docPath + "'");
+            
+            @SuppressWarnings("unchecked")
+            Map<String, Object> content = (Map<String, Object>) doc.get("content");
+            if (content == null) {
+                continue; // Skip documents without content field
+            }
+            
+            FileInfo fileInfo = new FileInfo();
+            String docPath = (String) content.get("path");
+            System.out.println("MongoDB doc - id: '" + docId + "' (from top level), path: '" + docPath + "'");
             
             fileInfo.setId(docId); // Set the custom id field
-            fileInfo.setName(doc.getString("name"));
+            fileInfo.setName((String) content.get("name"));
             fileInfo.setPath(docPath);
             fileInfo.setDirectory(false); // Files from MongoDB are always files, not directories
-            fileInfo.setContentType(doc.getString("file_type"));
+            fileInfo.setContentType((String) content.get("file_type"));
             
             // time_upload is in microseconds, convert to milliseconds
-            Object timeUpload = doc.get("time_upload");
+            Object timeUpload = content.get("time_upload");
             if (timeUpload != null) {
                 long timeUploadUs = timeUpload instanceof Long ? (Long) timeUpload : 
                                    timeUpload instanceof Integer ? ((Integer) timeUpload).longValue() : 0;
