@@ -72,6 +72,12 @@ export const redisLocalConfigAtom = atom([]);
 export const redisComputedConfigAtom = atom([]);
 export const redisConfigErrorAtom = atom(null);
 
+// ========== RabbitMQ Atoms ==========
+export const rabbitMQAppConfigAtom = atom([]);
+export const rabbitMQLocalConfigAtom = atom([]);
+export const rabbitMQComputedConfigAtom = atom([]);
+export const rabbitMQConfigErrorAtom = atom(null);
+
 // MongoDB Databases & Collections
 export const mongoDatabasesAtom = atom([]);
 export const mongoSelectedDatabaseAtom = atom(null);
@@ -831,6 +837,84 @@ export async function updateRedisConfig(key, value) {
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
     console.error('Failed to update Redis config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+// RabbitMQ Configuration APIs
+export async function fetchRabbitMQAppConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/rabbitmq/config/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key,
+        value: value === null ? '' : String(value)
+      }));
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch RabbitMQ application config' };
+  } catch (error) {
+    console.error('Failed to fetch RabbitMQ application.properties config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function fetchRabbitMQLocalConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/rabbitmq/config/local/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      // Backend already returns List<Map<String, String>>
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch RabbitMQ local config' };
+  } catch (error) {
+    console.error('Failed to fetch RabbitMQ local config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function fetchRabbitMQComputedConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/rabbitmq/config/computed/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      // Backend already returns List<Map<String, String>>
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch RabbitMQ computed config' };
+  } catch (error) {
+    console.error('Failed to fetch RabbitMQ computed config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function updateRabbitMQConfig(path, value) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/rabbitmq/config/set/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ path, value }),
+    });
+
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      return { code: 0, message: 'Success' };
+    }
+    return { code: -1, message: result.message || 'Update failed' };
+  } catch (error) {
+    console.error('Failed to update RabbitMQ config:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
