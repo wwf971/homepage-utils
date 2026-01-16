@@ -164,15 +164,73 @@ public class ElasticSearchService {
     /**
      * Index a flattened document (list of path/value pairs)
      * Uses nested structure with "flat" field containing all path/value pairs
+     * Uses optimistic concurrency control with if_seq_no and if_primary_term
      */
-    public void indexDocument(String indexName, String docId, String database, String collection,
-                             List<Map<String, String>> flattenedPairs) throws Exception {
+    public void indexDoc(String indexName, String docId, String database, String collection,
+                             List<Map<String, String>> flattenedPairs, long updateVersion, 
+                             long updateAt, Integer updateAtTimeZone) throws Exception {
         String baseUri = getBaseUri();
-        String indexUri = baseUri + indexName + "/_doc/" + docId;
-
-        // Create document with nested flat field
+        
+        // First, try to get existing document to check version and get seq_no/primary_term
+        Long seqNo = null;
+        Long primaryTerm = null;
+        
+        try {
+            String getUri = baseUri + indexName + "/_doc/" + docId;
+            HttpURLConnection getConn = setupConnection(getUri, "GET");
+            int getResponseCode = getConn.getResponseCode();
+            
+            if (getResponseCode == 200) {
+                // Document exists, check its version
+                String response = readResponse(getConn);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = objectMapper.readValue(response, Map.class);
+                
+                // Get seq_no and primary_term for optimistic concurrency control
+                seqNo = ((Number) result.get("_seq_no")).longValue();
+                primaryTerm = ((Number) result.get("_primary_term")).longValue();
+                
+                // Get the existing updateVersion
+                @SuppressWarnings("unchecked")
+                Map<String, Object> source = (Map<String, Object>) result.get("_source");
+                if (source != null && source.containsKey("updateVersion")) {
+                    Long existingVersion = ((Number) source.get("updateVersion")).longValue();
+                    
+                    // Only update if our version is greater than or equal to existing
+                    if (updateVersion < existingVersion) {
+                        System.err.println("WARNING: Aborting ES index update for doc " + docId + 
+                            ". Existing ES version " + existingVersion + " is higher than attempted version " + updateVersion + 
+                            ". This prevents overwriting newer data with older data.");
+                        return;
+                    }
+                    
+                    if (updateVersion == existingVersion) {
+                        System.out.println("Info: Skipping ES index update for doc " + docId + 
+                            ". Version " + updateVersion + " is already indexed (no change needed).");
+                        return;
+                    }
+                }
+            }
+            // If 404, document doesn't exist - proceed with creation
+        } catch (Exception e) {
+            // If we can't read, proceed anyway (might be first creation)
+            System.err.println("Warning: Could not read existing document for version check: " + e.getMessage());
+        }
+        
+        // Create document with nested flat field and metadata
         Map<String, Object> doc = new HashMap<>();
         doc.put("flat", flattenedPairs);
+        doc.put("updateVersion", updateVersion);
+        doc.put("updateAt", updateAt);
+        if (updateAtTimeZone != null) {
+            doc.put("updateAtTimeZone", updateAtTimeZone);
+        }
+
+        // Build URI with if_seq_no and if_primary_term if we have them
+        String indexUri = baseUri + indexName + "/_doc/" + docId;
+        if (seqNo != null && primaryTerm != null) {
+            indexUri += "?if_seq_no=" + seqNo + "&if_primary_term=" + primaryTerm;
+        }
 
         HttpURLConnection connection = setupConnection(indexUri, "PUT");
         connection.setDoOutput(true);
@@ -184,12 +242,15 @@ public class ElasticSearchService {
         }
 
         int responseCode = connection.getResponseCode();
-        if (responseCode != 200 && responseCode != 201) {
+        if (responseCode == 409) {
+            // Version conflict - document was modified by someone else
+            throw new Exception("Version conflict: document " + docId + " was modified concurrently. Retry may be needed.");
+        } else if (responseCode != 200 && responseCode != 201) {
             String errorResponse = readResponse(connection);
             throw new Exception("Failed to index document: HTTP " + responseCode + " - " + errorResponse);
         }
 
-        System.out.println("Indexed " + flattenedPairs.size() + " path/value pairs for doc " + docId + " to ES index " + indexName);
+        System.out.println("Indexed " + flattenedPairs.size() + " path/value pairs for doc " + docId + " (version " + updateVersion + ") to ES index " + indexName);
     }
 
     /**

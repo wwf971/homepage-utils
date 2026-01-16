@@ -12,6 +12,9 @@ import MongoConfigPanel from './mongo/MongoConfigPanel';
 import MongoTestConnection from './mongo/TestConnection';
 import {ConfigPanel as EsConfigPanel} from './elasticsearch/ConfigPanel';
 import {TestConnection as EsTestConnection} from './elasticsearch/TestConnection';
+import {RedisConfigPanel} from './redis/RedisConfigPanel';
+import {TestConnectionRedis} from './redis/TestConnectionRedis';
+import {TestConnectionRedisson} from './redis/TestConnectionRedisson';
 import BackendServerConfig from './remote/BackendServerConfig';
 import FilePanel from './file/FilePanel';
 import './App.css';
@@ -76,6 +79,28 @@ function App() {
               <SubTab label="Test Connection">
                 <Panel>
                   <EsTestConnection showIndexList={true} />
+                </Panel>
+              </SubTab>
+            </SubTab>
+          </Tab>
+          
+          <Tab label="Cache">
+            <SubTab label="Redis">
+              <SubTab label="Configuration" isDefault={true}>
+                <Panel>
+                  <RedisConfigPanel />
+                </Panel>
+              </SubTab>
+              
+              <SubTab label="Test Connection (Redis)">
+                <Panel>
+                  <TestConnectionRedis />
+                </Panel>
+              </SubTab>
+              
+              <SubTab label="Test Connection (Redisson)">
+                <Panel>
+                  <TestConnectionRedisson />
                 </Panel>
               </SubTab>
             </SubTab>

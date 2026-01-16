@@ -95,7 +95,7 @@ public class MongoIndexController {
      * Update an existing index
      */
     @PutMapping("/{indexName}")
-    public ApiResponse<Map<String, Object>> updateIndex(
+    public ApiResponse<Map<String, Object>> updateIndexCollections(
             @PathVariable String indexName,
             @RequestBody Map<String, Object> requestBody) {
         try {
@@ -103,7 +103,7 @@ public class MongoIndexController {
             @SuppressWarnings("unchecked")
             List<Map<String, String>> collections = (List<Map<String, String>>) requestBody.get("collections");
 
-            Map<String, Object> index = mongoIndexService.updateIndex(indexName, esIndex, collections);
+            Map<String, Object> index = mongoIndexService.updateIndexCollections(indexName, esIndex, collections);
             if (index == null) {
                 return new ApiResponse<>(-1, null, "Index not found: " + indexName);
             }
@@ -273,6 +273,32 @@ public class MongoIndexController {
             System.err.println("Failed to rebuild index: " + e.getMessage());
             e.printStackTrace();
             return new ApiResponse<>(-1, null, "Failed to rebuild index: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Incremental rebuild: only reindex documents marked with shouldUpdateIndex=true
+     * Much faster than full rebuild as it uses MongoDB index on shouldUpdateIndex field
+     * Optional query param: maxDocs (e.g., ?maxDocs=10 to rebuild only 10 docs)
+     */
+    @PostMapping("/{indexName}/rebuild-incremental")
+    public ApiResponse<Map<String, Object>> rebuildIndexIncremental(
+            @PathVariable String indexName,
+            @RequestParam(required = false) Integer maxDocs) {
+        try {
+            Map<String, Object> result = mongoIndexService.rebuildIndexOnShouldUpdateIndex(indexName, maxDocs);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, (String) result.get("message"));
+        } catch (Exception e) {
+            System.err.println("Failed to rebuild index incrementally: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to rebuild index incrementally: " + e.getMessage());
         }
     }
 

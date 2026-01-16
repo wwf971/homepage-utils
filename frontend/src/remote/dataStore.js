@@ -66,6 +66,12 @@ export const esConfigErrorAtom = atom(null);
 export const esIndicesAtom = atom([]);
 export const esSelectedIndexAtom = atom(null);
 
+// ========== Redis Atoms ==========
+export const redisAppConfigAtom = atom([]);
+export const redisLocalConfigAtom = atom([]);
+export const redisComputedConfigAtom = atom([]);
+export const redisConfigErrorAtom = atom(null);
+
 // MongoDB Databases & Collections
 export const mongoDatabasesAtom = atom([]);
 export const mongoSelectedDatabaseAtom = atom(null);
@@ -718,6 +724,113 @@ export async function fetchElasticsearchIndexInfo(indexName) {
     return { code: -1, message: result.message || 'Failed to fetch index info' };
   } catch (error) {
     console.error('Failed to fetch Elasticsearch index info:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+// ========== Redis Config API ==========
+
+/**
+ * Fetch Redis config from application.properties
+ */
+export async function fetchRedisAppConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/redis/config/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key,
+        value: value === null ? '' : String(value)
+      }));
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch config' };
+  } catch (error) {
+    console.error('Failed to fetch Redis application.properties config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
+ * Fetch Redis local config from SQLite
+ */
+export async function fetchRedisLocalConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/redis/config/local/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key,
+        value: value === null ? '' : String(value)
+      }));
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch local config' };
+  } catch (error) {
+    console.error('Failed to fetch Redis local config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
+ * Fetch Redis computed config (merged)
+ */
+export async function fetchRedisComputedConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/redis/config/computed/`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key,
+        value: value === null ? '' : String(value)
+      }));
+      
+      // Store config keys globally for EditableValueComp
+      if (!window.__computedConfigKeys) {
+        window.__computedConfigKeys = {};
+      }
+      window.__computedConfigKeys.redis = configArray.map(item => item.key);
+      
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: 'Invalid response' };
+  } catch (error) {
+    console.error('Failed to fetch Redis computed config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
+ * Update Redis config (saves to local override)
+ */
+export async function updateRedisConfig(key, value) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/redis/config/set/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: key,
+        value: value
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      return { code: 0, message: 'Success' };
+    }
+    return { code: -1, message: result.message || 'Update failed' };
+  } catch (error) {
+    console.error('Failed to update Redis config:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
