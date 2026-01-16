@@ -15,6 +15,8 @@ import {TestConnection as EsTestConnection} from './elasticsearch/TestConnection
 import {RedisConfigPanel} from './redis/RedisConfigPanel';
 import {TestConnectionRedis} from './redis/TestConnectionRedis';
 import {TestConnectionRedisson} from './redis/TestConnectionRedisson';
+import RabbitMQConfigPanel from './rabbitmq/RabbitMQConfigPanel';
+import TestConnectionRabbitMQ from './rabbitmq/TestConnectionRabbitMQ';
 import BackendServerConfig from './remote/BackendServerConfig';
 import FilePanel from './file/FilePanel';
 import './App.css';
@@ -101,6 +103,22 @@ function App() {
               <SubTab label="Test Connection (Redisson)">
                 <Panel>
                   <TestConnectionRedisson />
+                </Panel>
+              </SubTab>
+            </SubTab>
+          </Tab>
+          
+          <Tab label="MessageQueue">
+            <SubTab label="RabbitMQ">
+              <SubTab label="Configuration" isDefault={true}>
+                <Panel>
+                  <RabbitMQConfigPanel />
+                </Panel>
+              </SubTab>
+              
+              <SubTab label="Test Connection">
+                <Panel>
+                  <TestConnectionRabbitMQ />
                 </Panel>
               </SubTab>
             </SubTab>
