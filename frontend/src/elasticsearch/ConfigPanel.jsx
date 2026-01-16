@@ -102,10 +102,10 @@ export const ConfigPanel = () => {
                 onClick={async () => {
                   await handleLocalUpdate(item.key, '');
                 }}
-                className="empty-button"
+                className="clear-button"
                 title="Set to empty string"
               >
-                Empty
+                Clear
               </button>
             </div>
           </div>

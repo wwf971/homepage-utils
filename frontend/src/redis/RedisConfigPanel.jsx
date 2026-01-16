@@ -1,43 +1,38 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
   TabsOnTop, KeyValues, KeyValuesComp, EditableValueComp, RefreshIcon
 } from '@wwf971/react-comp-misc';
 import {
-  jdbcAppConfigAtom,
-  jdbcLocalConfigAtom,
-  jdbcComputedConfigAtom,
-  jdbcConfigErrorAtom,
-  fetchJdbcAppConfig,
-  fetchJdbcLocalConfig,
-  fetchJdbcComputedConfig,
-  updateJdbcConfig
+  redisAppConfigAtom,
+  redisLocalConfigAtom,
+  redisComputedConfigAtom,
+  redisConfigErrorAtom,
+  fetchRedisAppConfig,
+  fetchRedisLocalConfig,
+  fetchRedisComputedConfig,
+  updateRedisConfig
 } from '../remote/dataStore';
 import '../remote/configPanelStyles.css';
 
-const JdbcConfigPanel = () => {
-  const appConfig = useAtomValue(jdbcAppConfigAtom);
-  const localConfig = useAtomValue(jdbcLocalConfigAtom);
-  const computedConfig = useAtomValue(jdbcComputedConfigAtom);
-  const configError = useAtomValue(jdbcConfigErrorAtom);
-  const setAppConfig = useSetAtom(jdbcAppConfigAtom);
-  const setLocalConfig = useSetAtom(jdbcLocalConfigAtom);
-  const setComputedConfig = useSetAtom(jdbcComputedConfigAtom);
-  const setConfigError = useSetAtom(jdbcConfigErrorAtom);
+export const RedisConfigPanel = () => {
+  const appConfig = useAtomValue(redisAppConfigAtom);
+  const localConfig = useAtomValue(redisLocalConfigAtom);
+  const computedConfig = useAtomValue(redisComputedConfigAtom);
+  const configError = useAtomValue(redisConfigErrorAtom);
+  const setAppConfig = useSetAtom(redisAppConfigAtom);
+  const setLocalConfig = useSetAtom(redisLocalConfigAtom);
+  const setComputedConfig = useSetAtom(redisComputedConfigAtom);
+  const setConfigError = useSetAtom(redisConfigErrorAtom);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadAllConfigs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadAllConfigs = async () => {
+  const loadAllConfigs = useCallback(async () => {
     setLoading(true);
     setConfigError(null);
     const [appResult, localResult, computedResult] = await Promise.all([
-      fetchJdbcAppConfig(),
-      fetchJdbcLocalConfig(),
-      fetchJdbcComputedConfig()
+      fetchRedisAppConfig(),
+      fetchRedisLocalConfig(),
+      fetchRedisComputedConfig()
     ]);
     
     if (appResult.code === 0) {
@@ -59,28 +54,41 @@ const JdbcConfigPanel = () => {
     }
     
     setLoading(false);
-  };
+  }, [setAppConfig, setLocalConfig, setComputedConfig, setConfigError]);
+
+  useEffect(() => {
+    loadAllConfigs();
+  }, [loadAllConfigs]);
 
   // Update callback for local config edits
-  const handleLocalUpdate = async (configKey, newValue) => {
-    const result = await updateJdbcConfig(configKey, newValue);
+  const handleLocalUpdate = useCallback(async (configKey, newValue) => {
+    const result = await updateRedisConfig(configKey, newValue);
     
     if (result.code === 0) {
-      // Reload all configs after successful update
+      // Update local state immediately for responsiveness
+      setLocalConfig(prevConfig => {
+        const updated = prevConfig.map(item => 
+          item.key === configKey ? { ...item, value: newValue } : item
+        );
+        // If key doesn't exist, add it
+        if (!updated.some(item => item.key === configKey)) {
+          updated.push({ key: configKey, value: newValue });
+        }
+        return updated;
+      });
+
+      // Reload all configs
       await loadAllConfigs();
     }
     
     return result;
-  };
+  }, [loadAllConfigs, setLocalConfig]);
 
   // Memoize local config with editable value component
-  // Show all keys from computed config, with "NOT SET" for missing values
   const localConfigWithComp = useMemo(() => {
-    // Create a map of local config for quick lookup
     const localMap = new Map(localConfig.map(item => [item.key, item.value]));
     
-    // Use computed config keys as the base (all possible keys)
-    return computedConfig.map((item, index) => {
+    return computedConfig.map((item) => {
       const localValue = localMap.get(item.key);
       const isNotSet = localValue === undefined;
       const isEmpty = localValue === '';
@@ -93,7 +101,7 @@ const JdbcConfigPanel = () => {
             <div className="editable-value-inner">
               <EditableValueComp 
                 {...props} 
-                category="jdbc"
+                category="redis"
                 isNotSet={isNotSet}
                 configKey={item.key}
                 onUpdate={handleLocalUpdate}
@@ -132,7 +140,7 @@ const JdbcConfigPanel = () => {
         <TabsOnTop.Tab label="application.properties">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>JDBC Configuration from application.properties</h3>
+              <h3 style={{ margin: 0 }}>Redis Configuration from application.properties</h3>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -161,7 +169,7 @@ const JdbcConfigPanel = () => {
         <TabsOnTop.Tab label="Local Override">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>JDBC Configuration from Local Storage (Editable)</h3>
+              <h3 style={{ margin: 0 }}>Redis Configuration from Local Storage (Editable)</h3>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -194,7 +202,7 @@ const JdbcConfigPanel = () => {
         <TabsOnTop.Tab label="Computed Config">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>JDBC Computed Configuration (Read-only)</h3>
+              <h3 style={{ margin: 0 }}>Redis Computed Configuration (Read-only)</h3>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -223,5 +231,4 @@ const JdbcConfigPanel = () => {
   );
 };
 
-export default JdbcConfigPanel;
-
+export default RedisConfigPanel;
