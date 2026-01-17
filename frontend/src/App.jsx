@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Provider } from 'jotai';
 import { 
   MasterDetail, 
@@ -22,10 +22,16 @@ import FilePanel from './file/FilePanel';
 import './App.css';
 
 function App() {
+  useEffect(() => {
+    if (window.location.pathname.startsWith('/file_access_point/')) {
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
+
   return (
     <Provider>
       <div className="app">
-        <MasterDetail title="Database Management" sidebarWidth="220px">
+        <MasterDetail title="Backend Management" sidebarWidth="220px">
           <Tab label="Backend Server">
             <SubTab label="Backend Server" isDefault={true}>
               <Panel>

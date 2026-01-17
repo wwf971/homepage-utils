@@ -4,6 +4,7 @@ import app.pojo.ApiResponse;
 import app.pojo.FileAccessPoint;
 import app.pojo.FileInfo;
 import app.service.FileAccessPointService;
+import app.util.FileUtils;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,7 @@ public class FileAccessPointController {
             throw new IllegalArgumentException("Path traversal is not allowed: " + filePathOrId);
         }
     }
+
 
     @GetMapping("list/")
     public ApiResponse<List<FileAccessPoint>> listAccessPoints() {
@@ -162,7 +164,7 @@ public class FileAccessPointController {
     public ResponseEntity<byte[]> getFile(
             @PathVariable String accessPointId,
             @PathVariable String filePathOrId,
-            @RequestParam(required = false) String action) {
+            @RequestParam(required = false) String download) {
         
         try {
             // Validate file path for security
@@ -172,23 +174,19 @@ public class FileAccessPointController {
             
             HttpHeaders headers = new HttpHeaders();
             
-            // Set content type
-            if (fileInfo.getContentType() != null) {
-                headers.setContentType(MediaType.parseMediaType(fileInfo.getContentType()));
-            } else {
-                headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            }
+            // Determine proper content type based on file extension
+            String contentType = FileUtils.determineContentType(fileInfo.getName(), fileInfo.getContentType());
+            headers.setContentType(MediaType.parseMediaType(contentType));
             
-            // Set content disposition: "attachment" for download, "inline" for display in browser
+            // Set content disposition: "attachment" for download=true, "inline" for display in browser
             ContentDisposition contentDisposition;
-            if ("download".equals(action)) {
+            if ("true".equals(download)) {
                 contentDisposition = ContentDisposition.attachment()
                         .filename(fileInfo.getName())
                         .build();
             } else {
-                contentDisposition = ContentDisposition.inline()
-                        .filename(fileInfo.getName())
-                        .build();
+                // For inline display, don't set filename to avoid triggering downloads in some browsers
+                contentDisposition = ContentDisposition.inline().build();
             }
             headers.setContentDisposition(contentDisposition);
             

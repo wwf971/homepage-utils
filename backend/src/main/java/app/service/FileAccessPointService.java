@@ -98,11 +98,11 @@ public class FileAccessPointService {
         return accessPoint;
     }
 
-    public FileAccessPoint getFileAccessPoint(String id) {
+    public FileAccessPoint getFileAccessPoint(String idOrName) {
         // Ensure MongoDB connection is initialized
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
-            System.err.println("MongoDB connection not available for file access point: " + id);
+            System.err.println("MongoDB connection not available for file access point: " + idOrName);
             return null;
         }
         
@@ -110,13 +110,21 @@ public class FileAccessPointService {
             loadFileAccessPoints();
         }
         
-        FileAccessPoint cached = cachedFileAccessPoints.get(id);
+        // Try to find by ID in cache first
+        FileAccessPoint cached = cachedFileAccessPoints.get(idOrName);
         if (cached != null) {
             return cached;
         }
         
+        // Try to find by name in cache
+        for (FileAccessPoint accessPoint : cachedFileAccessPoints.values()) {
+            if (idOrName.equals(accessPoint.getName())) {
+                return accessPoint;
+            }
+        }
+        
         // Query for type and id at top level
-        Query query = new Query(Criteria.where("type").is("file_access_point").and("id").is(id));
+        Query query = new Query(Criteria.where("type").is("file_access_point").and("id").is(idOrName));
         org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
         if (doc != null) {
             @SuppressWarnings("unchecked")
@@ -128,6 +136,21 @@ public class FileAccessPointService {
                 return accessPoint;
             }
         }
+        
+        // If not found by ID, try to find by name in MongoDB
+        query = new Query(Criteria.where("type").is("file_access_point").and("content.name").is(idOrName));
+        doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
+        if (doc != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> content = (Map<String, Object>) doc.get("content");
+            if (content != null) {
+                FileAccessPoint accessPoint = convertToFileAccessPoint(content);
+                // Set id from top level
+                accessPoint.setId(doc.getString("id"));
+                return accessPoint;
+            }
+        }
+        
         return null;
     }
 
@@ -135,40 +158,65 @@ public class FileAccessPointService {
      * Refresh cache for a specific file access point by fetching latest data from MongoDB
      * This should be called after config changes to ensure the cache is up-to-date
      * 
-     * @param id The file access point ID
+     * @param idOrName The file access point ID or name
      * @return The refreshed FileAccessPoint, or null if not found
      */
-    public FileAccessPoint refreshFileAccessPointCache(String id) {
+    public FileAccessPoint refreshFileAccessPointCache(String idOrName) {
         // Ensure MongoDB connection is initialized
         MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
         if (mongoTemplate == null) {
-            System.err.println("MongoDB connection not available for refreshing file access point: " + id);
+            System.err.println("MongoDB connection not available for refreshing file access point: " + idOrName);
             return null;
         }
         
         // Query MongoDB directly using type and id at top level
-        Query query = new Query(Criteria.where("type").is("file_access_point").and("id").is(id));
+        Query query = new Query(Criteria.where("type").is("file_access_point").and("id").is(idOrName));
         org.bson.Document doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
         
         FileAccessPoint accessPoint = null;
+        String cacheKey = idOrName; // This will be the actual ID after we find the document
+        
         if (doc != null) {
             @SuppressWarnings("unchecked")
             Map<String, Object> content = (Map<String, Object>) doc.get("content");
             if (content != null) {
                 accessPoint = convertToFileAccessPoint(content);
                 // Set id from top level
-                accessPoint.setId(doc.getString("id"));
+                String actualId = doc.getString("id");
+                accessPoint.setId(actualId);
+                cacheKey = actualId; // Use actual ID as cache key
+            }
+        } else {
+            // If not found by ID, try to find by name in MongoDB
+            query = new Query(Criteria.where("type").is("file_access_point").and("content.name").is(idOrName));
+            doc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
+            
+            if (doc != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> content = (Map<String, Object>) doc.get("content");
+                if (content != null) {
+                    accessPoint = convertToFileAccessPoint(content);
+                    // Set id from top level
+                    String actualId = doc.getString("id");
+                    accessPoint.setId(actualId);
+                    cacheKey = actualId; // Use actual ID as cache key, not the name
+                }
             }
         }
         
         // Update cache with fresh data
         if (accessPoint != null) {
-            cachedFileAccessPoints.put(id, accessPoint);
-            System.out.println("Refreshed cache for file access point: " + id);
+            cachedFileAccessPoints.put(cacheKey, accessPoint);
+            System.out.println("Refreshed cache for file access point: " + cacheKey + (cacheKey.equals(idOrName) ? "" : " (looked up by name: " + idOrName + ")"));
         } else {
-            // Remove from cache if no longer exists in database
-            cachedFileAccessPoints.remove(id);
-            System.out.println("Removed file access point from cache (not found in database): " + id);
+            // Only remove from cache if idOrName looks like an ID (not a name)
+            // Names are not used as cache keys, so no need to remove them
+            if (cachedFileAccessPoints.containsKey(idOrName)) {
+                cachedFileAccessPoints.remove(idOrName);
+                System.out.println("Removed file access point from cache (not found in database): " + idOrName);
+            } else {
+                System.out.println("File access point not found in database: " + idOrName);
+            }
         }
         
         return accessPoint;
