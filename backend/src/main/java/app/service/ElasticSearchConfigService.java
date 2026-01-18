@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 public class ElasticSearchConfigService {
 
     private ElasticSearchConfig currentConfig;
+    private ElasticSearchConfig appConfig; // Store application.properties config separately
     private final LocalConfigService localConfigService;
 
     public ElasticSearchConfigService(
@@ -24,6 +25,9 @@ public class ElasticSearchConfigService {
             System.out.println("  username=" + username);
             System.out.println("  password=" + (password != null && !password.isEmpty() ? "***" : "(empty)"));
 
+            // Store application.properties config
+            this.appConfig = new ElasticSearchConfig(uris, username, password);
+            
             // Initialize with merged config
             this.currentConfig = mergeAllLayers(uris, username, password);
             System.out.println("ElasticSearchConfigService initialized with merged config: " + currentConfig);
@@ -31,6 +35,11 @@ public class ElasticSearchConfigService {
             System.err.println("WARNING: Failed to initialize ElasticSearchConfigService: " + e.getMessage());
             e.printStackTrace();
             // Fallback to empty config
+            this.appConfig = new ElasticSearchConfig(
+                uris != null ? uris : "http://localhost:9200",
+                username != null ? username : "",
+                password != null ? password : ""
+            );
             this.currentConfig = new ElasticSearchConfig(
                 uris != null ? uris : "http://localhost:9200",
                 username != null ? username : "",
@@ -67,6 +76,16 @@ public class ElasticSearchConfigService {
         this.currentConfig = mergeAllLayers(uris, username, password);
     }
 
+    /**
+     * Get application.properties config only (first layer, no overrides)
+     */
+    public ElasticSearchConfig getAppConfig() {
+        return appConfig;
+    }
+
+    /**
+     * Get current merged config (all layers applied)
+     */
     public ElasticSearchConfig getCurrentConfig() {
         return currentConfig;
     }

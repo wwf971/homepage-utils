@@ -22,6 +22,11 @@ public class JdbcConfigController {
         this.connectionService = connectionService;
     }
 
+    @GetMapping("config/app/")
+    public ApiResponse<JdbcConfig> getAppConfig() {
+        return ApiResponse.success(configService.getAppConfig(), "JDBC application.properties configuration retrieved");
+    }
+
     @GetMapping("config/")
     public ApiResponse<JdbcConfig> getConfig() {
         return ApiResponse.success(configService.getCurrentConfig(), "Current JDBC configuration retrieved");

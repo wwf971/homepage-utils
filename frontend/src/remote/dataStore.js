@@ -100,10 +100,18 @@ export function getBackendServerUrl() {
 }
 
 /**
- * Update backend server URL
+ * Update backend server URL and clear all caches
  */
 export function updateBackendServerUrl(url) {
   localStorage.setItem('backendServerUrl', url);
+  
+  // Clear all caches after URL change
+  import('../mongo/mongoStore').then(module => {
+    if (module.clearMongoCache) {
+      module.clearMongoCache();
+    }
+  }).catch(err => console.warn('Failed to clear mongo cache:', err));
+  
   return { code: 0, message: 'Backend URL updated' };
 }
 
@@ -134,7 +142,7 @@ export async function testBackendConnection(url) {
 export async function fetchJdbcAppConfig() {
   try {
     const backendUrl = getBackendUrl();
-    const response = await fetch(`${backendUrl}/jdbc/config/`);
+    const response = await fetch(`${backendUrl}/jdbc/config/app/`);
     const result = await response.json();
     if (result.code === 0 && result.data) {
       const configArray = Object.entries(result.data).map(([key, value]) => ({
@@ -145,7 +153,7 @@ export async function fetchJdbcAppConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.log('[ERROR]Failed to fetch JDBC config:', error);
+    console.log('[ERROR]Failed to fetch JDBC app config:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -238,7 +246,7 @@ export async function updateJdbcConfig(key, value) {
 export async function fetchMongoAppConfig() {
   try {
     const backendUrl = getBackendUrl();
-    const response = await fetch(`${backendUrl}/mongo/config/`);
+    const response = await fetch(`${backendUrl}/mongo/config/app/`);
     const result = await response.json();
     if (result.code === 0 && result.data) {
       const configArray = Object.entries(result.data).map(([key, value]) => ({
@@ -249,7 +257,7 @@ export async function fetchMongoAppConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.log('[ERROR]Failed to fetch MongoDB config:', error);
+    console.log('[ERROR]Failed to fetch MongoDB app config:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -600,7 +608,7 @@ export { extractDocId };
 export async function fetchElasticsearchAppConfig() {
   try {
     const backendUrl = getBackendUrl();
-    const response = await fetch(`${backendUrl}/elasticsearch/config/`);
+    const response = await fetch(`${backendUrl}/elasticsearch/config/app/`);
     const result = await response.json();
     if (result.code === 0 && result.data) {
       const configArray = Object.entries(result.data).map(([key, value]) => ({
@@ -611,7 +619,7 @@ export async function fetchElasticsearchAppConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.error('Failed to fetch Elasticsearch config:', error);
+    console.error('Failed to fetch Elasticsearch app config:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }

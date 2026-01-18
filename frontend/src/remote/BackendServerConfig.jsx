@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useAtom } from 'jotai';
+import React, { useState, useEffect, useRef } from 'react';
+import { useAtom, useSetAtom } from 'jotai';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
 import { 
   backendServerUrlAtom,
@@ -7,6 +7,7 @@ import {
   updateBackendServerUrl,
   testBackendConnection
 } from './dataStore';
+import { clearFileCache, fileCacheAtom } from '../file/fileStore';
 
 const BackendServerConfig = () => {
   const [backendUrl, setBackendUrl] = useAtom(backendServerUrlAtom);
@@ -14,6 +15,8 @@ const BackendServerConfig = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const setFileCache = useSetAtom(fileCacheAtom);
+  const editContainerRef = useRef(null);
 
   useEffect(() => {
     const loadUrl = async () => {
@@ -51,6 +54,22 @@ const BackendServerConfig = () => {
     loadUrl();
   }, [setBackendUrl]);
 
+  // Handle click outside to cancel editing
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleClickOutside = (event) => {
+      if (editContainerRef.current && !editContainerRef.current.contains(event.target)) {
+        handleCancel();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditing, backendUrl]);
+
   const handleEdit = () => {
     setIsEditing(true);
     setEditUrl(backendUrl);
@@ -66,6 +85,9 @@ const BackendServerConfig = () => {
     setBackendUrl(editUrl);
     setIsEditing(false);
     setTestResult(null);
+    
+    // Clear file cache
+    clearFileCache(setFileCache);
   };
 
   const handleTest = async () => {
@@ -88,30 +110,33 @@ const BackendServerConfig = () => {
       
       <div className="test-config-section">
         <h4>Backend Server URL</h4>
-        <div style={{ padding: '12px' }}>
+        <div>
           {isEditing ? (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div ref={editContainerRef} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <input
                 type="text"
                 value={editUrl}
                 onChange={(e) => setEditUrl(e.target.value)}
                 style={{
                   flex: 1,
-                  padding: '6px 10px',
-                  fontSize: '14px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px'
+                  maxWidth: '600px',
+                  padding: '4px 8px',
+                  fontSize: '13px',
+                  border: '1px solid #ccc',
+                  borderRadius: '3px'
                 }}
                 placeholder="http://localhost:900"
+                autoFocus
               />
               <button 
                 onClick={handleSave}
                 style={{
-                  padding: '6px 14px',
-                  backgroundColor: '#4CAF50',
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  backgroundColor: '#007bff',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
+                  borderRadius: '3px',
                   cursor: 'pointer'
                 }}
               >
@@ -120,11 +145,12 @@ const BackendServerConfig = () => {
               <button 
                 onClick={handleCancel}
                 style={{
-                  padding: '6px 14px',
-                  backgroundColor: '#666',
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  backgroundColor: '#6c757d',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
+                  borderRadius: '3px',
                   cursor: 'pointer'
                 }}
               >
@@ -132,25 +158,28 @@ const BackendServerConfig = () => {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <span style={{ 
-                flex: 1, 
+                flex: 1,
+                maxWidth: '600px',
                 fontFamily: 'monospace', 
-                fontSize: '14px',
-                padding: '6px 10px',
-                backgroundColor: '#f5f5f5',
-                borderRadius: '4px'
+                fontSize: '13px',
+                padding: '4px 8px',
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #e9ecef',
+                borderRadius: '3px'
               }}>
                 {backendUrl || 'http://localhost:900'}
               </span>
               <button 
                 onClick={handleEdit}
                 style={{
-                  padding: '6px 14px',
-                  backgroundColor: '#2196F3',
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  backgroundColor: '#007bff',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
+                  borderRadius: '3px',
                   cursor: 'pointer'
                 }}
               >
@@ -160,26 +189,40 @@ const BackendServerConfig = () => {
           )}
         </div>
         
-        <div style={{ padding: '0 12px', fontSize: '13px', color: '#666' }}>
-          <p style={{ margin: '8px 0' }}>
+        <div style={{ fontSize: '12px', color: '#6c757d' }}>
+          <p style={{ margin: '6px 0' }}>
             Configuration priority: localStorage &gt; config.0.js &gt; config.js &gt; default
           </p>
         </div>
       </div>
       
       <div className="test-action-section">
-        <p>Click the button below to test the connection to the backend server.</p>
+        <p style={{ fontSize: '13px', color: '#495057', margin: '0 0 12px 0' }}>
+          Click the button below to test the connection to the backend server.
+        </p>
         
         <div className="test-buttons">
           <button 
             onClick={handleTest} 
             disabled={testing}
             className="test-button"
+            style={{
+              padding: '6px 16px',
+              fontSize: '13px',
+              backgroundColor: testing ? '#6c757d' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: testing ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
           >
             {testing ? (
               <>
-                <SpinningCircle width={16} height={16} color="white" />
-                <span style={{ marginLeft: '8px' }}>Testing...</span>
+                <SpinningCircle width={14} height={14} color="white" />
+                <span>Testing...</span>
               </>
             ) : (
               'Test Connection'

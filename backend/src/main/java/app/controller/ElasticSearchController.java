@@ -93,6 +93,18 @@ public class ElasticSearchController {
         }
     }
 
+    @GetMapping("config/app/")
+    public ApiResponse<ElasticSearchConfig> getAppConfig() {
+        try {
+            ElasticSearchConfig config = configService.getAppConfig();
+            return ApiResponse.success(config, "Elasticsearch application.properties configuration retrieved");
+        } catch (Exception e) {
+            System.err.println("ElasticSearchController.getAppConfig() error: " + e.getMessage());
+            e.printStackTrace();
+            return ApiResponse.error(500, "Failed to get app config: " + e.getMessage());
+        }
+    }
+
     @GetMapping("config/")
     public ApiResponse<ElasticSearchConfig> getConfig() {
         try {

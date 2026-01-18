@@ -53,6 +53,12 @@ public class MongoService {
         String username = config.getUsername();
         String password = config.getPassword();
         
+        // Ensure URI ends with "/" if it doesn't have query parameters
+        // This is needed for proper MongoDB connection
+        if (uri != null && !uri.isEmpty() && !uri.contains("?") && !uri.endsWith("/")) {
+            uri = uri + "/";
+        }
+        
         // If username and password are provided, inject them into the URI
         if (username != null && !username.trim().isEmpty() && 
             password != null && !password.trim().isEmpty()) {

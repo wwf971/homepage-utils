@@ -338,6 +338,17 @@ export async function removeArrayItem(database, collection, docId, path) {
 }
 
 /**
+ * Clear all MongoDB caches
+ */
+export function clearMongoCache() {
+  databaseListCache = null;
+  databaseListTimestamp = 0;
+  collectionListCache.clear();
+  collectionListTimestamps.clear();
+  console.log('MongoDB cache cleared');
+}
+
+/**
  * List all databases in the MongoDB instance
  * Cached to avoid repeated calls
  * 

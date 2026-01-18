@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 public class MongoConfigService {
 
     private MongoConfig currentConfig;
+    private MongoConfig appConfig; // Store application.properties config separately
     private final LocalConfigService localConfigService;
     private final RemoteConfigService remoteConfigService;
     private final ApplicationEventPublisher eventPublisher;
@@ -28,6 +29,9 @@ public class MongoConfigService {
         this.remoteConfigService = remoteConfigService;
         this.eventPublisher = eventPublisher;
 
+        // Store application.properties config
+        this.appConfig = new MongoConfig(uri, database, username, password);
+        
         // Initialize with merged config
         this.currentConfig = mergeAllLayers(uri, database, username, password);
         System.out.println("MongoConfigService initialized with merged config: " + currentConfig);
@@ -82,6 +86,16 @@ public class MongoConfigService {
         eventPublisher.publishEvent(event);
     }
 
+    /**
+     * Get application.properties config only (first layer, no overrides)
+     */
+    public MongoConfig getAppConfig() {
+        return appConfig;
+    }
+
+    /**
+     * Get current merged config (all layers applied)
+     */
     public MongoConfig getCurrentConfig() {
         return currentConfig;
     }

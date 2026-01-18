@@ -22,6 +22,11 @@ public class MongoController {
         this.mongoService = mongoService;
     }
 
+    @GetMapping("config/app/")
+    public ApiResponse<MongoConfig> getAppConfig() {
+        return ApiResponse.success(configService.getAppConfig(), "MongoDB application.properties configuration retrieved");
+    }
+
     @GetMapping("config/")
     public ApiResponse<MongoConfig> getConfig() {
         return ApiResponse.success(configService.getCurrentConfig(), "Current MongoDB configuration retrieved");

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 public class JdbcConfigService {
 
     private JdbcConfig currentConfig;
+    private JdbcConfig appConfig; // Store application.properties config separately
     private final LocalConfigService localConfigService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -24,6 +25,9 @@ public class JdbcConfigService {
         this.localConfigService = localConfigService;
         this.eventPublisher = eventPublisher;
 
+        // Store application.properties config
+        this.appConfig = new JdbcConfig(url, username, password, driverClassName);
+        
         // Initialize with merged config
         this.currentConfig = mergeAllLayers(url, username, password, driverClassName);
         System.out.println("JdbcConfigService initialized with merged config: " + currentConfig);
@@ -62,6 +66,16 @@ public class JdbcConfigService {
         eventPublisher.publishEvent(event);
     }
 
+    /**
+     * Get application.properties config only (first layer, no overrides)
+     */
+    public JdbcConfig getAppConfig() {
+        return appConfig;
+    }
+
+    /**
+     * Get current merged config (all layers applied)
+     */
     public JdbcConfig getCurrentConfig() {
         return currentConfig;
     }

@@ -22,6 +22,17 @@ export const fileAccessPointsErrorAtom = atom(null);
 export const fileCacheAtom = atom({});
 
 /**
+ * Clear file cache
+ * @param {Function} setCache - Jotai setter for fileCacheAtom (optional)
+ */
+export function clearFileCache(setCache) {
+  if (setCache) {
+    setCache({});
+  }
+  console.log('File cache cleared');
+}
+
+/**
  * Fetch file access points using MongoDB document API with query filter
  * 1. Get mongo docs info (database, collection, IDs) from backend
  * 2. Query MongoDB for documents where type="file_access_point"
