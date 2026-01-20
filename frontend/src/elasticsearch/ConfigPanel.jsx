@@ -13,7 +13,7 @@ import {
   fetchElasticsearchComputedConfig,
   updateElasticsearchConfig
 } from '../remote/dataStore';
-import '../remote/configPanelStyles.css';
+import '../styles/configPanel.css';
 
 export const ConfigPanel = () => {
   const appConfig = useAtomValue(esAppConfigAtom);
@@ -115,7 +115,7 @@ export const ConfigPanel = () => {
   }, [localConfig, computedConfig, handleLocalUpdate]);
 
   return (
-    <div className="config-panel">
+    <div className="main-panel">
       {configError && (
         <div style={{ 
           padding: '12px', 

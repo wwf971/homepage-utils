@@ -1,245 +1,205 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
-import { SpinningCircle } from '@wwf971/react-comp-misc';
+import { KeyValuesComp, EditableValueComp, InfoIconWithTooltip } from '@wwf971/react-comp-misc';
 import { 
   backendServerUrlAtom,
   getBackendServerUrl,
   updateBackendServerUrl,
-  testBackendConnection
+  createConfigReloader,
+  backendLocalConfigAtom,
+  fetchBackendLocalConfig,
+  updateBackendLocalConfig,
+  mongoAppConfigAtom,
+  mongoLocalConfigAtom,
+  mongoComputedConfigAtom,
+  jdbcAppConfigAtom,
+  jdbcLocalConfigAtom,
+  jdbcComputedConfigAtom,
+  esAppConfigAtom,
+  esLocalConfigAtom,
+  esComputedConfigAtom,
+  redisAppConfigAtom,
+  redisLocalConfigAtom,
+  redisComputedConfigAtom,
+  rabbitMQAppConfigAtom,
+  rabbitMQLocalConfigAtom,
+  rabbitMQComputedConfigAtom
 } from './dataStore';
 import { clearFileCache, fileCacheAtom } from '../file/fileStore';
+import '../styles/configPanel.css';
+import './backendServer.css';
 
 const BackendServerConfig = () => {
   const [backendUrl, setBackendUrl] = useAtom(backendServerUrlAtom);
-  const [editUrl, setEditUrl] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState(null);
+  const [localConfig, setLocalConfig] = useAtom(backendLocalConfigAtom);
+  const [loading, setLoading] = useState(false);
   const setFileCache = useSetAtom(fileCacheAtom);
-  const editContainerRef = useRef(null);
+
+  // Config setters for reloading
+  const setMongoAppConfig = useSetAtom(mongoAppConfigAtom);
+  const setMongoLocalConfig = useSetAtom(mongoLocalConfigAtom);
+  const setMongoComputedConfig = useSetAtom(mongoComputedConfigAtom);
+  const setJdbcAppConfig = useSetAtom(jdbcAppConfigAtom);
+  const setJdbcLocalConfig = useSetAtom(jdbcLocalConfigAtom);
+  const setJdbcComputedConfig = useSetAtom(jdbcComputedConfigAtom);
+  const setEsAppConfig = useSetAtom(esAppConfigAtom);
+  const setEsLocalConfig = useSetAtom(esLocalConfigAtom);
+  const setEsComputedConfig = useSetAtom(esComputedConfigAtom);
+  const setRedisAppConfig = useSetAtom(redisAppConfigAtom);
+  const setRedisLocalConfig = useSetAtom(redisLocalConfigAtom);
+  const setRedisComputedConfig = useSetAtom(redisComputedConfigAtom);
+  const setRabbitMQAppConfig = useSetAtom(rabbitMQAppConfigAtom);
+  const setRabbitMQLocalConfig = useSetAtom(rabbitMQLocalConfigAtom);
+  const setRabbitMQComputedConfig = useSetAtom(rabbitMQComputedConfigAtom);
+
+  const loadConfigs = useCallback(async () => {
+    setLoading(true);
+
+    // Load backend URL
+    const currentUrl = getBackendServerUrl();
+    setBackendUrl(currentUrl);
+
+    // Load backend local config
+    const result = await fetchBackendLocalConfig();
+    if (result.code === 0) {
+      setLocalConfig({
+        serverName: result.data.serverName || '',
+        serverId: result.data.serverId || ''
+      });
+    }
+
+    setLoading(false);
+  }, [setBackendUrl, setLocalConfig]);
 
   useEffect(() => {
-    const loadUrl = async () => {
-      // First get current URL (from localStorage or default)
-      const currentUrl = getBackendServerUrl();
-      setBackendUrl(currentUrl);
-      setEditUrl(currentUrl);
-      
-      // Then try to load from config files
-      const loadBackendUrlFromFiles = async () => {
-        try {
-          const response0 = await fetch('/config.0.js');
-          const text0 = await response0.text();
-          const match0 = text0.match(/SERVER_URL\s*=\s*['"]([^'"]+)['"]/);
-          if (match0) return match0[1];
-        } catch (e) {}
-        
-        try {
-          const response = await fetch('/config.js');
-          const text = await response.text();
-          const match = text.match(/SERVER_URL\s*=\s*['"]([^'"]+)['"]/);
-          if (match) return match[1];
-        } catch (e) {}
-        
-        return null;
-      };
-      
-      const fileUrl = await loadBackendUrlFromFiles();
-      // Only update if no localStorage override exists and file has URL
-      if (fileUrl && !localStorage.getItem('backendServerUrl')) {
-        setBackendUrl(fileUrl);
-        setEditUrl(fileUrl);
-      }
-    };
-    loadUrl();
-  }, [setBackendUrl]);
+    loadConfigs();
+  }, [loadConfigs]);
 
-  // Handle click outside to cancel editing
-  useEffect(() => {
-    if (!isEditing) return;
-
-    const handleClickOutside = (event) => {
-      if (editContainerRef.current && !editContainerRef.current.contains(event.target)) {
-        handleCancel();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isEditing, backendUrl]);
-
-  const handleEdit = () => {
-    setIsEditing(true);
-    setEditUrl(backendUrl);
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditUrl(backendUrl);
-  };
-
-  const handleSave = () => {
-    updateBackendServerUrl(editUrl);
-    setBackendUrl(editUrl);
-    setIsEditing(false);
-    setTestResult(null);
+  const handleUpdateUrl = useCallback(async (key, newValue) => {
+    updateBackendServerUrl(newValue);
+    setBackendUrl(newValue);
     
-    // Clear file cache
     clearFileCache(setFileCache);
-  };
 
-  const handleTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    
-    const urlToTest = isEditing ? editUrl : backendUrl;
-    const result = await testBackendConnection(urlToTest);
-    
-    setTestResult({
-      success: result.code === 0,
-      message: result.message
+    // Reload backend local config (serverName, serverId) from new server
+    const backendConfigResult = await fetchBackendLocalConfig();
+    if (backendConfigResult.code === 0) {
+      setLocalConfig({
+        serverName: backendConfigResult.data.serverName || '',
+        serverId: backendConfigResult.data.serverId || ''
+      });
+    }
+
+    const reloader = createConfigReloader();
+    await reloader({
+      setMongoAppConfig,
+      setMongoLocalConfig,
+      setMongoComputedConfig,
+      setJdbcAppConfig,
+      setJdbcLocalConfig,
+      setJdbcComputedConfig,
+      setEsAppConfig,
+      setEsLocalConfig,
+      setEsComputedConfig,
+      setRedisAppConfig,
+      setRedisLocalConfig,
+      setRedisComputedConfig,
+      setRabbitMQAppConfig,
+      setRabbitMQLocalConfig,
+      setRabbitMQComputedConfig
     });
-    setTesting(false);
-  };
+    
+    return { code: 0, message: 'Backend URL updated' };
+  }, [setBackendUrl, setFileCache, setLocalConfig, setMongoAppConfig, setMongoLocalConfig, setMongoComputedConfig, setJdbcAppConfig, setJdbcLocalConfig, setJdbcComputedConfig, setEsAppConfig, setEsLocalConfig, setEsComputedConfig, setRedisAppConfig, setRedisLocalConfig, setRedisComputedConfig, setRabbitMQAppConfig, setRabbitMQLocalConfig, setRabbitMQComputedConfig]);
+
+  const handleUpdateLocalConfig = useCallback(async (key, newValue) => {
+    // Validate serverId format
+    if (key === 'serverId' && newValue && !/^[a-z0-9]*$/.test(newValue)) {
+      return { 
+        code: -1, 
+        message: 'Server ID can only contain lowercase letters (a-z) and numbers (0-9)' 
+      };
+    }
+
+    const result = await updateBackendLocalConfig(key, newValue);
+    if (result.code === 0) {
+      setLocalConfig(prev => ({
+        ...prev,
+        [key]: newValue
+      }));
+    }
+    return result;
+  }, [setLocalConfig]);
+
+  const configData = useMemo(() => {
+    return [
+      {
+        key: 'Backend URL',
+        value: backendUrl || 'http://localhost:900',
+        valueComp: (props) => (
+          <EditableValueComp 
+            {...props} 
+            category="backend"
+            configKey="url"
+            onUpdate={handleUpdateUrl}
+          />
+        )
+      },
+      {
+        key: 'Server Name',
+        value: localConfig.serverName || '(not set)',
+        valueComp: (props) => (
+          <EditableValueComp 
+            {...props} 
+            category="backend"
+            isNotSet={!localConfig.serverName}
+            configKey="serverName"
+            onUpdate={handleUpdateLocalConfig}
+          />
+        )
+      },
+      {
+        key: (
+          <span className="key-with-info">
+            Server ID
+            <InfoIconWithTooltip 
+              tooltipText="Only lowercase letters (a-z) and numbers (0-9) are allowed"
+              width={14}
+              height={14}
+            />
+          </span>
+        ),
+        value: localConfig.serverId || '(not set)',
+        valueComp: (props) => (
+          <EditableValueComp 
+            {...props} 
+            category="backend"
+            isNotSet={!localConfig.serverId}
+            configKey="serverId"
+            onUpdate={handleUpdateLocalConfig}
+          />
+        )
+      }
+    ];
+  }, [backendUrl, localConfig, handleUpdateUrl, handleUpdateLocalConfig]);
 
   return (
-    <div className="connection-test">
-      <h3>Backend Server Configuration</h3>
-      
-      <div className="test-config-section">
-        <h4>Backend Server URL</h4>
-        <div>
-          {isEditing ? (
-            <div ref={editContainerRef} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <input
-                type="text"
-                value={editUrl}
-                onChange={(e) => setEditUrl(e.target.value)}
-                style={{
-                  flex: 1,
-                  maxWidth: '600px',
-                  padding: '4px 8px',
-                  fontSize: '13px',
-                  border: '1px solid #ccc',
-                  borderRadius: '3px'
-                }}
-                placeholder="http://localhost:900"
-                autoFocus
-              />
-              <button 
-                onClick={handleSave}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '13px',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Save
-              </button>
-              <button 
-                onClick={handleCancel}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '13px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ 
-                flex: 1,
-                maxWidth: '600px',
-                fontFamily: 'monospace', 
-                fontSize: '13px',
-                padding: '4px 8px',
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #e9ecef',
-                borderRadius: '3px'
-              }}>
-                {backendUrl || 'http://localhost:900'}
-              </span>
-              <button 
-                onClick={handleEdit}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '13px',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Edit
-              </button>
-            </div>
-          )}
-        </div>
+    <>
+      <div className="section-title">Backend Server Configuration</div>
+      <div className="config-section">
+        <KeyValuesComp 
+          data={configData} 
+          isEditable={false}
+          alignColumn={true}
+          keyColWidth="min"
+        />
         
-        <div style={{ fontSize: '12px', color: '#6c757d' }}>
-          <p style={{ margin: '6px 0' }}>
-            Configuration priority: localStorage &gt; config.0.js &gt; config.js &gt; default
-          </p>
+        <div className="config-note">
+          <p>Backend URL priority: localStorage &gt; config.0.js &gt; config.js &gt; default</p>
         </div>
       </div>
-      
-      <div className="test-action-section">
-        <p style={{ fontSize: '13px', color: '#495057', margin: '0 0 12px 0' }}>
-          Click the button below to test the connection to the backend server.
-        </p>
-        
-        <div className="test-buttons">
-          <button 
-            onClick={handleTest} 
-            disabled={testing}
-            className="test-button"
-            style={{
-              padding: '6px 16px',
-              fontSize: '13px',
-              backgroundColor: testing ? '#6c757d' : '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: testing ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {testing ? (
-              <>
-                <SpinningCircle width={14} height={14} color="white" />
-                <span>Testing...</span>
-              </>
-            ) : (
-              'Test Connection'
-            )}
-          </button>
-        </div>
-        
-        {testResult && (
-          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-            <strong>{testResult.success ? '✓ Success' : '✗ Failed'}</strong>
-            <div className="result-message">{testResult.message}</div>
-          </div>
-        )}
-      </div>
-    </div>
+    </>
   );
 };
 
 export default BackendServerConfig;
-

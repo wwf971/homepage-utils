@@ -2,10 +2,11 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { esComputedConfigAtom, esSelectedIndexAtom, getBackendServerUrl } from '../remote/dataStore';
+import '../styles/testSection.css';
 import ListIndices from './ListIndices';
 import IndexInfo from './IndexInfo';
 import ListDocs from './ListDocs';
-import SearchDoc from './SearchDoc';
+import EsDocSearch from './EsDocSearch';
 
 export const TestConnection = ({ showIndexList = false }) => {
   const selectedIndex = useAtomValue(esSelectedIndexAtom);
@@ -81,11 +82,11 @@ export const TestConnection = ({ showIndexList = false }) => {
   };
 
   return (
-    <div className="connection-test">
+    <div className="main-panel">
       <h3>Test Elasticsearch Connection</h3>
       
       <div className="test-config-section">
-        <h4>Current Config(Computed)</h4>
+        <div className="section-title">Current Config(Computed)</div>
         {config.length === 0 ? (
           <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
         ) : (
@@ -94,7 +95,7 @@ export const TestConnection = ({ showIndexList = false }) => {
       </div>
       
       <div className="test-action-section">
-        <p>Click the button below to test the connection with the above configuration.</p>
+        <div className="test-description">Click the button below to test the connection with the above configuration.</div>
         
         <div className="test-buttons">
           <button 
@@ -141,7 +142,7 @@ export const TestConnection = ({ showIndexList = false }) => {
           {selectedIndex && (
             <>
               <IndexInfo />
-              <SearchDoc />
+              <EsDocSearch />
               <ListDocs />
             </>
           )}

@@ -13,7 +13,7 @@ import {
   fetchJdbcComputedConfig,
   updateJdbcConfig
 } from '../remote/dataStore';
-import '../remote/configPanelStyles.css';
+import '../styles/configPanel.css';
 
 const JdbcConfigPanel = () => {
   const appConfig = useAtomValue(jdbcAppConfigAtom);
@@ -115,7 +115,7 @@ const JdbcConfigPanel = () => {
   }, [localConfig, computedConfig, handleLocalUpdate]);
 
   return (
-    <div className="config-panel">
+    <div className="main-panel">
       {configError && (
         <div style={{ 
           padding: '12px', 

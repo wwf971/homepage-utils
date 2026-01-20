@@ -12,7 +12,7 @@ import {
   fetchMongoComputedConfig,
   updateMongoConfig
 } from '../remote/dataStore';
-import '../remote/configPanelStyles.css';
+import '../styles/configPanel.css';
 
 const MongoConfigPanel = () => {
   const appConfig = useAtomValue(mongoAppConfigAtom);
@@ -165,7 +165,7 @@ const MongoConfigPanel = () => {
   }, [localConfig, computedConfig, handleLocalUpdate]);
 
   return (
-    <div className="config-panel">
+    <div className="main-panel">
       {configError && (
         <div style={{ 
           padding: '12px', 

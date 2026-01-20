@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle, TabsOnTop } from '@wwf971/react-comp-misc';
 import { mongoComputedConfigAtom, mongoSelectedDatabaseAtom, mongoSelectedCollectionAtom, getBackendServerUrl } from '../remote/dataStore';
+import '../styles/testSection.css';
 import ListDatabases from './ListDatabases';
 import ListCollections from './ListCollections';
-import SearchDoc from './SearchDoc';
+import MongoDocSearch from './MongoDocSearch';
 import ListDocs from './ListDocs';
 import MongoIndex from '../mongo-index/MongoIndex';
 
@@ -103,91 +104,93 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
   };
 
   return (
-    <div className="connection-test">
-      <h3>MongoDB Connection</h3>
-      
-      <div className="test-config-section">
-        <h4>Current Config(Computed)</h4>
-        {config.length === 0 ? (
-          <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
-        ) : (
-          <KeyValues data={config} isEditable={false} />
-        )}
-      </div>
-      
-      <div className="test-action-section">
-        <p>Click the button below to test the connection with the above configuration.</p>
+    <div className="main-panel">
+      <div className="main-panel">
+        <h3>MongoDB Connection</h3>
         
-        <div className="test-buttons">
-          <button 
-            onClick={handleTest} 
-            disabled={testing}
-            className="test-button"
-          >
-            {testing ? (
-              <>
-                <SpinningCircle width={16} height={16} color="white" />
-                <span style={{ marginLeft: '8px' }}>Testing...</span>
-              </>
-            ) : (
-              'Test Connection'
-            )}
-          </button>
-          
-          {testing && (
-            <button 
-              onClick={handleAbort}
-              className="abort-button"
-            >
-              Abort
-            </button>
+        <div className="test-config-section">
+          <div className="test-section-title">Current Config(Computed)</div>
+          {config.length === 0 ? (
+            <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
+          ) : (
+            <KeyValues data={config} isEditable={false} />
           )}
         </div>
         
-        {result && (
-          <div className={`test-result ${result.success ? 'success' : 'error'}`}>
-            <strong>{result.success ? '✓ Success' : '✗ Failed'}</strong>
-            <div className="result-message">{result.message}</div>
+        <div className="test-action-section">
+          <div className="test-description">Click the button below to test the connection with the above configuration.</div>
+          
+          <div className="test-buttons">
+            <button 
+              onClick={handleTest} 
+              disabled={testing}
+              className="test-button"
+            >
+              {testing ? (
+                <>
+                  <SpinningCircle width={16} height={16} color="white" />
+                  <span style={{ marginLeft: '8px' }}>Testing...</span>
+                </>
+              ) : (
+                'Test Connection'
+              )}
+            </button>
+            
+            {testing && (
+              <button 
+                onClick={handleAbort}
+                className="abort-button"
+              >
+                Abort
+              </button>
+            )}
           </div>
-        )}
-      </div>
-      
-      {showDatabaseList ? (
-        <>
-          <ListDatabases 
-            onTestConnection={handleTest}
-            hasSuccessfulTest={result?.success || false}
-            isTestingConnection={testing}
-          />
           
-          {selectedDatabase && (
-            <ListCollections
-              hasSuccessfulTest={result?.success || false}
-            />
-          )}
-          
-          {selectedCollection && (
-            <div style={{ marginTop: '8px' }}>
-              <TabsOnTop defaultTab="Search Docs" autoSwitchToNewTab={false}>
-                <TabsOnTop.Tab label="Search Docs">
-                  <SearchDoc
-                    selectedDatabase={selectedDatabase}
-                    selectedCollection={selectedCollection}
-                  />
-                </TabsOnTop.Tab>
-                
-                <TabsOnTop.Tab label="All Docs">
-                  <ListDocsTabWrapper
-              hasSuccessfulTest={result?.success || false}
-            />
-                </TabsOnTop.Tab>
-              </TabsOnTop>
+          {result && (
+            <div className={`test-result ${result.success ? 'success' : 'error'}`}>
+              <strong>{result.success ? '✓ Success' : '✗ Failed'}</strong>
+              <div className="result-message">{result.message}</div>
             </div>
           )}
-        </>
-      ) : (
-        <MongoIndex />
-      )}
+        </div>
+        
+        {showDatabaseList ? (
+          <>
+            <ListDatabases 
+              onTestConnection={handleTest}
+              hasSuccessfulTest={result?.success || false}
+              isTestingConnection={testing}
+            />
+            
+            {selectedDatabase && (
+              <ListCollections
+                hasSuccessfulTest={result?.success || false}
+              />
+            )}
+            
+            {selectedCollection && (
+              <div style={{ marginTop: '8px' }}>
+                <TabsOnTop defaultTab="Search Docs" autoSwitchToNewTab={false}>
+                  <TabsOnTop.Tab label="Search Docs">
+                    <MongoDocSearch
+                      selectedDatabase={selectedDatabase}
+                      selectedCollection={selectedCollection}
+                    />
+                  </TabsOnTop.Tab>
+                  
+                  <TabsOnTop.Tab label="All Docs">
+                    <ListDocsTabWrapper
+                hasSuccessfulTest={result?.success || false}
+              />
+                  </TabsOnTop.Tab>
+                </TabsOnTop>
+              </div>
+            )}
+          </>
+        ) : (
+          <MongoIndex />
+        )}
+      </div>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { jdbcComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
+import '../styles/testSection.css';
 
 const JdbcConnectionTest = () => {
   const [testing, setTesting] = useState(false);
@@ -69,11 +70,11 @@ const JdbcConnectionTest = () => {
   };
 
   return (
-    <div className="connection-test">
-      <h3>Test JDBC Connection</h3>
+    <div className=" main-panel">
+      <div className="section-title">Test JDBC Connection</div>
       
       <div className="test-config-section">
-        <h4>Current Config(Computed)</h4>
+        <div className="test-section-title">Current Config(Computed)</div>
         {config.length === 0 ? (
           <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
         ) : (
@@ -82,7 +83,7 @@ const JdbcConnectionTest = () => {
       </div>
       
       <div className="test-action-section">
-        <p>Click the button below to test the connection with the above configuration.</p>
+        <div className="test-description">Click the button below to test the connection with the above configuration.</div>
         
         <div className="test-buttons">
           <button 

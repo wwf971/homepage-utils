@@ -185,8 +185,11 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
           const numericIndex = typeof index === 'number' ? index : parseInt(index, 10);
           if (!isNaN(numericIndex) && numericIndex >= 0 && numericIndex < dirs.length) {
             const resolvedPath = dirs[numericIndex];
-            if (resolvedPath && resolvedPath.trim()) {
-              return resolvedPath;
+            if (resolvedPath != null) {
+              const pathStr = String(resolvedPath).trim();
+              if (pathStr) {
+                return pathStr;
+              }
             }
           }
         }
@@ -195,8 +198,11 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
         if (typeof dirs === 'object' && !Array.isArray(dirs)) {
           const key = String(index);
           const resolvedPath = dirs[key];
-          if (resolvedPath && resolvedPath.trim()) {
-            return resolvedPath;
+          if (resolvedPath != null) {
+            const pathStr = String(resolvedPath).trim();
+            if (pathStr) {
+              return pathStr;
+            }
           }
         }
       }

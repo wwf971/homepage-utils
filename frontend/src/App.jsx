@@ -17,7 +17,7 @@ import {TestConnectionRedis} from './redis/TestConnectionRedis';
 import {TestConnectionRedisson} from './redis/TestConnectionRedisson';
 import RabbitMQConfigPanel from './rabbitmq/RabbitMQConfigPanel';
 import TestConnectionRabbitMQ from './rabbitmq/TestConnectionRabbitMQ';
-import BackendServerConfig from './remote/BackendServerConfig';
+import BackendServerPanel from './remote/BackendServerPanel';
 import FilePanel from './file/FilePanel';
 import './App.css';
 
@@ -33,9 +33,9 @@ function App() {
       <div className="app">
         <MasterDetail title="Backend Management" sidebarWidth="220px">
           <Tab label="Backend Server">
-            <SubTab label="Backend Server" isDefault={true}>
+            <SubTab label="Configuration" isDefault={true}>
               <Panel>
-                <BackendServerConfig />
+                <BackendServerPanel />
               </Panel>
             </SubTab>
           </Tab>

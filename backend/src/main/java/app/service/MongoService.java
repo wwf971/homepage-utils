@@ -36,16 +36,23 @@ public class MongoService {
         // Close existing connection since config changed
         closeConnection();
         
-        // Try to reconnect with new config, but don't throw exception if it fails
-        // This allows config to be saved even if the new config doesn't work yet
-        try {
-            initializeConnection(event.getNewConfig());
-            System.out.println("Successfully reconnected with new config");
-        } catch (Exception e) {
-            System.err.println("Failed to reconnect with new config (config still saved): " + e.getMessage());
-            // Don't throw - config update should succeed even if connection fails
-            this.currentConfig = event.getNewConfig();
-        }
+        // Reconnect asynchronously to avoid blocking the HTTP response
+        // This allows config save to return immediately
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                System.out.println("Attempting to reconnect to MongoDB in background...");
+                initializeConnection(event.getNewConfig());
+                System.out.println("Successfully reconnected with new config");
+            } catch (Exception e) {
+                System.err.println("Failed to reconnect with new config (config still saved): " + e.getMessage());
+                // Don't throw - config update should succeed even if connection fails
+                this.currentConfig = event.getNewConfig();
+            }
+        });
+        
+        // Update current config immediately so it's available even if connection fails
+        this.currentConfig = event.getNewConfig();
+        System.out.println("Config updated immediately, MongoDB reconnection in progress...");
     }
 
     private String buildConnectionUri(MongoConfig config) {

@@ -68,6 +68,25 @@ public class LocalConfigController {
         }
     }
 
+    @PostMapping("set/")
+    public ApiResponse<Void> setConfig(@RequestBody Map<String, String> request) {
+        try {
+            String category = request.get("category");
+            String key = request.get("key");
+            String value = request.get("value");
+            
+            if (category == null || key == null || value == null) {
+                return new ApiResponse<>(-1, null, "Missing required fields: category, key, value");
+            }
+            
+            localConfigService.saveConfig(key, value, category);
+            return new ApiResponse<>(0, null, "Config saved successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to set config: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to set config: " + e.getMessage());
+        }
+    }
+
     @GetMapping("info/")
     public ApiResponse<Map<String, Object>> getInfo() {
         try {

@@ -13,7 +13,7 @@ import {
   fetchRabbitMQComputedConfig,
   updateRabbitMQConfig
 } from '../remote/dataStore';
-import '../remote/configPanelStyles.css';
+import '../styles/configPanel.css';
 
 export const RabbitMQConfigPanel = () => {
   const appConfig = useAtomValue(rabbitMQAppConfigAtom);
@@ -125,7 +125,7 @@ export const RabbitMQConfigPanel = () => {
   }, [localConfig, computedConfig, handleLocalUpdate]);
 
   return (
-    <div className="config-panel">
+    <div className="main-panel">
       {configError && (
         <div style={{ 
           padding: '12px', 

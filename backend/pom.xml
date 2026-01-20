@@ -109,6 +109,7 @@
         </dependency>
     </dependencies>
     <build>
+        <finalName>homepage-utils</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

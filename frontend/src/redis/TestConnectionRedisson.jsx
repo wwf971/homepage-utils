@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { redisComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
+import '../styles/testSection.css';
 
 export const TestConnectionRedisson = () => {
   const [testing, setTesting] = useState(false);
@@ -69,11 +70,11 @@ export const TestConnectionRedisson = () => {
   };
 
   return (
-    <div className="connection-test">
+    <div className="main-panel">
       <h3>Test Redisson Connection</h3>
       
       <div className="test-config-section">
-        <h4>Current Config (Computed)</h4>
+        <div className="test-section-title">Current Config (Computed)</div>
         {config.length === 0 ? (
           <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
         ) : (
@@ -82,7 +83,7 @@ export const TestConnectionRedisson = () => {
       </div>
       
       <div className="test-action-section">
-        <p>Click the button below to test the Redisson (distributed lock library) connection using the above configuration.</p>
+        <div className="test-description">Click the button below to test the Redisson (distributed lock library) connection using the above configuration.</div>
         
         <div className="test-buttons">
           <button 

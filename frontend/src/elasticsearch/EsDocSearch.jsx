@@ -6,9 +6,9 @@ import { searchEsDocs } from './EsStore';
 import './elasticsearch.css';
 
 /**
- * SearchDoc - Component for searching documents using character-level index
+ * EsDocSearch - Component for searching documents using character-level index
  */
-const SearchDoc = () => {
+const EsDocSearch = () => {
   const [query, setQuery] = useState('');
   const [searchInKeys, setSearchInKeys] = useState(false);
   const [searchInValues, setSearchInValues] = useState(true);
@@ -186,5 +186,5 @@ const SearchDoc = () => {
   );
 };
 
-export default SearchDoc;
+export default EsDocSearch;
 

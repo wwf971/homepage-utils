@@ -5,7 +5,7 @@ import './mongo-index.css';
 
 /**
  * MongoIndexSearch - Component for searching documents in MongoDB-ES index
- * Wraps the character-level search logic from ES SearchDoc
+ * Wraps the character-level search logic from EsDocSearch
  */
 const MongoIndexSearch = ({ indexName }) => {
   const [query, setQuery] = useState('');

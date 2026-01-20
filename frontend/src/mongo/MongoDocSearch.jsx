@@ -38,12 +38,12 @@ const EditableValueAdapter = ({ data, onChangeAttempt, isEditable, field, index,
 };
 
 /**
- * SearchDoc - Component for searching MongoDB documents with filters
+ * MongoDocSearch - Component for searching MongoDB documents with filters
  * 
  * @param {string} selectedDatabase - Currently selected database
  * @param {string} selectedCollection - Currently selected collection
  */
-const SearchDoc = ({ selectedDatabase, selectedCollection }) => {
+const MongoDocSearch = ({ selectedDatabase, selectedCollection }) => {
   const [filterPairs, setFilterPairs] = useState([
     { key: '', value: '' }
   ]);
@@ -366,5 +366,5 @@ const SearchDoc = ({ selectedDatabase, selectedCollection }) => {
   );
 };
 
-export default SearchDoc;
+export default MongoDocSearch;
 

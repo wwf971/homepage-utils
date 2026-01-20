@@ -5,6 +5,12 @@ import { extractDocId } from '../mongo/mongoUtils';
 // ========== Backend Server Config ==========
 export const backendServerUrlAtom = atom('http://localhost:900');
 
+// Backend Server Local Config Atoms
+export const backendLocalConfigAtom = atom({
+  serverName: '',
+  serverId: ''
+});
+
 // Helper to get current backend URL (synchronous)
 function getBackendUrl() {
   // Priority: localStorage > default
@@ -100,6 +106,152 @@ export function getBackendServerUrl() {
 }
 
 /**
+ * Reload all configs from backend (useful after backend URL change)
+ * Returns a function that can be called with setter functions
+ */
+export function createConfigReloader() {
+  return async (setters) => {
+    const {
+      setMongoAppConfig,
+      setMongoLocalConfig,
+      setMongoComputedConfig,
+      setJdbcAppConfig,
+      setJdbcLocalConfig,
+      setJdbcComputedConfig,
+      setEsAppConfig,
+      setEsLocalConfig,
+      setEsComputedConfig,
+      setRedisAppConfig,
+      setRedisLocalConfig,
+      setRedisComputedConfig,
+      setRabbitMQAppConfig,
+      setRabbitMQLocalConfig,
+      setRabbitMQComputedConfig
+    } = setters;
+
+    const reloadPromises = [];
+
+    // MongoDB configs
+    if (setMongoAppConfig) {
+      reloadPromises.push(
+        fetchMongoAppConfig().then(result => {
+          if (result.code === 0) setMongoAppConfig(result.data);
+        }).catch(err => console.warn('Failed to reload MongoDB app config:', err))
+      );
+    }
+    if (setMongoLocalConfig) {
+      reloadPromises.push(
+        fetchMongoLocalConfig().then(result => {
+          if (result.code === 0) setMongoLocalConfig(result.data);
+        }).catch(err => console.warn('Failed to reload MongoDB local config:', err))
+      );
+    }
+    if (setMongoComputedConfig) {
+      reloadPromises.push(
+        fetchMongoComputedConfig().then(result => {
+          if (result.code === 0) setMongoComputedConfig(result.data);
+        }).catch(err => console.warn('Failed to reload MongoDB computed config:', err))
+      );
+    }
+
+    // JDBC configs
+    if (setJdbcAppConfig) {
+      reloadPromises.push(
+        fetchJdbcAppConfig().then(result => {
+          if (result.code === 0) setJdbcAppConfig(result.data);
+        }).catch(err => console.warn('Failed to reload JDBC app config:', err))
+      );
+    }
+    if (setJdbcLocalConfig) {
+      reloadPromises.push(
+        fetchJdbcLocalConfig().then(result => {
+          if (result.code === 0) setJdbcLocalConfig(result.data);
+        }).catch(err => console.warn('Failed to reload JDBC local config:', err))
+      );
+    }
+    if (setJdbcComputedConfig) {
+      reloadPromises.push(
+        fetchJdbcComputedConfig().then(result => {
+          if (result.code === 0) setJdbcComputedConfig(result.data);
+        }).catch(err => console.warn('Failed to reload JDBC computed config:', err))
+      );
+    }
+
+    // Elasticsearch configs
+    if (setEsAppConfig) {
+      reloadPromises.push(
+        fetchElasticsearchAppConfig().then(result => {
+          if (result.code === 0) setEsAppConfig(result.data);
+        }).catch(err => console.warn('Failed to reload ES app config:', err))
+      );
+    }
+    if (setEsLocalConfig) {
+      reloadPromises.push(
+        fetchElasticsearchLocalConfig().then(result => {
+          if (result.code === 0) setEsLocalConfig(result.data);
+        }).catch(err => console.warn('Failed to reload ES local config:', err))
+      );
+    }
+    if (setEsComputedConfig) {
+      reloadPromises.push(
+        fetchElasticsearchComputedConfig().then(result => {
+          if (result.code === 0) setEsComputedConfig(result.data);
+        }).catch(err => console.warn('Failed to reload ES computed config:', err))
+      );
+    }
+
+    // Redis configs
+    if (setRedisAppConfig) {
+      reloadPromises.push(
+        fetchRedisAppConfig().then(result => {
+          if (result.code === 0) setRedisAppConfig(result.data);
+        }).catch(err => console.warn('Failed to reload Redis app config:', err))
+      );
+    }
+    if (setRedisLocalConfig) {
+      reloadPromises.push(
+        fetchRedisLocalConfig().then(result => {
+          if (result.code === 0) setRedisLocalConfig(result.data);
+        }).catch(err => console.warn('Failed to reload Redis local config:', err))
+      );
+    }
+    if (setRedisComputedConfig) {
+      reloadPromises.push(
+        fetchRedisComputedConfig().then(result => {
+          if (result.code === 0) setRedisComputedConfig(result.data);
+        }).catch(err => console.warn('Failed to reload Redis computed config:', err))
+      );
+    }
+
+    // RabbitMQ configs
+    if (setRabbitMQAppConfig) {
+      reloadPromises.push(
+        fetchRabbitMQAppConfig().then(result => {
+          if (result.code === 0) setRabbitMQAppConfig(result.data);
+        }).catch(err => console.warn('Failed to reload RabbitMQ app config:', err))
+      );
+    }
+    if (setRabbitMQLocalConfig) {
+      reloadPromises.push(
+        fetchRabbitMQLocalConfig().then(result => {
+          if (result.code === 0) setRabbitMQLocalConfig(result.data);
+        }).catch(err => console.warn('Failed to reload RabbitMQ local config:', err))
+      );
+    }
+    if (setRabbitMQComputedConfig) {
+      reloadPromises.push(
+        fetchRabbitMQComputedConfig().then(result => {
+          if (result.code === 0) setRabbitMQComputedConfig(result.data);
+        }).catch(err => console.warn('Failed to reload RabbitMQ computed config:', err))
+      );
+    }
+
+    await Promise.allSettled(reloadPromises);
+    console.log('All configs reloaded after backend URL change');
+  };
+}
+
+/**
  * Update backend server URL and clear all caches
  */
 export function updateBackendServerUrl(url) {
@@ -131,6 +283,49 @@ export async function testBackendConnection(url) {
     return { code: -1, message: 'Server is not healthy' };
   } catch (error) {
     return { code: -2, message: error.message || 'Connection failed' };
+  }
+}
+
+/**
+ * Fetch backend local config from backend SQLite database
+ */
+export async function fetchBackendLocalConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/local_config/category/backend/`);
+    const result = await response.json();
+    if (result.code === 0 && result.data) {
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'No config found', data: {} };
+  } catch (error) {
+    console.log('[ERROR] Failed to fetch backend local config:', error);
+    return { code: -2, message: error.message || 'Network error', data: {} };
+  }
+}
+
+/**
+ * Update backend local config value
+ */
+export async function updateBackendLocalConfig(key, value) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/local_config/set/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        category: 'backend',
+        key: key,
+        value: value
+      })
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.log('[ERROR] Failed to update backend local config:', error);
+    return { code: -2, message: error.message || 'Network error' };
   }
 }
 
@@ -255,7 +450,7 @@ export async function fetchMongoAppConfig() {
       }));
       return { code: 0, data: configArray };
     }
-    return { code: -1, message: 'Invalid response' };
+    return { code: -1, message: result.message || 'Invalid response' };
   } catch (error) {
     console.log('[ERROR]Failed to fetch MongoDB app config:', error);
     return { code: -2, message: error.message || 'Network error' };

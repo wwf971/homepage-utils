@@ -13,7 +13,7 @@ import {
   fetchRedisComputedConfig,
   updateRedisConfig
 } from '../remote/dataStore';
-import '../remote/configPanelStyles.css';
+import '../styles/configPanel.css';
 
 export const RedisConfigPanel = () => {
   const appConfig = useAtomValue(redisAppConfigAtom);
@@ -123,7 +123,7 @@ export const RedisConfigPanel = () => {
   }, [localConfig, computedConfig, handleLocalUpdate]);
 
   return (
-    <div className="config-panel">
+    <div className="main-panel">
       {configError && (
         <div style={{ 
           padding: '12px', 
