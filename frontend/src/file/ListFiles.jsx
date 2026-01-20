@@ -10,11 +10,11 @@ import './file.css';
 /**
  * ListFiles - Component for listing files in a file access point
  * 
- * @param {Object} accessPoint - The file access point object
+ * @param {Object} fileAccessPoint - The file access point object
  * @param {Object} tabsState - Tab state object from TabsOnTop {tabKey: {clickCount, isFocused}}
  * @param {string} tabKey - The tab key this component belongs to
  */
-const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
+const ListFiles = ({ fileAccessPoint, tabsState, tabKey }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -35,7 +35,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
   // Get unified file cache
   const [fileCache, setFileCache] = useAtom(fileCacheAtom);
 
-  const settingType = accessPoint?.content?.setting?.type || 'NOT SET';
+  const settingType = fileAccessPoint?.content?.setting?.type || 'NOT SET';
 
   // Get this tab's state
   const myTabState = tabsState && tabKey ? tabsState[tabKey] : null;
@@ -61,7 +61,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
 
     try {
       // Use the unified cache function from fileStore
-      const result = await fetchFileList(accessPoint.id, pathToLoad, pageNum, pageSize, setFileCache);
+      const result = await fetchFileList(fileAccessPoint.id, pathToLoad, pageNum, pageSize, setFileCache);
 
       if (result.code === 0) {
         setFiles(result.data);
@@ -163,7 +163,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
     const fileId = file.id || file.path;
     // Don't encode slashes in fileId for local/external types
     const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
-    const url = `/file_access_point/${encodeURIComponent(accessPoint.id)}/${encodedFileId}?action=download`;
+    const url = `/file_access_point/${encodeURIComponent(fileAccessPoint.id)}/${encodedFileId}?action=download`;
     
     // Open in new tab or trigger download
     const link = document.createElement('a');
@@ -224,7 +224,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
       const fileId = renamingFile.id || renamingFile.path;
       
       // Use the unified rename function from fileStore
-      const result = await renameFile(accessPoint.id, fileId, renameValue, setFileCache);
+      const result = await renameFile(fileAccessPoint.id, fileId, renameValue, setFileCache);
 
       if (result.code === 0) {
         // Success - update the file in the list
@@ -272,7 +272,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
     
     // Check cache first
     const fileId = file.id || file.path;
-    const cachedFile = getCachedFile(fileCache, accessPoint.id, fileId);
+    const cachedFile = getCachedFile(fileCache, fileAccessPoint.id, fileId);
     
     // If cached and size has been fetched (>= 0), show it
     if (cachedFile && cachedFile.size >= 0) {
@@ -461,7 +461,7 @@ const ListFiles = ({ accessPoint, tabsState, tabKey }) => {
       {viewingFile && (
         <FileView
           file={viewingFile}
-          accessPointId={accessPoint.id}
+          fileAccessPointId={fileAccessPoint.id}
           onClose={() => setViewingFile(null)}
           onFileUpdate={handleFileUpdate}
         />

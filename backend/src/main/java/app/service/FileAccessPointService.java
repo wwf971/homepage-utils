@@ -24,10 +24,25 @@ public class FileAccessPointService {
 
     private final Map<String, FileAccessPoint> cachedFileAccessPoints = new ConcurrentHashMap<>();
     private final MongoService mongoService;
+    private final LocalConfigService localConfigService;
 
-    public FileAccessPointService(MongoService mongoService) {
+    public FileAccessPointService(MongoService mongoService, LocalConfigService localConfigService) {
         this.mongoService = mongoService;
+        this.localConfigService = localConfigService;
         System.out.println("FileAccessPointService initialized (lazy loading - will connect on first use)");
+    }
+
+    /**
+     * Get server name from local config
+     */
+    private String getServerName() {
+        try {
+            String serverName = localConfigService.getConfig("serverName");
+            return serverName;
+        } catch (Exception e) {
+            System.err.println("Failed to get serverName from local config: " + e.getMessage());
+            return null;
+        }
     }
 
     private void loadFileAccessPoints() {
@@ -237,7 +252,8 @@ public class FileAccessPointService {
     }
 
     private FileInfo getFileFromFilesystem(FileAccessPoint accessPoint, String filePath, boolean getFileBytes) throws IOException {
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured for: " + accessPoint.getId());
         }
@@ -531,7 +547,8 @@ public class FileAccessPointService {
         }
         
         // Verify file exists on filesystem, search if not found
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath != null) {
             basePath = expandHomePath(basePath);
             Path fullPath = null;
@@ -568,7 +585,8 @@ public class FileAccessPointService {
      * Get file metadata from filesystem for local/external type
      */
     private FileInfo getFileMetadataFromFilesystem(FileAccessPoint accessPoint, String relativePath) throws Exception {
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured");
         }
@@ -653,7 +671,8 @@ public class FileAccessPointService {
         }
 
         // Read file from filesystem
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         System.out.println("Base path (before expansion): " + basePath);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured");
@@ -726,7 +745,8 @@ public class FileAccessPointService {
      * Get file content for local/external type - read directly from filesystem
      */
     private FileInfo getFileContentFromFilesystem(FileAccessPoint accessPoint, String relativePath) throws Exception {
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured");
         }
@@ -846,7 +866,8 @@ public class FileAccessPointService {
         fileInfo.setContentType((String) content.get("file_type"));
         
         // Get size from filesystem if available
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath != null) {
             basePath = expandHomePath(basePath);
             String filePath = (String) content.get("path");
@@ -866,7 +887,8 @@ public class FileAccessPointService {
      * Rename file for local/external type - rename on filesystem only
      */
     private FileInfo renameFileInFilesystem(FileAccessPoint accessPoint, String relativePath, String newName) throws Exception {
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured");
         }
@@ -1011,7 +1033,8 @@ public class FileAccessPointService {
      * List files for local/external type - scan filesystem directory
      */
     private List<FileInfo> listFilesFromFilesystem(FileAccessPoint accessPoint, String subPath, int page, int pageSize) throws IOException {
-        String basePath = accessPoint.resolveBaseDirPath();
+        String serverName = getServerName();
+        String basePath = accessPoint.resolveBaseDirPath(serverName);
         if (basePath == null) {
             throw new IllegalArgumentException("dir_path_base not configured for: " + accessPoint.getId());
         }

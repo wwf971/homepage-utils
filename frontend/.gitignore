@@ -3,3 +3,5 @@ dist
 .DS_Store
 *.local
 
+# Private configuration (contains sensitive data)
+config.0.js

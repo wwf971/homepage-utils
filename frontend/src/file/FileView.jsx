@@ -10,11 +10,11 @@ import './file.css';
  * FileView - Popup component for viewing file content and metadata
  * 
  * @param {Object} file - The file object to display
- * @param {string} accessPointId - The file access point ID
+ * @param {string} fileAccessPointId - The file access point ID
  * @param {Function} onClose - Callback to close the popup
  * @param {Function} onFileUpdate - Callback when file is updated (renamed, etc.)
  */
-const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
+const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
@@ -44,7 +44,7 @@ const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
         const fileId = file.id || file.path;
         
         // Use the unified caching function from fileStore
-        const result = await fetchFileData(accessPointId, fileId, setFileCache);
+        const result = await fetchFileData(fileAccessPointId, fileId, setFileCache);
         
         if (result.code !== 0) {
           throw new Error(result.message || 'Failed to load file');
@@ -82,7 +82,7 @@ const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
         URL.revokeObjectURL(fileUrl);
       }
     };
-  }, [file, accessPointId, setFileCache]);
+  }, [file, fileAccessPointId, setFileCache]);
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -94,7 +94,7 @@ const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
     const fileId = file.id || file.path;
     
     // Use the unified rename function from fileStore
-    const result = await renameFile(accessPointId, fileId, newValue, setFileCache);
+    const result = await renameFile(fileAccessPointId, fileId, newValue, setFileCache);
     
     if (result.code === 0 && result.data) {
       // Update local metadata state with the new data from the server
@@ -126,9 +126,9 @@ const FileView = ({ file, accessPointId, onClose, onFileUpdate }) => {
     const origin = window.location.origin;
     // Don't encode slashes in fileId for local/external types
     const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
-    const path = `/file_access_point/${encodeURIComponent(accessPointId)}/${encodedFileId}`;
+    const path = `/file_access_point/${encodeURIComponent(fileAccessPointId)}/${encodedFileId}`;
     return `${origin}${path}`;
-  }, [file, accessPointId]);
+  }, [file, fileAccessPointId]);
 
   const handleCopyUrl = async () => {
     try {

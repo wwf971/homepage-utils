@@ -8,9 +8,9 @@ import './file.css';
 /**
  * FetchFile - Component for fetching and displaying a file by URL
  * 
- * @param {string} accessPointId - The file access point ID
+ * @param {string} fileAccessPointId - The file access point ID
  */
-const FetchFile = ({ accessPointId }) => {
+const FetchFile = ({ fileAccessPointId }) => {
   const [urlPath, setUrlPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,23 +39,23 @@ const FetchFile = ({ accessPointId }) => {
       let cleanPath = urlPath.replace(/^\/+/, '').split('?')[0];
       
       // If the path starts with "file_access_point/{id}/", strip that prefix
-      const fileAccessPointPrefix = `file_access_point/${accessPointId}/`;
-      if (cleanPath.startsWith(fileAccessPointPrefix)) {
-        cleanPath = cleanPath.substring(fileAccessPointPrefix.length);
+      const fileAccessPointPrefix1 = `file_access_point/${fileAccessPointId}/`;
+      if (cleanPath.startsWith(fileAccessPointPrefix1)) {
+        cleanPath = cleanPath.substring(fileAccessPointPrefix1.length);
       }
       
       // If the path starts with just the access point ID, strip that too
-      const accessPointPrefix = `${accessPointId}/`;
-      if (cleanPath.startsWith(accessPointPrefix)) {
-        cleanPath = cleanPath.substring(accessPointPrefix.length);
+      const fileAccessPointPrefix2 = `${fileAccessPointId}/`;
+      if (cleanPath.startsWith(fileAccessPointPrefix2)) {
+        cleanPath = cleanPath.substring(fileAccessPointPrefix2.length);
       }
       
       // Construct the actual fetch URL that will be used
-      const actualUrl = `${window.location.origin}/file_access_point/${accessPointId}/${cleanPath}`;
+      const actualUrl = `${window.location.origin}/file_access_point/${fileAccessPointId}/${cleanPath}`;
       setActualFetchUrl(actualUrl);
       
       // Use the unified caching function from fileStore
-      const result = await fetchFileData(accessPointId, cleanPath, setFileCache);
+      const result = await fetchFileData(fileAccessPointId, cleanPath, setFileCache);
       
       if (result.code !== 0) {
         throw new Error(result.message || 'Failed to load file');
@@ -105,7 +105,7 @@ const FetchFile = ({ accessPointId }) => {
     const fileId = metadata.id || metadata.path || urlPath.replace(/^\/+/, '').split('?')[0];
     
     // Use the unified rename function from fileStore
-    const result = await renameFile(accessPointId, fileId, newValue, setFileCache);
+    const result = await renameFile(fileAccessPointId, fileId, newValue, setFileCache);
     
     if (result.code === 0 && result.data) {
       // Update local metadata state with the new data from the server

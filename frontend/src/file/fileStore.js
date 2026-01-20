@@ -16,7 +16,7 @@ export const fileAccessPointsMetadataAtom = atom({
 export const fileAccessPointsLoadingAtom = atom(false);
 export const fileAccessPointsErrorAtom = atom(null);
 
-// Unified file cache - stores all file information (metadata, content, etc.) by composite key "accessPointId:fileId"
+// Unified file cache - stores all file information (metadata, content, etc.) by composite key "fileAccessPointId:fileId"
 // Each entry can contain: id, name, size, contentType, lastModified, path, fileBytes, isDirectory, etc.
 // The cache is incremental - partial information is merged with existing data
 export const fileCacheAtom = atom({});
@@ -102,13 +102,13 @@ export async function updateFileAccessPointField(database, collection, docId, fi
  * Fetch the computed base directory from backend
  * Forces backend to re-read config and compute the base directory
  * 
- * @param {string} accessPointId - File access point ID
+ * @param {string} fileAccessPointId - File access point ID
  * @returns {Promise<{code: number, data?: string, message?: string}>}
  */
-export async function fetchComputedBaseDir(accessPointId) {
+export async function fetchComputedBaseDir(fileAccessPointId) {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/file_access_point/${encodeURIComponent(accessPointId)}/base_dir/`);
+    const response = await fetch(`${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/base_dir/`);
     
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
@@ -130,25 +130,25 @@ export async function fetchComputedBaseDir(accessPointId) {
 
 /**
  * Generate cache key for file
- * @param {string} accessPointId
+ * @param {string} fileAccessPointId
  * @param {string} fileId
  * @returns {string}
  */
-function getFileCacheKey(accessPointId, fileId) {
-  return `${accessPointId}:${fileId}`;
+function getFileCacheKey(fileAccessPointId, fileId) {
+  return `${fileAccessPointId}:${fileId}`;
 }
 
 /**
  * Merge file information into cache (incremental updates)
  * @param {Function} setCache - Jotai setter for fileCacheAtom
- * @param {string} accessPointId
+ * @param {string} fileAccessPointId
  * @param {string} fileId
  * @param {object} fileInfo - Partial or complete file information
  */
-function mergeFileInfoIntoCache(setCache, accessPointId, fileId, fileInfo) {
+function mergeFileInfoIntoCache(setCache, fileAccessPointId, fileId, fileInfo) {
   if (!fileInfo) return;
   
-  const cacheKey = getFileCacheKey(accessPointId, fileId);
+  const cacheKey = getFileCacheKey(fileAccessPointId, fileId);
   setCache((prevCache) => {
     const existing = prevCache[cacheKey] || {};
     return {
@@ -161,12 +161,12 @@ function mergeFileInfoIntoCache(setCache, accessPointId, fileId, fileInfo) {
 /**
  * Get cached file information
  * @param {object} cache - Current cache state
- * @param {string} accessPointId
+ * @param {string} fileAccessPointId
  * @param {string} fileId
  * @returns {object|null}
  */
-export function getCachedFile(cache, accessPointId, fileId) {
-  const cacheKey = getFileCacheKey(accessPointId, fileId);
+export function getCachedFile(cache, fileAccessPointId, fileId) {
+  const cacheKey = getFileCacheKey(fileAccessPointId, fileId);
   return cache[cacheKey] || null;
 }
 
@@ -174,18 +174,18 @@ export function getCachedFile(cache, accessPointId, fileId) {
  * List files with caching
  * Makes API request and caches all returned file information
  * 
- * @param {string} accessPointId - File access point ID
+ * @param {string} fileAccessPointId - File access point ID
  * @param {string} path - Path to list (default: "")
  * @param {number} page - Page number (default: 0)
  * @param {number} pageSize - Page size (default: 50)
  * @param {Function} setCache - Jotai setter for fileCacheAtom
  * @returns {Promise<{code: number, data?: Array, message?: string}>}
  */
-export async function fetchFileList(accessPointId, path = '', page = 0, pageSize = 50, setCache) {
+export async function fetchFileList(fileAccessPointId, path = '', page = 0, pageSize = 50, setCache) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/file_access_point/${encodeURIComponent(accessPointId)}/files/?path=${encodeURIComponent(path)}&page=${page}&pageSize=${pageSize}`
+      `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/files/?path=${encodeURIComponent(path)}&page=${page}&pageSize=${pageSize}`
     );
     
     const result = await response.json();
@@ -196,7 +196,7 @@ export async function fetchFileList(accessPointId, path = '', page = 0, pageSize
         result.data.forEach(file => {
           const fileId = file.id || file.path;
           if (fileId) {
-            mergeFileInfoIntoCache(setCache, accessPointId, fileId, file);
+            mergeFileInfoIntoCache(setCache, fileAccessPointId, fileId, file);
           }
         });
       }
@@ -216,18 +216,18 @@ export async function fetchFileList(accessPointId, path = '', page = 0, pageSize
  * Uses POST to get both metadata and file bytes (if available)
  * Updates the cache with all fetched information
  * 
- * @param {string} accessPointId - File access point ID
+ * @param {string} fileAccessPointId - File access point ID
  * @param {string} fileId - File ID (custom id or path)
  * @param {Function} setCache - Jotai setter for fileCacheAtom
  * @returns {Promise<{code: number, data?: {metadata: object, fileBytes?: string}, message?: string}>}
  */
-export async function fetchFileData(accessPointId, fileId, setCache) {
+export async function fetchFileData(fileAccessPointId, fileId, setCache) {
   try {
     // Don't encode slashes in fileId, as they are part of the path structure
     // Only encode individual path segments
     const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
     const backendUrl = getBackendServerUrl();
-    const url = `${backendUrl}/file_access_point/${encodeURIComponent(accessPointId)}/${encodedFileId}`;
+    const url = `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/${encodedFileId}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -254,7 +254,7 @@ export async function fetchFileData(accessPointId, fileId, setCache) {
       if (fileBytes) {
         cacheInfo.fileBytes = fileBytes;
       }
-      mergeFileInfoIntoCache(setCache, accessPointId, fileId, cacheInfo);
+      mergeFileInfoIntoCache(setCache, fileAccessPointId, fileId, cacheInfo);
     }
     
     return { code: 0, data: { metadata, fileBytes } };
@@ -267,19 +267,19 @@ export async function fetchFileData(accessPointId, fileId, setCache) {
 /**
  * Rename file and update cache
  * 
- * @param {string} accessPointId - File access point ID
+ * @param {string} fileAccessPointId - File access point ID
  * @param {string} fileId - File ID (custom id or path)
  * @param {string} newName - New file name
  * @param {Function} setCache - Jotai setter for fileCacheAtom
  * @returns {Promise<{code: number, data?: object, message?: string}>}
  */
-export async function renameFile(accessPointId, fileId, newName, setCache) {
+export async function renameFile(fileAccessPointId, fileId, newName, setCache) {
   try {
     // Don't encode slashes in fileId for local/external types
     const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/file_access_point/${encodeURIComponent(accessPointId)}/${encodedFileId}/rename`,
+      `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/${encodedFileId}/rename`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -292,7 +292,7 @@ export async function renameFile(accessPointId, fileId, newName, setCache) {
     if (result.code === 0) {
       // Update cache with new file information
       if (setCache && result.data) {
-        mergeFileInfoIntoCache(setCache, accessPointId, fileId, result.data);
+        mergeFileInfoIntoCache(setCache, fileAccessPointId, fileId, result.data);
       }
       
       return { code: 0, data: result.data, message: 'Success' };

@@ -73,7 +73,7 @@ const FilePanel = () => {
   }
 
   return (
-    <div className="config-section">
+    <div className="main-panel">
       <div className="file-panel-header">
         <h3>File Access Points</h3>
         <button
@@ -100,10 +100,10 @@ const FilePanel = () => {
         </div>
       ) : (
         <div className="file-access-points-list">
-          {displayedAccessPoints.map((accessPoint) => (
+          {displayedAccessPoints.map((fileAccessPoint) => (
             <FileAccessPointCard 
-              key={accessPoint.id} 
-              accessPoint={accessPoint}
+              key={fileAccessPoint.id} 
+              fileAccessPoint={fileAccessPoint}
               database={metadata.database}
               collection={metadata.collection}
               onUpdate={loadFileAccessPoints}

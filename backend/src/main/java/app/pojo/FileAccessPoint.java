@@ -128,6 +128,16 @@ public class FileAccessPoint {
         return null;
     }
 
+    @SuppressWarnings("unchecked")
+    public Map<String, String> getDirsPathBaseServer() {
+        if (setting == null) return null;
+        Object value = setting.get("dirs_path_base_server");
+        if (value instanceof Map) {
+            return (Map<String, String>) value;
+        }
+        return null;
+    }
+
     public Object getDirPathBaseIndexRaw() {
         if (setting == null) return null;
         return setting.get("dir_path_base_index");
@@ -161,11 +171,26 @@ public class FileAccessPoint {
     /**
      * Resolves the effective base directory path.
      * Logic:
-     * 1. Try: dirs_path_base as array with numeric dir_path_base_index
-     * 2. If fails, try: dirs_path_base as object/map with string/numeric key dir_path_base_index
-     * 3. Fall back to dir_path_base
+     * 1. Try: dirs_path_base_server[serverName] (if serverName provided)
+     * 2. Try: dirs_path_base as array with numeric dir_path_base_index
+     * 3. If fails, try: dirs_path_base as object/map with string/numeric key dir_path_base_index
+     * 4. Fall back to dir_path_base
+     * 
+     * @param serverName Optional server name from local config (can be null)
      */
-    public String resolveBaseDirPath() {
+    public String resolveBaseDirPath(String serverName) {
+        // Attempt 0: Try dirs_path_base_server[serverName] if serverName is provided
+        if (serverName != null && !serverName.trim().isEmpty()) {
+            Map<String, String> dirsPathBaseServer = getDirsPathBaseServer();
+            if (dirsPathBaseServer != null) {
+                String resolvedPath = dirsPathBaseServer.get(serverName);
+                if (resolvedPath != null && !resolvedPath.trim().isEmpty()) {
+                    System.out.println("Resolved base dir from server map with key '" + serverName + "': " + resolvedPath);
+                    return resolvedPath;
+                }
+            }
+        }
+        
         Object indexRaw = getDirPathBaseIndexRaw();
         
         if (indexRaw != null) {
@@ -198,6 +223,14 @@ public class FileAccessPoint {
         String fallback = getDirPathBase();
         System.out.println("Using fallback base dir: " + fallback);
         return fallback;
+    }
+
+    /**
+     * Resolves the effective base directory path without server name.
+     * This is a convenience method that calls resolveBaseDirPath(null).
+     */
+    public String resolveBaseDirPath() {
+        return resolveBaseDirPath(null);
     }
 
     @Override

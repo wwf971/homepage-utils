@@ -4,6 +4,7 @@ import app.pojo.ApiResponse;
 import app.pojo.FileAccessPoint;
 import app.pojo.FileInfo;
 import app.service.FileAccessPointService;
+import app.service.LocalConfigService;
 import app.util.FileUtils;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -21,9 +22,11 @@ import java.util.Map;
 public class FileAccessPointController {
 
     private final FileAccessPointService fileAccessPointService;
+    private final LocalConfigService localConfigService;
 
-    public FileAccessPointController(FileAccessPointService fileAccessPointService) {
+    public FileAccessPointController(FileAccessPointService fileAccessPointService, LocalConfigService localConfigService) {
         this.fileAccessPointService = fileAccessPointService;
+        this.localConfigService = localConfigService;
     }
 
     /**
@@ -120,8 +123,11 @@ public class FileAccessPointController {
                 return new ApiResponse<>(-1, null, "File access point not found: " + id);
             }
             
+            // Get server name from local config
+            String serverName = localConfigService.getConfig("serverName");
+            
             // Compute the base directory using the latest config
-            String baseDir = accessPoint.resolveBaseDirPath();
+            String baseDir = accessPoint.resolveBaseDirPath(serverName);
             
             return new ApiResponse<>(0, baseDir, "Base directory computed successfully");
         } catch (Exception e) {

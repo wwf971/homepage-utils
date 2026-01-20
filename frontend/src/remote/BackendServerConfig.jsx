@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
-import { KeyValuesComp, EditableValueComp, InfoIconWithTooltip } from '@wwf971/react-comp-misc';
+import { KeyValuesComp, EditableValueComp, InfoIconWithTooltip, SpinningCircle } from '@wwf971/react-comp-misc';
 import { 
   backendServerUrlAtom,
   getBackendServerUrl,
@@ -33,6 +33,8 @@ const BackendServerConfig = () => {
   const [backendUrl, setBackendUrl] = useAtom(backendServerUrlAtom);
   const [localConfig, setLocalConfig] = useAtom(backendLocalConfigAtom);
   const [loading, setLoading] = useState(false);
+  const [localConfigLoading, setLocalConfigLoading] = useState(false);
+  const [localConfigError, setLocalConfigError] = useState(null);
   const setFileCache = useSetAtom(fileCacheAtom);
 
   // Config setters for reloading
@@ -66,6 +68,10 @@ const BackendServerConfig = () => {
         serverName: result.data.serverName || '',
         serverId: result.data.serverId || ''
       });
+      setLocalConfigError(null);
+    } else {
+      // On error, keep previous values but mark as error
+      setLocalConfigError(result.message || 'Failed to fetch config');
     }
 
     setLoading(false);
@@ -81,6 +87,10 @@ const BackendServerConfig = () => {
     
     clearFileCache(setFileCache);
 
+    // Set loading state for local config
+    setLocalConfigLoading(true);
+    setLocalConfigError(null);
+
     // Reload backend local config (serverName, serverId) from new server
     const backendConfigResult = await fetchBackendLocalConfig();
     if (backendConfigResult.code === 0) {
@@ -88,7 +98,12 @@ const BackendServerConfig = () => {
         serverName: backendConfigResult.data.serverName || '',
         serverId: backendConfigResult.data.serverId || ''
       });
+      setLocalConfigError(null);
+    } else {
+      // On error, keep previous values but mark as error
+      setLocalConfigError(backendConfigResult.message || 'Failed to fetch config');
     }
+    setLocalConfigLoading(false);
 
     const reloader = createConfigReloader();
     await reloader({
@@ -147,8 +162,33 @@ const BackendServerConfig = () => {
       },
       {
         key: 'Server Name',
-        value: localConfig.serverName || '(not set)',
-        valueComp: (props) => (
+        value: localConfigLoading ? 'Loading...' : (localConfigError ? '(error fetching)' : (localConfig.serverName || '(not set)')),
+        valueComp: (props) => localConfigLoading ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <SpinningCircle width={16} height={16} color="#666" />
+            <span style={{ fontSize: '13px', color: '#666' }}>Loading...</span>
+          </span>
+        ) : localConfigError ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ 
+              color: '#d32f2f', 
+              fontSize: '13px',
+              fontStyle: 'italic'
+            }}>
+              {props.data}
+            </span>
+            <span 
+              style={{ 
+                color: '#d32f2f', 
+                fontSize: '12px',
+                cursor: 'help'
+              }}
+              title={localConfigError}
+            >
+              {localConfigError}
+            </span>
+          </span>
+        ) : (
           <EditableValueComp 
             {...props} 
             category="backend"
@@ -169,8 +209,33 @@ const BackendServerConfig = () => {
             />
           </span>
         ),
-        value: localConfig.serverId || '(not set)',
-        valueComp: (props) => (
+        value: localConfigLoading ? 'Loading...' : (localConfigError ? '(error fetching)' : (localConfig.serverId || '(not set)')),
+        valueComp: (props) => localConfigLoading ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <SpinningCircle width={16} height={16} color="#666" />
+            <span style={{ fontSize: '13px', color: '#666' }}>Loading...</span>
+          </span>
+        ) : localConfigError ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ 
+              color: '#d32f2f', 
+              fontSize: '13px',
+              fontStyle: 'italic'
+            }}>
+              {props.data}
+            </span>
+            <span 
+              style={{ 
+                color: '#d32f2f', 
+                fontSize: '12px',
+                cursor: 'help'
+              }}
+              title={localConfigError}
+            >
+              {localConfigError}
+            </span>
+          </span>
+        ) : (
           <EditableValueComp 
             {...props} 
             category="backend"
@@ -181,7 +246,7 @@ const BackendServerConfig = () => {
         )
       }
     ];
-  }, [backendUrl, localConfig, handleUpdateUrl, handleUpdateLocalConfig]);
+  }, [backendUrl, localConfig, localConfigLoading, localConfigError, handleUpdateUrl, handleUpdateLocalConfig]);
 
   return (
     <>

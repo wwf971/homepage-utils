@@ -4,11 +4,11 @@ import { KeyValuesComp, JsonComp, TabsOnTop, RefreshIcon, EditableValueComp, Sel
 import ListFiles from './ListFiles';
 import FetchFile from './FetchFile';
 import { fetchFileAccessPoints, fetchComputedBaseDir } from './fileStore';
-import { useMongoDocEditor, extractDocId, mongoDocsAtom } from '../remote/dataStore';
+import { useMongoDocEditor, extractDocId, mongoDocsAtom, backendLocalConfigAtom } from '../remote/dataStore';
 import { formatTimestamp } from './fileUtils';
 import './file.css';
 
-const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOpenMongoDoc }) => {
+const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, onOpenMongoDoc }) => {
   const [showJsonView, setShowJsonView] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,33 +19,41 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
   // Subscribe to mongoDocsAtom to ensure document is available for JsonComp
   const setDocs = useSetAtom(mongoDocsAtom);
   
+  // Get backend local config for serverName
+  const localConfig = useAtomValue(backendLocalConfigAtom);
+  
   // Ensure the document is in the atom for JsonComp to work
-  const docId = extractDocId(accessPoint);
+  const docId = fileAccessPoint ? extractDocId(fileAccessPoint) : null;
   useEffect(() => {
-    if (!docId) return;
+    if (!docId || !fileAccessPoint) return;
     
     // Add document to atom if not already present (needed for JsonComp)
     setDocs(prev => {
       const existsInAtom = prev.some(d => extractDocId(d) === docId);
       if (!existsInAtom) {
-        return [...prev, accessPoint];
+        return [...prev, fileAccessPoint];
       }
       return prev;
     });
-  }, [accessPoint, docId, setDocs]);
+  }, [fileAccessPoint, docId, setDocs]);
 
-  // Use the custom hook for document editing
+  // Use the custom hook for document editing (pass null-safe document)
   const { handleChange, isUpdating } = useMongoDocEditor(
     database,
     collection,
-    accessPoint
+    fileAccessPoint || {}
   );
+
+  // Early return after all hooks are called
+  if (!fileAccessPoint) {
+    return <div className="file-access-point-card">Loading...</div>;
+  }
 
   // Handle field updates - use handleChange from useMongoDocEditor to ensure atom is updated
   const handleFieldUpdate = async (fieldPath, newValue) => {
     // Get the old value from the nested path
     const pathParts = fieldPath.split('.');
-    let oldValue = accessPoint;
+    let oldValue = fileAccessPoint;
     for (const part of pathParts) {
       oldValue = oldValue?.[part];
     }
@@ -110,13 +118,13 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
 
   // Extract settingType for use in component
   const settingType = useMemo(() => {
-    const flattened = flattenObject(accessPoint);
+    const flattened = flattenObject(fileAccessPoint);
     return flattened['content.setting.type'] || 'NOT SET';
-  }, [accessPoint]);
+  }, [fileAccessPoint]);
 
   // Prepare data for KeyValuesComp with editable fields
   const cardData = useMemo(() => {
-    const flattened = flattenObject(accessPoint);
+    const flattened = flattenObject(fileAccessPoint);
     
     // Define recognized editable fields (key stays as-is, just add edit component)
     const editableFields = {
@@ -172,10 +180,25 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
 
     // Compute resolved base directory path
     // Logic:
-    // 1. Try: dirs_path_base as array with numeric dir_path_base_index
-    // 2. If fails, try: dirs_path_base as object/map with string/numeric key dir_path_base_index
-    // 3. Fall back to dir_path_base
+    // 1. Try: dirs_path_base_server[serverName] (if serverName exists in local config)
+    // 2. Try: dirs_path_base as array with numeric dir_path_base_index
+    // 3. If fails, try: dirs_path_base as object/map with string/numeric key dir_path_base_index
+    // 4. Fall back to dir_path_base
     const resolveBaseDirPath = () => {
+      // Attempt 0: Try dirs_path_base_server[serverName] if serverName is available
+      const serverName = localConfig?.serverName;
+      const dirsPathBaseServer = flattened['content.setting.dirs_path_base_server'];
+      
+      if (serverName && dirsPathBaseServer && typeof dirsPathBaseServer === 'object') {
+        const resolvedPath = dirsPathBaseServer[serverName];
+        if (resolvedPath != null) {
+          const pathStr = String(resolvedPath).trim();
+          if (pathStr) {
+            return pathStr;
+          }
+        }
+      }
+      
       const index = flattened['content.setting.dir_path_base_index'];
       const dirs = flattened['content.setting.dirs_path_base'];
       
@@ -312,7 +335,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
     });
 
     return dataArray;
-  }, [accessPoint, fileAccessPointTypeOptions, handleFieldUpdate, settingType]);
+  }, [fileAccessPoint, fileAccessPointTypeOptions, handleFieldUpdate, settingType, localConfig]);
 
 
   const handleRefresh = async () => {
@@ -324,7 +347,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
         // Find the updated access point
         const updated = result.data.find(ap => {
           const apId = extractDocId(ap);
-          const currentId = extractDocId(accessPoint);
+          const currentId = extractDocId(fileAccessPoint);
           return apId === currentId;
         });
         
@@ -348,7 +371,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
     
     try {
       // Use the custom id field, not MongoDB _id
-      const apId = accessPoint.id;
+      const apId = fileAccessPoint.id;
       if (!apId) {
         setComputedBaseDirError('File access point ID not found');
         return;
@@ -374,7 +397,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
       <div className="file-access-point-card">
         <div className="card-title">
           <span className="card-title-text">
-            {accessPoint.content?.name || 'Unnamed Access Point'}
+            {fileAccessPoint.content?.name || 'Unnamed Access Point'}
           </span>
         </div>
 
@@ -502,11 +525,11 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
             </div>
           </TabsOnTop.Tab>
           <TabsOnTop.Tab label="Files">
-            <ListFiles accessPoint={accessPoint} />
+            <ListFiles fileAccessPoint={fileAccessPoint} />
           </TabsOnTop.Tab>
           {settingType === 'local/external' && (
             <TabsOnTop.Tab label="Fetch">
-              <FetchFile accessPointId={accessPoint.id} />
+              <FetchFile fileAccessPointId={fileAccessPoint.id} />
             </TabsOnTop.Tab>
           )}
         </TabsOnTop>
@@ -516,7 +539,17 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
         <div className="doc-editor-overlay" onClick={() => setShowJsonView(false)}>
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
-              <h3>{accessPoint.content?.name || 'File Access Point'}</h3>
+              <div>
+                <h3>{fileAccessPoint.content?.name || 'File Access Point'}</h3>
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: '#666', 
+                  marginTop: '4px',
+                  fontFamily: 'monospace'
+                }}>
+                  mongo doc path: {database}/{collection}/id={fileAccessPoint.id}
+                </div>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {isUpdating && (
                   <span style={{ 
@@ -537,7 +570,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
             </div>
             <div className="doc-editor-content">
               <JsonComp 
-                data={accessPoint} 
+                data={fileAccessPoint} 
                 isEditable={true}
                 isKeyEditable={true}
                 isValueEditable={true}
@@ -552,7 +585,17 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
         <div className="doc-editor-overlay" onClick={() => setShowRawJson(false)}>
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
-              <h3>Raw JSON - {accessPoint.content?.name || 'File Access Point'}</h3>
+              <div>
+                <h3>Raw JSON - {fileAccessPoint.content?.name || 'File Access Point'}</h3>
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: '#666', 
+                  marginTop: '4px',
+                  fontFamily: 'monospace'
+                }}>
+                  mongo doc path: {database}/{collection}/id={fileAccessPoint.id}
+                </div>
+              </div>
               <button
                 className="doc-editor-close-button"
                 onClick={() => setShowRawJson(false)}
@@ -573,7 +616,7 @@ const FileAccessPointCard = ({ accessPoint, database, collection, onUpdate, onOp
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}>
-                {JSON.stringify(accessPoint, null, 2)}
+                {JSON.stringify(fileAccessPoint, null, 2)}
               </pre>
             </div>
           </div>
