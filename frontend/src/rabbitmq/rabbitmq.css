@@ -1,0 +1,251 @@
+/* RabbitMQ Test Panel */
+.rabbitmq-test-container {
+  padding: 16px;
+}
+
+/* STOMP Connection Status */
+.stomp-connection-container {
+  padding: 12px;
+  border: 1px solid #ddd;
+  borderRadius: 4px;
+  background: #f9f9f9;
+  margin-bottom: 16px;
+}
+
+.stomp-connection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.stomp-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stomp-status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.stomp-status-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.stomp-connection-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.stomp-connection-button {
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.stomp-connection-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.stomp-error-box {
+  padding: 6px 8px;
+  background: #ffebee;
+  border: 1px solid #ef5350;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #c62828;
+  margin-bottom: 8px;
+}
+
+.stomp-topics-container {
+  font-size: 12px;
+  color: #666;
+}
+
+.stomp-topics-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.stomp-topics-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.stomp-topic-item {
+  font-family: monospace;
+}
+
+/* Control Buttons */
+.rabbitmq-controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rabbitmq-publish-button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rabbitmq-publish-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rabbitmq-clear-button {
+  padding: 8px 16px;
+  font-size: 14px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rabbitmq-stats {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.rabbitmq-stat-value {
+  font-weight: 600;
+}
+
+.rabbitmq-stat-published {
+  color: #1976d2;
+}
+
+.rabbitmq-stat-received {
+  color: #4caf50;
+}
+
+.rabbitmq-stat-match {
+  font-weight: 600;
+}
+
+.rabbitmq-stat-match-success {
+  color: #4caf50;
+}
+
+.rabbitmq-stat-match-fail {
+  color: #ff9800;
+}
+
+/* Logs Layout */
+.rabbitmq-logs-layout {
+  display: flex;
+  gap: 16px;
+  height: 500px;
+}
+
+/* Log Panel (shared by PublishLog and ReceiveLog) */
+.log-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.log-panel-header {
+  padding: 6px 8px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.log-panel-content {
+  flex: 1;
+  overflow: auto;
+  padding: 6px;
+}
+
+.log-panel-empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+.log-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Log Item */
+.log-item {
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.log-item-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.log-item-type {
+  font-weight: 600;
+}
+
+.log-item-type-published {
+  color: #1976d2;
+}
+
+.log-item-type-received {
+  color: #4caf50;
+}
+
+.log-item-timestamp {
+  font-size: 11px;
+  color: #999;
+}
+
+.log-item-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Info Box */
+.rabbitmq-info-box {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #666;
+}
+
+.rabbitmq-info-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.rabbitmq-info-list {
+  margin: 0;
+  padding-left: 20px;
+}
+

@@ -4,6 +4,7 @@ import app.pojo.ApiResponse;
 import app.pojo.RabbitMQConfig;
 import app.pojo.RabbitMQConfigUpdateRequest;
 import app.service.RabbitMQConfigService;
+import app.service.RabbitMQTaskPublishService;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/rabbitmq/")
@@ -20,6 +22,9 @@ public class RabbitMQController {
 
     @Autowired
     private RabbitMQConfigService rabbitMQConfigService;
+
+    @Autowired
+    private RabbitMQTaskPublishService taskPublishService;
 
     /**
      * Get application.properties configuration
@@ -156,6 +161,39 @@ public class RabbitMQController {
             System.err.println("RabbitMQ connection test failed: " + e.getMessage());
             e.printStackTrace();
             return ApiResponse.error(-1, "Connection test failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Publish a test task to RabbitMQ
+     */
+    @PostMapping("task/publish/")
+    public ApiResponse<Map<String, Object>> publishTask(@RequestBody Map<String, Object> requestBody) {
+        try {
+            String taskType = (String) requestBody.getOrDefault("type", "example-task");
+            String taskId = (String) requestBody.getOrDefault("id", UUID.randomUUID().toString());
+            
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("id", taskId);
+            if (requestBody.containsKey("data")) {
+                payload.put("data", requestBody.get("data"));
+            }
+            
+            boolean success = taskPublishService.publishTask(taskType, payload);
+            
+            if (success) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("type", taskType);
+                response.put("id", taskId);
+                response.put("timestamp", System.currentTimeMillis());
+                return new ApiResponse<>(0, response, "Task published successfully");
+            } else {
+                return ApiResponse.error(-1, "Failed to publish task. Is RabbitMQ configured?");
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to publish task: " + e.getMessage());
+            e.printStackTrace();
+            return ApiResponse.error(-1, "Failed to publish task: " + e.getMessage());
         }
     }
 }

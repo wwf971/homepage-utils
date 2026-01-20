@@ -3,6 +3,7 @@ import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { rabbitMQComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
 import '../styles/testSection.css';
+import './rabbitmq.css';
 
 export const TestConnectionRabbitMQ = () => {
   const [testing, setTesting] = useState(false);
@@ -77,7 +78,7 @@ export const TestConnectionRabbitMQ = () => {
       <div className="test-config-section">
         <div className="test-section-title">Current Config (Computed)</div>
         {config.length === 0 ? (
-          <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
+          <div className="test-loading">Loading configuration...</div>
         ) : (
           <KeyValues data={config} isEditable={false} />
         )}
@@ -90,15 +91,7 @@ export const TestConnectionRabbitMQ = () => {
           <button 
             onClick={handleTest}
             disabled={testing}
-            style={{
-              padding: '8px 16px',
-              cursor: testing ? 'not-allowed' : 'pointer',
-              backgroundColor: testing ? '#ccc' : '#007bff',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              marginRight: '8px'
-            }}
+            className="test-button"
           >
             {testing ? 'Testing...' : 'Test Connection'}
           </button>
@@ -106,14 +99,7 @@ export const TestConnectionRabbitMQ = () => {
           {testing && (
             <button 
               onClick={handleAbort}
-              style={{
-                padding: '8px 16px',
-                cursor: 'pointer',
-                backgroundColor: '#dc3545',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px'
-              }}
+              className="abort-button"
             >
               Abort
             </button>
@@ -121,23 +107,16 @@ export const TestConnectionRabbitMQ = () => {
         </div>
         
         {testing && (
-          <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="test-progress">
             <SpinningCircle size={20} />
             <span>Testing connection...</span>
           </div>
         )}
         
         {result && (
-          <div style={{
-            marginTop: '12px',
-            padding: '12px',
-            borderRadius: '4px',
-            backgroundColor: result.success ? '#d4edda' : '#f8d7da',
-            border: `1px solid ${result.success ? '#c3e6cb' : '#f5c6cb'}`,
-            color: result.success ? '#155724' : '#721c24'
-          }}>
+          <div className={`test-result ${result.success ? 'success' : 'error'}`}>
             <strong>{result.success ? '✓ Success' : '✗ Failed'}</strong>
-            <div style={{ marginTop: '8px' }}>{result.message}</div>
+            <div className="result-message">{result.message}</div>
           </div>
         )}
       </div>

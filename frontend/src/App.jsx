@@ -15,8 +15,7 @@ import {TestConnection as EsTestConnection} from './elasticsearch/TestConnection
 import {RedisConfigPanel} from './redis/RedisConfigPanel';
 import {TestConnectionRedis} from './redis/TestConnectionRedis';
 import {TestConnectionRedisson} from './redis/TestConnectionRedisson';
-import RabbitMQConfigPanel from './rabbitmq/RabbitMQConfigPanel';
-import TestConnectionRabbitMQ from './rabbitmq/TestConnectionRabbitMQ';
+import RabbitMQPanel from './rabbitmq/RabbitMQPanel';
 import BackendServerPanel from './remote/BackendServerPanel';
 import FilePanel from './file/FilePanel';
 import './App.css';
@@ -78,13 +77,13 @@ function App() {
           
           <Tab label="Index">
             <SubTab label="ElasticSearch">
-              <SubTab label="Configuration" isDefault={true}>
+              <SubTab label="Config" isDefault={true}>
                 <Panel>
                   <EsConfigPanel />
                 </Panel>
               </SubTab>
               
-              <SubTab label="Test Connection">
+              <SubTab label="Test">
                 <Panel>
                   <EsTestConnection showIndexList={true} />
                 </Panel>
@@ -94,7 +93,7 @@ function App() {
           
           <Tab label="Cache">
             <SubTab label="Redis">
-              <SubTab label="Configuration" isDefault={true}>
+              <SubTab label="Config" isDefault={true}>
                 <Panel>
                   <RedisConfigPanel />
                 </Panel>
@@ -115,18 +114,13 @@ function App() {
           </Tab>
           
           <Tab label="MessageQueue">
-            <SubTab label="RabbitMQ">
-              <SubTab label="Configuration" isDefault={true}>
+            <SubTab label="RabbitMQ" isDefault={true}>
+              <SubTab label="Config/Test">
                 <Panel>
-                  <RabbitMQConfigPanel />
+                  <RabbitMQPanel />
                 </Panel>
               </SubTab>
-              
-              <SubTab label="Test Connection">
-                <Panel>
-                  <TestConnectionRabbitMQ />
-                </Panel>
-              </SubTab>
+
             </SubTab>
           </Tab>
           

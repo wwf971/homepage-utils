@@ -69,6 +69,17 @@
   background: #c82333;
 }
 
+.test-loading {
+  padding: 12px;
+  color: #666;
+}
+
+.test-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .test-result {
   padding: 8px 12px;
   border-radius: 4px;
