@@ -29,7 +29,7 @@ public class RedisController {
     @PostMapping("test/")
     public ApiResponse<String> testConnection() {
         try {
-            RedisConfig config = configService.getCurrentConfig();
+            RedisConfig config = configService.getConfigCurrent();
             
             if (config.getHost() == null || config.getHost().isEmpty()) {
                 return ApiResponse.error(-1, "Redis host not configured");
@@ -147,7 +147,7 @@ public class RedisController {
     @GetMapping("config/")
     public ApiResponse<RedisConfig> getConfig() {
         try {
-            RedisConfig config = configService.getCurrentConfig();
+            RedisConfig config = configService.getConfigCurrent();
             return ApiResponse.success(config, "Current Redis configuration retrieved");
         } catch (Exception e) {
             System.err.println("RedisController.getConfig() error: " + e.getMessage());
@@ -171,7 +171,7 @@ public class RedisController {
     @GetMapping("config/computed/")
     public ApiResponse<RedisConfig> getComputedConfig() {
         try {
-            RedisConfig config = configService.getCurrentConfig();
+            RedisConfig config = configService.getConfigCurrent();
             return ApiResponse.success(config, "Computed Redis configuration retrieved");
         } catch (Exception e) {
             System.err.println("RedisController.getComputedConfig() error: " + e.getMessage());
@@ -184,7 +184,7 @@ public class RedisController {
     public ApiResponse<RedisConfig> setConfig(@RequestBody RedisConfigUpdateRequest request) {
         try {
             configService.updateConfig(request.getPath(), request.getValue());
-            return ApiResponse.success(configService.getCurrentConfig(), "Redis configuration updated successfully");
+            return ApiResponse.success(configService.getConfigCurrent(), "Redis configuration updated successfully");
         } catch (Exception e) {
             System.err.println("Failed to update config: " + e.getMessage());
             return ApiResponse.error(400, "Failed to update config: " + e.getMessage());

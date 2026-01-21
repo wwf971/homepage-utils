@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ElasticSearchConfigService {
 
-    private ElasticSearchConfig currentConfig;
+    private ElasticSearchConfig configCurrent;
     private ElasticSearchConfig appConfig; // Store application.properties config separately
     private final LocalConfigService localConfigService;
 
@@ -29,8 +29,8 @@ public class ElasticSearchConfigService {
             this.appConfig = new ElasticSearchConfig(uris, username, password);
             
             // Initialize with merged config
-            this.currentConfig = mergeAllLayers(uris, username, password);
-            System.out.println("ElasticSearchConfigService initialized with merged config: " + currentConfig);
+            this.configCurrent = mergeAllLayers(uris, username, password);
+            System.out.println("ElasticSearchConfigService initialized with merged config: " + configCurrent);
         } catch (Exception e) {
             System.err.println("WARNING: Failed to initialize ElasticSearchConfigService: " + e.getMessage());
             e.printStackTrace();
@@ -40,12 +40,12 @@ public class ElasticSearchConfigService {
                 username != null ? username : "",
                 password != null ? password : ""
             );
-            this.currentConfig = new ElasticSearchConfig(
+            this.configCurrent = new ElasticSearchConfig(
                 uris != null ? uris : "http://localhost:9200",
                 username != null ? username : "",
                 password != null ? password : ""
             );
-            System.out.println("ElasticSearchConfigService initialized with fallback config: " + currentConfig);
+            System.out.println("ElasticSearchConfigService initialized with fallback config: " + configCurrent);
         }
     }
     
@@ -73,7 +73,7 @@ public class ElasticSearchConfigService {
      * Reload config by merging all layers again
      */
     public void reloadConfig(String uris, String username, String password) {
-        this.currentConfig = mergeAllLayers(uris, username, password);
+        this.configCurrent = mergeAllLayers(uris, username, password);
     }
 
     /**
@@ -86,12 +86,12 @@ public class ElasticSearchConfigService {
     /**
      * Get current merged config (all layers applied)
      */
-    public ElasticSearchConfig getCurrentConfig() {
-        return currentConfig;
+    public ElasticSearchConfig getConfigCurrent() {
+        return configCurrent;
     }
 
     public void updateConfig(String path, Object value) throws Exception {
-        setNestedProperty(this.currentConfig, path, value);
+        setNestedProperty(this.configCurrent, path, value);
 
         // Save to local config
         localConfigService.saveConfig("elasticsearch." + path, String.valueOf(value), "elasticsearch");

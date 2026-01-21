@@ -16,14 +16,14 @@ import java.sql.SQLException;
 public class JdbcConnectionService {
 
     private HikariDataSource dataSource;
-    private JdbcConfig currentConfig;
+    private JdbcConfig configCurrent;
 
     private final JdbcConfigService configService;
 
     public JdbcConnectionService(JdbcConfigService configService) {
         this.configService = configService;
-        this.currentConfig = configService.getCurrentConfig();
-        System.out.println("JdbcConnectionService initialized with config from JdbcConfigService (lazy connection): " + currentConfig);
+        this.configCurrent = configService.getConfigCurrent();
+        System.out.println("JdbcConnectionService initialized with config from JdbcConfigService (lazy connection): " + configCurrent);
         System.out.println("JDBC will connect on first use or manual start");
     }
 
@@ -34,7 +34,7 @@ public class JdbcConnectionService {
         System.out.println("New config: " + event.getNewConfig());
         
         closeDataSource();
-        this.currentConfig = event.getNewConfig();
+        this.configCurrent = event.getNewConfig();
         initializeDataSource(event.getNewConfig());
     }
 
@@ -64,12 +64,12 @@ public class JdbcConnectionService {
 
     public JdbcConnectionStatus getStatus() {
         JdbcConnectionStatus status = new JdbcConnectionStatus();
-        status.setCurrentUrl(currentConfig != null ? currentConfig.getUrl() : null);
+        status.setCurrentUrl(configCurrent != null ? configCurrent.getUrl() : null);
 
         // If dataSource is null, try lazy initialization
-        if (dataSource == null && currentConfig != null) {
+        if (dataSource == null && configCurrent != null) {
             try {
-                initializeDataSource(currentConfig);
+                initializeDataSource(configCurrent);
             } catch (Exception e) {
                 System.err.println("Failed to initialize connection for status check: " + e.getMessage());
                 status.setConnected(false);
@@ -124,15 +124,15 @@ public class JdbcConnectionService {
         if (dataSource != null && !dataSource.isClosed()) {
             throw new IllegalStateException("Connection is already active. Stop it first.");
         }
-        this.currentConfig = config;
+        this.configCurrent = config;
         initializeDataSource(config);
         System.out.println("JDBC connection started manually with config: " + config);
     }
 
     public HikariDataSource getDataSource() {
-        if (this.dataSource == null && this.currentConfig != null) {
+        if (this.dataSource == null && this.configCurrent != null) {
             try {
-                initializeDataSource(this.currentConfig);
+                initializeDataSource(this.configCurrent);
             } catch (Exception e) {
                 System.err.println("Failed to lazily connect to database: " + e.getMessage());
                 return null;
@@ -144,12 +144,12 @@ public class JdbcConnectionService {
     public String testConnection() throws SQLException {
         // If not initialized, try with a test datasource with timeouts
         if (dataSource == null || dataSource.isClosed()) {
-            if (currentConfig != null) {
+            if (configCurrent != null) {
                 HikariConfig testConfig = new HikariConfig();
-                testConfig.setJdbcUrl(currentConfig.getUrl());
-                testConfig.setUsername(currentConfig.getUsername());
-                testConfig.setPassword(currentConfig.getPassword());
-                testConfig.setDriverClassName(currentConfig.getDriverClassName());
+                testConfig.setJdbcUrl(configCurrent.getUrl());
+                testConfig.setUsername(configCurrent.getUsername());
+                testConfig.setPassword(configCurrent.getPassword());
+                testConfig.setDriverClassName(configCurrent.getDriverClassName());
                 
                 // Set timeouts for testing (120 seconds)
                 testConfig.setConnectionTimeout(120000);

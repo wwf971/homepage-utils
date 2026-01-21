@@ -29,14 +29,14 @@ public class JdbcConfigController {
 
     @GetMapping("config/")
     public ApiResponse<JdbcConfig> getConfig() {
-        return ApiResponse.success(configService.getCurrentConfig(), "Current JDBC configuration retrieved");
+        return ApiResponse.success(configService.getConfigCurrent(), "Current JDBC configuration retrieved");
     }
 
     @PostMapping("config/set/")
     public ApiResponse<JdbcConfig> setConfig(@RequestBody JdbcConfigUpdateRequest request) {
         try {
             configService.updateConfig(request.getPath(), request.getValue());
-            return ApiResponse.success(configService.getCurrentConfig(), "JDBC configuration updated successfully");
+            return ApiResponse.success(configService.getConfigCurrent(), "JDBC configuration updated successfully");
         } catch (Exception e) {
             System.err.println("Failed to update config: " + e.getMessage());
             return ApiResponse.error(400, "Failed to update config: " + e.getMessage());
@@ -72,8 +72,8 @@ public class JdbcConfigController {
     @PostMapping("connection/start/")
     public ApiResponse<JdbcConfig> startConnection() {
         try {
-            connectionService.startConnection(configService.getCurrentConfig());
-            return new ApiResponse<>(0, configService.getCurrentConfig(), "Connection started successfully");
+            connectionService.startConnection(configService.getConfigCurrent());
+            return new ApiResponse<>(0, configService.getConfigCurrent(), "Connection started successfully");
         } catch (Exception e) {
             System.err.println("Failed to start connection: " + e.getMessage());
             return new ApiResponse<>(-1, null, "Failed to start connection: " + e.getMessage());

@@ -29,14 +29,14 @@ public class MongoController {
 
     @GetMapping("config/")
     public ApiResponse<MongoConfig> getConfig() {
-        return ApiResponse.success(configService.getCurrentConfig(), "Current MongoDB configuration retrieved");
+        return ApiResponse.success(configService.getConfigCurrent(), "Current MongoDB configuration retrieved");
     }
 
     @PostMapping("config/set/")
     public ApiResponse<MongoConfig> setConfig(@RequestBody MongoConfigUpdateRequest request) {
         try {
             configService.updateConfig(request.getPath(), request.getValue());
-            return ApiResponse.success(configService.getCurrentConfig(), "MongoDB configuration updated successfully");
+            return ApiResponse.success(configService.getConfigCurrent(), "MongoDB configuration updated successfully");
         } catch (Exception e) {
             System.err.println("Failed to update config: " + e.getMessage());
             return ApiResponse.error(400, "Failed to update config: " + e.getMessage());
@@ -72,8 +72,8 @@ public class MongoController {
     @PostMapping("connection/start/")
     public ApiResponse<MongoConfig> startConnection() {
         try {
-            mongoService.startConnection(configService.getCurrentConfig());
-            return new ApiResponse<>(0, configService.getCurrentConfig(), "Connection started successfully");
+            mongoService.startConnection(configService.getConfigCurrent());
+            return new ApiResponse<>(0, configService.getConfigCurrent(), "Connection started successfully");
         } catch (Exception e) {
             System.err.println("Failed to start connection: " + e.getMessage());
             return new ApiResponse<>(-1, null, "Failed to start connection: " + e.getMessage());

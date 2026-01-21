@@ -19,7 +19,7 @@ public class RemoteConfigMongoConnectionService {
     
     private final MongoService dataMongoService;
     private MongoClient configMongoClient;
-    private String currentConfigUri;
+    private String configCurrentUri;
     private boolean usingSameAsData = false;
     
     public RemoteConfigMongoConnectionService(@Lazy MongoService dataMongoService) {
@@ -45,11 +45,11 @@ public class RemoteConfigMongoConnectionService {
             this.usingSameAsData = false;
             
             // If URI changed, reconnect
-            if (configMongoClient == null || !configUri.equals(currentConfigUri)) {
+            if (configMongoClient == null || !configUri.equals(configCurrentUri)) {
                 closeConfigConnection();
                 try {
                     configMongoClient = MongoClients.create(configUri);
-                    currentConfigUri = configUri;
+                    configCurrentUri = configUri;
                     logger.info("Connected to config MongoDB: {}", configUri);
                 } catch (Exception e) {
                     logger.error("Failed to connect to config MongoDB: {}", e.getMessage());
@@ -73,7 +73,7 @@ public class RemoteConfigMongoConnectionService {
                 logger.error("Error closing config MongoDB connection: {}", e.getMessage());
             } finally {
                 configMongoClient = null;
-                currentConfigUri = null;
+                configCurrentUri = null;
             }
         }
     }

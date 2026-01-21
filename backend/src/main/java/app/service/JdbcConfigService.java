@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class JdbcConfigService {
 
-    private JdbcConfig currentConfig;
+    private JdbcConfig configCurrent;
     private JdbcConfig appConfig; // Store application.properties config separately
     private final LocalConfigService localConfigService;
     private final ApplicationEventPublisher eventPublisher;
@@ -29,8 +29,8 @@ public class JdbcConfigService {
         this.appConfig = new JdbcConfig(url, username, password, driverClassName);
         
         // Initialize with merged config
-        this.currentConfig = mergeAllLayers(url, username, password, driverClassName);
-        System.out.println("JdbcConfigService initialized with merged config: " + currentConfig);
+        this.configCurrent = mergeAllLayers(url, username, password, driverClassName);
+        System.out.println("JdbcConfigService initialized with merged config: " + configCurrent);
     }
     
     /**
@@ -58,11 +58,11 @@ public class JdbcConfigService {
      * Reload config by merging all layers again
      */
     public void reloadConfig(String url, String username, String password, String driverClassName) {
-        JdbcConfig oldConfig = cloneConfig(this.currentConfig);
-        this.currentConfig = mergeAllLayers(url, username, password, driverClassName);
+        JdbcConfig oldConfig = cloneConfig(this.configCurrent);
+        this.configCurrent = mergeAllLayers(url, username, password, driverClassName);
         
         // Publish event
-        JdbcConfigChangeEvent event = new JdbcConfigChangeEvent(oldConfig, this.currentConfig);
+        JdbcConfigChangeEvent event = new JdbcConfigChangeEvent(oldConfig, this.configCurrent);
         eventPublisher.publishEvent(event);
     }
 
@@ -76,20 +76,20 @@ public class JdbcConfigService {
     /**
      * Get current merged config (all layers applied)
      */
-    public JdbcConfig getCurrentConfig() {
-        return currentConfig;
+    public JdbcConfig getConfigCurrent() {
+        return configCurrent;
     }
 
     public void updateConfig(String path, Object value) throws Exception {
-        JdbcConfig oldConfig = cloneConfig(this.currentConfig);
+        JdbcConfig oldConfig = cloneConfig(this.configCurrent);
 
-        setNestedProperty(this.currentConfig, path, value);
+        setNestedProperty(this.configCurrent, path, value);
 
         // Save to local config
         localConfigService.saveConfig("jdbc." + path, String.valueOf(value), "jdbc");
 
         // Publish event
-        JdbcConfigChangeEvent event = new JdbcConfigChangeEvent(oldConfig, this.currentConfig);
+        JdbcConfigChangeEvent event = new JdbcConfigChangeEvent(oldConfig, this.configCurrent);
         eventPublisher.publishEvent(event);
 
         System.out.println("JdbcConfigService: Config updated: path=" + path + ", value=" + value);

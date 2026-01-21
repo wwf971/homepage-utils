@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
 import { KeyValuesComp, EditableValueComp, InfoIconWithTooltip, SpinningCircle } from '@wwf971/react-comp-misc';
-import { 
+import {
   backendServerUrlAtom,
+  backendLocalConfigAtom,
+  backendConnectionFailedAtom,
   getBackendServerUrl,
   updateBackendServerUrl,
-  createConfigReloader,
-  backendLocalConfigAtom,
   fetchBackendLocalConfig,
-  updateBackendLocalConfig,
+  updateBackendLocalConfig
+} from './backendServerStore';
+import { 
+  createConfigReloader,
   mongoAppConfigAtom,
   mongoLocalConfigAtom,
   mongoComputedConfigAtom,
@@ -32,6 +35,7 @@ import './backendServer.css';
 const BackendServerConfig = () => {
   const [backendUrl, setBackendUrl] = useAtom(backendServerUrlAtom);
   const [localConfig, setLocalConfig] = useAtom(backendLocalConfigAtom);
+  const [connectionFailed, setConnectionFailed] = useAtom(backendConnectionFailedAtom);
   const [loading, setLoading] = useState(false);
   const [localConfigLoading, setLocalConfigLoading] = useState(false);
   const [localConfigError, setLocalConfigError] = useState(null);
@@ -69,13 +73,15 @@ const BackendServerConfig = () => {
         serverId: result.data.serverId || ''
       });
       setLocalConfigError(null);
+      setConnectionFailed(false); // Mark connection as successful
     } else {
       // On error, keep previous values but mark as error
       setLocalConfigError(result.message || 'Failed to fetch config');
+      setConnectionFailed(true); // Mark connection as failed
     }
 
     setLoading(false);
-  }, [setBackendUrl, setLocalConfig]);
+  }, [setBackendUrl, setLocalConfig, setConnectionFailed]);
 
   useEffect(() => {
     loadConfigs();
@@ -99,9 +105,11 @@ const BackendServerConfig = () => {
         serverId: backendConfigResult.data.serverId || ''
       });
       setLocalConfigError(null);
+      setConnectionFailed(false); // Mark connection as successful
     } else {
       // On error, keep previous values but mark as error
       setLocalConfigError(backendConfigResult.message || 'Failed to fetch config');
+      setConnectionFailed(true); // Mark connection as failed
     }
     setLocalConfigLoading(false);
 

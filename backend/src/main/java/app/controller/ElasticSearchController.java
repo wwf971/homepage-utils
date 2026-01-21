@@ -21,7 +21,7 @@ public class ElasticSearchController {
     public ApiResponse<String> testConnection() {
         try {
             // Get current config
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             // Check if config is valid
             if (config.getUris() == null || config.getUris().isEmpty()) {
@@ -108,7 +108,7 @@ public class ElasticSearchController {
     @GetMapping("config/")
     public ApiResponse<ElasticSearchConfig> getConfig() {
         try {
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             System.out.println("ElasticSearchController.getConfig() returning: " + config);
             return ApiResponse.success(config, "Current Elasticsearch configuration retrieved");
         } catch (Exception e) {
@@ -122,7 +122,7 @@ public class ElasticSearchController {
     public ApiResponse<ElasticSearchConfig> setConfig(@RequestBody ElasticSearchConfigUpdateRequest request) {
         try {
             configService.updateConfig(request.getPath(), request.getValue());
-            return ApiResponse.success(configService.getCurrentConfig(), "Elasticsearch configuration updated successfully");
+            return ApiResponse.success(configService.getConfigCurrent(), "Elasticsearch configuration updated successfully");
         } catch (Exception e) {
             System.err.println("Failed to update config: " + e.getMessage());
             return ApiResponse.error(400, "Failed to update config: " + e.getMessage());
@@ -143,7 +143,7 @@ public class ElasticSearchController {
             @SuppressWarnings("unchecked")
             java.util.Map<String, Object> body = (java.util.Map<String, Object>) request.get("body");
             
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -213,7 +213,7 @@ public class ElasticSearchController {
     @GetMapping("indices/")
     public ApiResponse<java.util.List<String>> listIndices() {
         try {
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -292,7 +292,7 @@ public class ElasticSearchController {
     @GetMapping("indices/{indexName}")
     public ApiResponse<java.util.Map<String, Object>> getIndexInfo(@PathVariable String indexName) {
         try {
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -359,7 +359,7 @@ public class ElasticSearchController {
     @DeleteMapping("indices/{indexName}")
     public ApiResponse<String> deleteIndex(@PathVariable String indexName) {
         try {
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -421,7 +421,7 @@ public class ElasticSearchController {
                 return ApiResponse.error(-1, "New name must be different from current name");
             }
             
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -514,7 +514,7 @@ public class ElasticSearchController {
         @RequestParam(defaultValue = "20") int pageSize
     ) {
         try {
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -623,7 +623,7 @@ public class ElasticSearchController {
                 body = new java.util.HashMap<>();
             }
             
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -750,7 +750,7 @@ public class ElasticSearchController {
                 return ApiResponse.error(-1, "Document body is required");
             }
             
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -852,7 +852,7 @@ public class ElasticSearchController {
         @PathVariable String docId
     ) {
         try {
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");
@@ -916,7 +916,7 @@ public class ElasticSearchController {
             if (searchInPaths == null) searchInPaths = false;
             if (searchInValues == null) searchInValues = true;
             
-            ElasticSearchConfig config = configService.getCurrentConfig();
+            ElasticSearchConfig config = configService.getConfigCurrent();
             
             if (config.getUris() == null || config.getUris().isEmpty()) {
                 return ApiResponse.error(-1, "Elasticsearch URIs not configured");

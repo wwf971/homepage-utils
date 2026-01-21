@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class MongoConfigService {
 
-    private MongoConfig currentConfig;
+    private MongoConfig configCurrent;
     private MongoConfig appConfig; // Store application.properties config separately
     private final LocalConfigService localConfigService;
     private final RemoteConfigService remoteConfigService;
@@ -33,8 +33,8 @@ public class MongoConfigService {
         this.appConfig = new MongoConfig(uri, database, username, password);
         
         // Initialize with merged config
-        this.currentConfig = mergeAllLayers(uri, database, username, password);
-        System.out.println("MongoConfigService initialized with merged config: " + currentConfig);
+        this.configCurrent = mergeAllLayers(uri, database, username, password);
+        System.out.println("MongoConfigService initialized with merged config: " + configCurrent);
     }
     
     /**
@@ -78,11 +78,11 @@ public class MongoConfigService {
      * Reload config by merging all layers again
      */
     public void reloadConfig(String uri, String database, String username, String password) {
-        MongoConfig oldConfig = cloneConfig(this.currentConfig);
-        this.currentConfig = mergeAllLayers(uri, database, username, password);
+        MongoConfig oldConfig = cloneConfig(this.configCurrent);
+        this.configCurrent = mergeAllLayers(uri, database, username, password);
         
         // Publish event
-        MongoConfigChangeEvent event = new MongoConfigChangeEvent(oldConfig, this.currentConfig);
+        MongoConfigChangeEvent event = new MongoConfigChangeEvent(oldConfig, this.configCurrent);
         eventPublisher.publishEvent(event);
     }
 
@@ -96,20 +96,20 @@ public class MongoConfigService {
     /**
      * Get current merged config (all layers applied)
      */
-    public MongoConfig getCurrentConfig() {
-        return currentConfig;
+    public MongoConfig getConfigCurrent() {
+        return configCurrent;
     }
 
     public void updateConfig(String path, Object value) throws Exception {
-        MongoConfig oldConfig = cloneConfig(this.currentConfig);
+        MongoConfig oldConfig = cloneConfig(this.configCurrent);
 
-        setNestedProperty(this.currentConfig, path, value);
+        setNestedProperty(this.configCurrent, path, value);
 
         // Save to local config
         localConfigService.saveConfig("mongo." + path, String.valueOf(value), "mongo");
 
         // Publish event
-        MongoConfigChangeEvent event = new MongoConfigChangeEvent(oldConfig, this.currentConfig);
+        MongoConfigChangeEvent event = new MongoConfigChangeEvent(oldConfig, this.configCurrent);
         eventPublisher.publishEvent(event);
 
         System.out.println("MongoConfigService: Config updated: path=" + path + ", value=" + value);

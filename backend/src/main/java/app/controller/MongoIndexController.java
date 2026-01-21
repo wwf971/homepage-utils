@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Controller for managing MongoDB-Elasticsearch index metadata
@@ -161,6 +162,38 @@ public class MongoIndexController {
         }
     }
 
+    /**
+     * Get all indices that monitor a specific collection
+     * Query params: database, collection
+     */
+    @GetMapping("/indices-of-collection")
+    public ApiResponse<Set<String>> getIndicesOfCollection(
+            @RequestParam String database,
+            @RequestParam String collection) {
+        try {
+            Set<String> indices = mongoIndexService.getIndicesOfColl(database, collection);
+            return new ApiResponse<>(0, indices, 
+                "Found " + indices.size() + " index(es) monitoring " + database + "." + collection);
+        } catch (Exception e) {
+            System.err.println("Failed to get indices for collection: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to get indices for collection: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Manually trigger rebuild of the collection->indices mapping
+     */
+    @PostMapping("/rebuild-collection-mapping")
+    public ApiResponse<String> rebuildCollectionMapping() {
+        try {
+            mongoIndexService.buildIndicesOfColl();
+            return new ApiResponse<>(0, "success", "Collection->indices mapping rebuilt successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to rebuild collection mapping: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to rebuild collection mapping: " + e.getMessage());
+        }
+    }
+
     // ============================================================================
     // Document Operations
     // ============================================================================
@@ -172,9 +205,11 @@ public class MongoIndexController {
      *   "updateIndex": true/false (optional, default true)
      * }
      */
-    @PutMapping("/{indexName}/doc/{docId}")
+    @PutMapping("/{indexName}/doc/{database}/{collection}/{docId}")
     public ApiResponse<Map<String, Object>> updateDoc(
             @PathVariable String indexName,
+            @PathVariable String database,
+            @PathVariable String collection,
             @PathVariable String docId,
             @RequestBody Map<String, Object> requestBody) {
         try {
@@ -189,7 +224,7 @@ public class MongoIndexController {
                 return new ApiResponse<>(-1, null, "updateDict is required");
             }
 
-            Map<String, Object> result = mongoIndexService.updateDoc(indexName, docId, updateDict, updateIndex);
+            Map<String, Object> result = mongoIndexService.updateDoc(indexName, database, collection, docId, updateDict, updateIndex);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));
@@ -208,12 +243,14 @@ public class MongoIndexController {
     /**
      * Get a document (returns content only)
      */
-    @GetMapping("/{indexName}/doc/{docId}")
+    @GetMapping("/{indexName}/doc/{database}/{collection}/{docId}")
     public ApiResponse<Object> getDoc(
             @PathVariable String indexName,
+            @PathVariable String database,
+            @PathVariable String collection,
             @PathVariable String docId) {
         try {
-            Map<String, Object> result = mongoIndexService.getDoc(indexName, docId);
+            Map<String, Object> result = mongoIndexService.getDoc(indexName, database, collection, docId);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));
@@ -229,12 +266,14 @@ public class MongoIndexController {
     /**
      * Delete a document (soft delete)
      */
-    @DeleteMapping("/{indexName}/doc/{docId}")
+    @DeleteMapping("/{indexName}/doc/{database}/{collection}/{docId}")
     public ApiResponse<Void> deleteDoc(
             @PathVariable String indexName,
+            @PathVariable String database,
+            @PathVariable String collection,
             @PathVariable String docId) {
         try {
-            Map<String, Object> result = mongoIndexService.deleteDoc(indexName, docId);
+            Map<String, Object> result = mongoIndexService.deleteDoc(indexName, database, collection, docId);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));

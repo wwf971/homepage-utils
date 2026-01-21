@@ -16,14 +16,14 @@ public class MongoService {
 
     private MongoClient mongoClient;
     private MongoDatabase mongoDatabase;
-    private MongoConfig currentConfig;
+    private MongoConfig configCurrent;
 
     private final MongoConfigService configService;
 
     public MongoService(MongoConfigService configService) {
         this.configService = configService;
-        this.currentConfig = configService.getCurrentConfig();
-        System.out.println("MongoService initialized with config from MongoConfigService (lazy connection): " + currentConfig);
+        this.configCurrent = configService.getConfigCurrent();
+        System.out.println("MongoService initialized with config from MongoConfigService (lazy connection): " + configCurrent);
         System.out.println("MongoDB will connect on first use or manual start");
     }
 
@@ -46,12 +46,12 @@ public class MongoService {
             } catch (Exception e) {
                 System.err.println("Failed to reconnect with new config (config still saved): " + e.getMessage());
                 // Don't throw - config update should succeed even if connection fails
-                this.currentConfig = event.getNewConfig();
+                this.configCurrent = event.getNewConfig();
             }
         });
         
         // Update current config immediately so it's available even if connection fails
-        this.currentConfig = event.getNewConfig();
+        this.configCurrent = event.getNewConfig();
         System.out.println("Config updated immediately, MongoDB reconnection in progress...");
     }
 
@@ -149,7 +149,7 @@ public class MongoService {
             // Test connection
             this.mongoDatabase.listCollectionNames().first();
             
-            this.currentConfig = config;
+            this.configCurrent = config;
             System.out.println("MongoDB connection initialized successfully with connection pool settings");
         } catch (Exception e) {
             System.err.println("Failed to initialize MongoDB connection: " + e.getMessage());
@@ -167,9 +167,9 @@ public class MongoService {
     }
 
     public MongoClient getMongoClient() {
-        if (this.mongoClient == null && this.currentConfig != null) {
+        if (this.mongoClient == null && this.configCurrent != null) {
             try {
-                initializeConnection(this.currentConfig);
+                initializeConnection(this.configCurrent);
             } catch (Exception e) {
                 System.err.println("Failed to lazily connect to MongoDB: " + e.getMessage());
                 
@@ -177,7 +177,7 @@ public class MongoService {
                     try {
                         System.out.println("Retrying connection...");
                         Thread.sleep(2000);
-                        initializeConnection(this.currentConfig);
+                        initializeConnection(this.configCurrent);
                     } catch (Exception retry) {
                         System.err.println("Retry failed: " + retry.getMessage());
                         return null;
@@ -191,9 +191,9 @@ public class MongoService {
     }
 
     public MongoDatabase getMongoDatabase() {
-        if (this.mongoClient == null && this.currentConfig != null) {
+        if (this.mongoClient == null && this.configCurrent != null) {
             try {
-                initializeConnection(this.currentConfig);
+                initializeConnection(this.configCurrent);
             } catch (Exception e) {
                 System.err.println("Failed to lazily connect to MongoDB: " + e.getMessage());
                 
@@ -201,7 +201,7 @@ public class MongoService {
                     try {
                         System.out.println("Retrying connection...");
                         Thread.sleep(2000);
-                        initializeConnection(this.currentConfig);
+                        initializeConnection(this.configCurrent);
                     } catch (Exception retry) {
                         System.err.println("Retry failed: " + retry.getMessage());
                         return null;
@@ -296,9 +296,9 @@ public class MongoService {
     private void attemptReconnect() {
         System.out.println("Attempting to reconnect to MongoDB...");
         closeConnection();
-        if (this.currentConfig != null) {
+        if (this.configCurrent != null) {
             try {
-                initializeConnection(this.currentConfig);
+                initializeConnection(this.configCurrent);
                 System.out.println("Successfully reconnected to MongoDB");
             } catch (Exception e) {
                 System.err.println("Failed to reconnect: " + e.getMessage());
@@ -308,9 +308,9 @@ public class MongoService {
     }
 
     public MongoTemplate getMongoTemplate() {
-        if (this.mongoClient == null && this.currentConfig != null) {
+        if (this.mongoClient == null && this.configCurrent != null) {
             try {
-                initializeConnection(this.currentConfig);
+                initializeConnection(this.configCurrent);
             } catch (Exception e) {
                 System.err.println("Failed to connect to MongoDB: " + e.getMessage());
                 
@@ -319,7 +319,7 @@ public class MongoService {
                     try {
                         System.out.println("Connection error detected, retrying after 2 seconds...");
                         Thread.sleep(2000);
-                        initializeConnection(this.currentConfig);
+                        initializeConnection(this.configCurrent);
                     } catch (Exception retry) {
                         System.err.println("Retry also failed: " + retry.getMessage());
                         return null;
@@ -330,14 +330,14 @@ public class MongoService {
             }
         }
         
-        if (this.mongoClient == null || this.currentConfig == null) {
+        if (this.mongoClient == null || this.configCurrent == null) {
             return null;
         }
         
         try {
             // Test the connection before returning template
             mongoDatabase.listCollectionNames().first();
-            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(this.mongoClient, this.currentConfig.getDatabase()));
+            return new MongoTemplate(new SimpleMongoClientDatabaseFactory(this.mongoClient, this.configCurrent.getDatabase()));
         } catch (Exception e) {
             System.err.println("Failed to create MongoTemplate or connection test failed: " + e.getMessage());
             
@@ -345,7 +345,7 @@ public class MongoService {
             if (isConnectionException(e)) {
                 try {
                     attemptReconnect();
-                    return new MongoTemplate(new SimpleMongoClientDatabaseFactory(this.mongoClient, this.currentConfig.getDatabase()));
+                    return new MongoTemplate(new SimpleMongoClientDatabaseFactory(this.mongoClient, this.configCurrent.getDatabase()));
                 } catch (Exception retry) {
                     System.err.println("Reconnection failed: " + retry.getMessage());
                     return null;
@@ -356,14 +356,14 @@ public class MongoService {
         }
     }
 
-    public MongoConfig getCurrentConfig() {
-        return this.currentConfig;
+    public MongoConfig getConfigCurrent() {
+        return this.configCurrent;
     }
 
     public MongoConnectionStatus getStatus() {
         MongoConnectionStatus status = new MongoConnectionStatus();
-        status.setCurrentUri(currentConfig != null ? currentConfig.getUri() : null);
-        status.setCurrentDatabase(currentConfig != null ? currentConfig.getDatabase() : null);
+        status.setCurrentUri(configCurrent != null ? configCurrent.getUri() : null);
+        status.setCurrentDatabase(configCurrent != null ? configCurrent.getDatabase() : null);
 
         if (mongoClient == null) {
             status.setConnected(false);
@@ -396,10 +396,10 @@ public class MongoService {
     public String testConnection() {
         try {
             if (mongoClient == null || mongoDatabase == null) {
-                if (currentConfig != null) {
+                if (configCurrent != null) {
                     try {
                         // Create a client with shorter timeout for testing
-                        String connectionUri = buildConnectionUri(currentConfig);
+                        String connectionUri = buildConnectionUri(configCurrent);
                         com.mongodb.ConnectionString connString = new com.mongodb.ConnectionString(connectionUri);
                         com.mongodb.MongoClientSettings settings = com.mongodb.MongoClientSettings.builder()
                             .applyConnectionString(connString)
@@ -411,7 +411,7 @@ public class MongoService {
                             .build();
                         
                         MongoClient testClient = MongoClients.create(settings);
-                        MongoDatabase testDb = testClient.getDatabase(currentConfig.getDatabase());
+                        MongoDatabase testDb = testClient.getDatabase(configCurrent.getDatabase());
                         
                         // Test the connection
                         String firstCollection = testDb.listCollectionNames().first();
@@ -420,9 +420,9 @@ public class MongoService {
                         testClient.close();
                         
                         if (firstCollection != null) {
-                            return "Connection successful! Database '" + currentConfig.getDatabase() + "' has collection: " + firstCollection;
+                            return "Connection successful! Database '" + configCurrent.getDatabase() + "' has collection: " + firstCollection;
                         } else {
-                            return "Connection successful! Database '" + currentConfig.getDatabase() + "' exists but has no collections";
+                            return "Connection successful! Database '" + configCurrent.getDatabase() + "' exists but has no collections";
                         }
                     } catch (Exception e) {
                         throw new RuntimeException("Failed to connect: " + e.getMessage());
@@ -435,9 +435,9 @@ public class MongoService {
             // If already connected, just test it
             String firstCollection = mongoDatabase.listCollectionNames().first();
             if (firstCollection != null) {
-                return "Connection successful! Database '" + currentConfig.getDatabase() + "' has collection: " + firstCollection;
+                return "Connection successful! Database '" + configCurrent.getDatabase() + "' has collection: " + firstCollection;
             } else {
-                return "Connection successful! Database '" + currentConfig.getDatabase() + "' exists but has no collections";
+                return "Connection successful! Database '" + configCurrent.getDatabase() + "' exists but has no collections";
             }
         } catch (Exception e) {
             System.err.println("MongoDB connection test failed: " + e.getMessage());
@@ -449,8 +449,8 @@ public class MongoService {
         try {
             // Ensure connection exists
             if (mongoClient == null) {
-                if (currentConfig != null) {
-                    initializeConnection(currentConfig);
+                if (configCurrent != null) {
+                    initializeConnection(configCurrent);
                 } else {
                     throw new RuntimeException("No configuration available");
                 }
@@ -473,8 +473,8 @@ public class MongoService {
         try {
             // Ensure connection exists
             if (mongoClient == null) {
-                if (currentConfig != null) {
-                    initializeConnection(currentConfig);
+                if (configCurrent != null) {
+                    initializeConnection(configCurrent);
                 } else {
                     throw new RuntimeException("No configuration available");
                 }
@@ -500,8 +500,8 @@ public class MongoService {
         try {
             // Ensure connection exists
             if (mongoClient == null) {
-                if (currentConfig != null) {
-                    initializeConnection(currentConfig);
+                if (configCurrent != null) {
+                    initializeConnection(configCurrent);
                 } else {
                     throw new RuntimeException("No configuration available");
                 }
@@ -712,8 +712,8 @@ public class MongoService {
             String sortOrder) {
         
         if (mongoClient == null) {
-            if (currentConfig != null) {
-                initializeConnection(currentConfig);
+            if (configCurrent != null) {
+                initializeConnection(configCurrent);
             } else {
                 throw new RuntimeException("MongoDB client is not initialized");
             }
@@ -838,8 +838,8 @@ public class MongoService {
             int pageSize) {
         
         if (mongoClient == null) {
-            if (currentConfig != null) {
-                initializeConnection(currentConfig);
+            if (configCurrent != null) {
+                initializeConnection(configCurrent);
             } else {
                 throw new RuntimeException("MongoDB client is not initialized");
             }
@@ -911,8 +911,8 @@ public class MongoService {
      */
     public void createCollection(String databaseName, String collectionName) {
         if (mongoClient == null) {
-            if (currentConfig != null) {
-                initializeConnection(currentConfig);
+            if (configCurrent != null) {
+                initializeConnection(configCurrent);
             } else {
                 throw new RuntimeException("MongoDB client is not initialized");
             }
@@ -940,8 +940,8 @@ public class MongoService {
      */
     public org.bson.Document createEmptyDocument(String databaseName, String collectionName) {
         if (mongoClient == null) {
-            if (currentConfig != null) {
-                initializeConnection(currentConfig);
+            if (configCurrent != null) {
+                initializeConnection(configCurrent);
             } else {
                 throw new RuntimeException("MongoDB client is not initialized");
             }

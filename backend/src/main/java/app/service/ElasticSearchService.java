@@ -30,7 +30,7 @@ public class ElasticSearchService {
      * Get base URI for Elasticsearch
      */
     private String getBaseUri() {
-        ElasticSearchConfig config = configService.getCurrentConfig();
+        ElasticSearchConfig config = configService.getConfigCurrent();
         String uris = config.getUris();
         String baseUri = uris.split(",")[0].trim();
         if (!baseUri.endsWith("/")) {
@@ -43,7 +43,7 @@ public class ElasticSearchService {
      * Setup HTTP connection with auth
      */
     private HttpURLConnection setupConnection(String urlString, String method) throws Exception {
-        ElasticSearchConfig config = configService.getCurrentConfig();
+        ElasticSearchConfig config = configService.getConfigCurrent();
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod(method);
@@ -255,6 +255,7 @@ public class ElasticSearchService {
 
     /**
      * Delete document by ES document ID (which is the MongoDB docId)
+     * WITHOUT version control - use deleteDocumentWithVersion for version-controlled deletes
      */
     public void deleteDocument(String indexName, String docId) throws Exception {
         String baseUri = getBaseUri();
@@ -266,6 +267,87 @@ public class ElasticSearchService {
         if (responseCode == 200 || responseCode == 404) {
             // 404 is OK - document may not exist
             System.out.println("Deleted doc " + docId + " from ES index " + indexName);
+        } else {
+            String errorResponse = readResponse(connection);
+            throw new Exception("Failed to delete document: HTTP " + responseCode + " - " + errorResponse);
+        }
+    }
+
+    /**
+     * Delete document with optimistic concurrency control using MongoDB updateVersion
+     * 
+     * @param indexName ES index name
+     * @param docId Document ID
+     * @param deleteVersion The MongoDB updateVersion at time of deletion
+     */
+    public void deleteDocumentWithVersion(String indexName, String docId, long deleteVersion) throws Exception {
+        String baseUri = getBaseUri();
+        
+        // First, try to get existing document to check version and get seq_no/primary_term
+        Long seqNo = null;
+        Long primaryTerm = null;
+        
+        try {
+            String getUri = baseUri + indexName + "/_doc/" + docId;
+            HttpURLConnection getConn = setupConnection(getUri, "GET");
+            int getResponseCode = getConn.getResponseCode();
+            
+            if (getResponseCode == 200) {
+                // Document exists, check its version
+                String response = readResponse(getConn);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = objectMapper.readValue(response, Map.class);
+                
+                // Get seq_no and primary_term for optimistic concurrency control
+                seqNo = ((Number) result.get("_seq_no")).longValue();
+                primaryTerm = ((Number) result.get("_primary_term")).longValue();
+                
+                // Get the existing updateVersion
+                @SuppressWarnings("unchecked")
+                Map<String, Object> source = (Map<String, Object>) result.get("_source");
+                if (source != null && source.containsKey("updateVersion")) {
+                    Long existingVersion = ((Number) source.get("updateVersion")).longValue();
+                    
+                    // Only delete if ES version is < deleteVersion
+                    // If ES version >= deleteVersion, a newer update has already been indexed
+                    if (existingVersion > deleteVersion) {
+                        System.err.println("WARNING: Aborting ES delete for doc " + docId + 
+                            ". Existing ES version " + existingVersion + " is higher than delete version " + deleteVersion + 
+                            ". A late-arriving update has already indexed newer data.");
+                        return;
+                    }
+                    
+                    if (existingVersion < deleteVersion) {
+                        System.out.println("Info: Proceeding with ES delete for doc " + docId + 
+                            ". ES version " + existingVersion + " < delete version " + deleteVersion);
+                    }
+                }
+            } else if (getResponseCode == 404) {
+                // Document doesn't exist in ES - nothing to delete
+                System.out.println("Info: Document " + docId + " not found in ES (already deleted or never indexed)");
+                return;
+            }
+        } catch (Exception e) {
+            // If we can't read, proceed with delete anyway (might not exist)
+            System.err.println("Warning: Could not read existing document for version check before delete: " + e.getMessage());
+        }
+        
+        // Build delete URI with if_seq_no and if_primary_term if we have them
+        String deleteUri = baseUri + indexName + "/_doc/" + docId;
+        if (seqNo != null && primaryTerm != null) {
+            deleteUri += "?if_seq_no=" + seqNo + "&if_primary_term=" + primaryTerm;
+        }
+
+        HttpURLConnection connection = setupConnection(deleteUri, "DELETE");
+        int responseCode = connection.getResponseCode();
+        
+        if (responseCode == 409) {
+            // Version conflict - document was modified by someone else
+            System.err.println("Version conflict during delete: document " + docId + " was modified concurrently. Delete aborted.");
+            // Don't throw - this is expected behavior with concurrent operations
+        } else if (responseCode == 200 || responseCode == 404) {
+            // 200 = deleted, 404 = already gone
+            System.out.println("Deleted doc " + docId + " from ES index " + indexName + " (version " + deleteVersion + ")");
         } else {
             String errorResponse = readResponse(connection);
             throw new Exception("Failed to delete document: HTTP " + responseCode + " - " + errorResponse);

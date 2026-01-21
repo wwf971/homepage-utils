@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class RedisConfigService {
 
-    private RedisConfig currentConfig;
+    private RedisConfig configCurrent;
     private final LocalConfigService localConfigService;
 
     public RedisConfigService(
@@ -29,20 +29,20 @@ public class RedisConfigService {
             System.out.println("  timeout=" + timeout);
 
             // Initialize with merged config
-            this.currentConfig = mergeAllLayers(host, port, username, password, timeout);
-            System.out.println("RedisConfigService initialized with merged config: " + currentConfig);
+            this.configCurrent = mergeAllLayers(host, port, username, password, timeout);
+            System.out.println("RedisConfigService initialized with merged config: " + configCurrent);
         } catch (Exception e) {
             System.err.println("WARNING: Failed to initialize RedisConfigService: " + e.getMessage());
             e.printStackTrace();
             // Fallback to empty config
-            this.currentConfig = new RedisConfig(
+            this.configCurrent = new RedisConfig(
                 host != null ? host : "localhost",
                 port != null ? port : 6379,
                 username != null ? username : "",
                 password != null ? password : "",
                 timeout != null ? timeout : 3000
             );
-            System.out.println("RedisConfigService initialized with fallback config: " + currentConfig);
+            System.out.println("RedisConfigService initialized with fallback config: " + configCurrent);
         }
     }
     
@@ -80,11 +80,11 @@ public class RedisConfigService {
      * Reload config by merging all layers again
      */
     public void reloadConfig(String host, Integer port, String username, String password, Integer timeout) {
-        this.currentConfig = mergeAllLayers(host, port, username, password, timeout);
+        this.configCurrent = mergeAllLayers(host, port, username, password, timeout);
     }
 
-    public RedisConfig getCurrentConfig() {
-        return currentConfig;
+    public RedisConfig getConfigCurrent() {
+        return configCurrent;
     }
 
     public RedisConfig getLocalConfig() {
@@ -115,7 +115,7 @@ public class RedisConfigService {
     }
 
     public void updateConfig(String path, Object value) throws Exception {
-        setNestedProperty(this.currentConfig, path, value);
+        setNestedProperty(this.configCurrent, path, value);
 
         // Save to local config
         localConfigService.saveConfig("redis." + path, String.valueOf(value), "redis");
