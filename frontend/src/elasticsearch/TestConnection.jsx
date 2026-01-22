@@ -5,7 +5,7 @@ import { esComputedConfigAtom, esSelectedIndexAtom, getBackendServerUrl } from '
 import '../styles/testSection.css';
 import ListIndices from './ListIndices';
 import IndexInfo from './IndexInfo';
-import ListDocs from './ListDocs';
+import EsDocListAll from './ListDocs';
 import EsDocSearch from './EsDocSearch';
 
 export const TestConnection = ({ showIndexList = false }) => {
@@ -143,7 +143,7 @@ export const TestConnection = ({ showIndexList = false }) => {
             <>
               <IndexInfo />
               <EsDocSearch />
-              <ListDocs />
+              <EsDocListAll />
             </>
           )}
         </>

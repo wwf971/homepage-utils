@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { KeyValuesComp, SearchableValueComp, SpinningCircle, PlusIcon } from '@wwf971/react-comp-misc';
-import { getBackendServerUrl } from '../remote/dataStore';
 import { searchDatabases, searchCollections } from '../mongo/mongoStore';
+import { createMongoIndex } from './mongoIndexStore';
 import '../mongo/mongo.css';
 import './mongo-index.css';
 
@@ -104,7 +104,9 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType, co
   
   const handleUpdate = async (configKey, newValue) => {
     if (onChangeAttempt) {
-      onChangeAttempt(index, field, newValue);
+      // Map KeyValuesComp's 'key'/'value' to 'database'/'collection'
+      const mappedField = field === 'key' ? 'database' : field === 'value' ? 'collection' : field;
+      onChangeAttempt(index, mappedField, newValue);
     }
     
     // After updating, trigger validation to update status
@@ -158,13 +160,23 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType, co
 };
 
 /**
- * CreateMongoIndex - Form for creating a new MongoDB-ES index
+ * MongoIndexCreate - Form for creating a new MongoDB-ES index
+ * 
+ * @param {function} onCreated - Callback when index is created
+ * @param {function} onCancel - Callback when creation is cancelled
+ * @param {boolean} embedded - If true, hides the buttons (for embedding in other components)
+ * @param {Object} initialData - Initial data {name, esIndex, collections}
  */
-const CreateMongoIndex = ({ onCreated, onCancel }) => {
-  const [name, setName] = useState('');
-  const [esIndex, setEsIndex] = useState('');
-  const [collections, setCollections] = useState([{ database: '', collection: '' }]);
-  const [validationStatus, setValidationStatus] = useState({});
+const MongoIndexCreate = forwardRef(({ onCreated, onCancel, embedded = false, initialData = null }, ref) => {
+  const [name, setName] = useState(initialData?.name || '');
+  const [esIndex, setEsIndex] = useState(initialData?.esIndex || '');
+  const [collections, setCollections] = useState(initialData?.collections || [{ database: '', collection: '' }]);
+  const [validationStatus, setValidationStatus] = useState(
+    initialData?.collections?.reduce((acc, _, idx) => {
+      acc[idx] = { databaseValid: false, collectionValid: false };
+      return acc;
+    }, {}) || {}
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   
@@ -213,57 +225,101 @@ const CreateMongoIndex = ({ onCreated, onCancel }) => {
     }));
   };
   
-  const handleCreate = async () => {
+  // Validate the form and return validation result
+  const validate = () => {
     if (!name || !name.trim()) {
       setError('Name is required');
-      return;
+      return { valid: false, message: 'Name is required' };
     }
     
     if (!esIndex || !esIndex.trim()) {
       setError('ES Index name is required');
-      return;
+      return { valid: false, message: 'ES Index name is required' };
+    }
+    
+    const validCollections = collections.filter(c => c.database && c.collection);
+    if (validCollections.length === 0) {
+      setError('At least one collection is required');
+      return { valid: false, message: 'At least one collection is required' };
+    }
+    
+    setError(null);
+    return { valid: true };
+  };
+  
+  // Get current form data
+  const getData = () => {
+    return {
+      name: name.trim(),
+      esIndex: esIndex.trim(),
+      collections: collections.filter(c => c.database && c.collection)
+    };
+  };
+  
+  const handleCreate = async () => {
+    const validation = validate();
+    if (!validation.valid) {
+      return { code: -1, message: validation.message };
     }
     
     setIsCreating(true);
     setError(null);
     
     try {
-      const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo-index/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          esIndex: esIndex.trim(),
-          collections: collections.filter(c => c.database && c.collection)
-        })
-      });
-      
-      const result = await response.json();
+      const data = getData();
+      const result = await createMongoIndex(data.name, data.esIndex, data.collections);
       
       if (result.code === 0) {
         if (onCreated) {
           onCreated(result.data);
         }
-        // Reset form
-        setName('');
-        setEsIndex('');
-        setCollections([{ database: '', collection: '' }]);
+        // Reset form if not embedded
+        if (!embedded) {
+          setName('');
+          setEsIndex('');
+          setCollections([{ database: '', collection: '' }]);
+          setValidationStatus({});
+        }
+        return result;
       } else {
         setError(result.message || 'Failed to create index');
+        return result;
       }
     } catch (err) {
-      setError(`Error: ${err.message}`);
+      const errorMsg = `Error: ${err.message}`;
+      setError(errorMsg);
+      return { code: -2, message: errorMsg };
     } finally {
       setIsCreating(false);
     }
   };
   
+  // Update collection at index (useful when embedded)
+  const updateCollection = (index, field, value) => {
+    setCollections(prev => {
+      const updated = [...prev];
+      if (updated[index]) {
+        updated[index] = {
+          ...updated[index],
+          [field]: value
+        };
+      }
+      return updated;
+    });
+  };
+  
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    validate,
+    getData,
+    isCreating,
+    createIndex: handleCreate,
+    updateCollection
+  }));
+  
   return (
     <div className="mongo-index-create-form">
-      <h4>Create New Index</h4>
+      <div className="mongo-index-create-title">Create New Index</div>
       
       <div className="mongo-index-form-group">
         <label className="mongo-index-form-label">Name *</label>
@@ -294,38 +350,36 @@ const CreateMongoIndex = ({ onCreated, onCancel }) => {
         </div>
         
         <div className="mongo-index-collections-list">
-          {collections.map((coll, idx) => {
-            return (
-              <div key={idx} className="mongo-index-collection-row">
-                <div className="mongo-index-collection-field">
-                  <label className="mongo-index-field-label">Database:</label>
-                  <SearchableAdapter
-                    data={coll.database}
-                    onChangeAttempt={handleCollectionChange}
-                    field="database"
-                    index={idx}
-                    searchType="database"
-                    collections={collections}
-                    validationStatus={validationStatus}
-                    onValidationChange={handleValidationChange}
-                  />
-                </div>
-                <div className="mongo-index-collection-field">
-                  <label className="mongo-index-field-label">Collection:</label>
-                  <SearchableAdapter
-                    data={coll.collection}
-                    onChangeAttempt={handleCollectionChange}
-                    field="collection"
-                    index={idx}
-                    searchType="collection"
-                    collections={collections}
-                    validationStatus={validationStatus}
-                    onValidationChange={handleValidationChange}
-                  />
-                </div>
+          {collections.map((coll, idx) => (
+            <div key={idx} className="mongo-index-collection-row">
+              <div className="mongo-index-collection-field">
+                <label>Database:</label>
+                <SearchableAdapter
+                  data={coll.database}
+                  onChangeAttempt={handleCollectionChange}
+                  field="database"
+                  index={idx}
+                  searchType="database"
+                  collections={collections}
+                  validationStatus={validationStatus}
+                  onValidationChange={handleValidationChange}
+                />
               </div>
-            );
-          })}
+              <div className="mongo-index-collection-field">
+                <label>Collection:</label>
+                <SearchableAdapter
+                  data={coll.collection}
+                  onChangeAttempt={handleCollectionChange}
+                  field="collection"
+                  index={idx}
+                  searchType="collection"
+                  collections={collections}
+                  validationStatus={validationStatus}
+                  onValidationChange={handleValidationChange}
+                />
+              </div>
+            </div>
+          ))}
         </div>
         
         <div className="mongo-index-add-collection" onClick={handleAddCollection}>
@@ -340,29 +394,31 @@ const CreateMongoIndex = ({ onCreated, onCancel }) => {
         </div>
       )}
       
-      <div className="mongo-index-form-buttons">
-        <button
-          onClick={handleCreate}
-          disabled={isCreating}
-          className="mongo-index-btn-create"
-        >
-          {isCreating && <SpinningCircle width={14} height={14} color="white" />}
-          {isCreating ? 'Creating...' : 'Create Index'}
-        </button>
-        
-        {onCancel && (
+      {!embedded && (
+        <div className="mongo-index-form-buttons">
           <button
-            onClick={onCancel}
+            onClick={handleCreate}
             disabled={isCreating}
-            className="mongo-index-btn-cancel"
+            className="mongo-index-btn-create"
           >
-            Cancel
+            {isCreating && <SpinningCircle width={14} height={14} color="white" />}
+            {isCreating ? 'Creating...' : 'Create Index'}
           </button>
-        )}
-      </div>
+          
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              disabled={isCreating}
+              className="mongo-index-btn-cancel"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
-};
+});
 
-export default CreateMongoIndex;
+export default MongoIndexCreate;
 

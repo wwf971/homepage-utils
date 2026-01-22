@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { SpinningCircle, RefreshIcon, PlusIcon } from '@wwf971/react-comp-misc';
-import { getBackendServerUrl } from '../remote/dataStore';
+import { fetchMongoIndices } from './mongoIndexStore';
 import MongoIndexCard from './MongoIndexCard';
-import CreateMongoIndex from './CreateMongoIndex';
+import MongoIndexCreate from './MongoIndexCreate';
 import '../mongo/mongo.css';
 
 /**
- * MongoIndex - Main component for managing MongoDB-ES indices
+ * MongoIndexPanel - Main component for managing MongoDB-ES indices
  */
-const MongoIndex = () => {
+const MongoIndexPanel = () => {
   const [indices, setIndices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,9 +19,7 @@ const MongoIndex = () => {
     setError(null);
     
     try {
-      const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo-index/list`);
-      const result = await response.json();
+      const result = await fetchMongoIndices();
       
       if (result.code === 0) {
         setIndices(result.data || []);
@@ -100,12 +98,6 @@ const MongoIndex = () => {
         </div>
       )}
       
-      {showCreateForm && (
-        <CreateMongoIndex
-          onCreated={handleIndexCreated}
-          onCancel={() => setShowCreateForm(false)}
-        />
-      )}
       
       {!loading && indices.length === 0 && !showCreateForm && (
         <div style={{ 
@@ -132,9 +124,20 @@ const MongoIndex = () => {
           ))}
         </div>
       )}
+
+      {showCreateForm && (
+        <div className="mongo-popup-overlay" onClick={() => setShowCreateForm(false)}>
+          <div className="mongo-popup" onClick={(e) => e.stopPropagation()} style={{ minWidth: '500px', maxWidth: '600px' }}>
+            <MongoIndexCreate
+              onCreated={handleIndexCreated}
+              onCancel={() => setShowCreateForm(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default MongoIndex;
+export default MongoIndexPanel;
 

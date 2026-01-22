@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonComp } from '@wwf971/react-comp-misc';
-import { getBackendServerUrl, useMongoDocEditor } from '../remote/dataStore';
+import { getBackendServerUrl } from '../remote/dataStore';
+import { updateMongoIndex, deleteMongoIndex } from './mongoIndexStore';
+import { searchDatabases, searchCollections, useMongoDocEditor } from '../mongo/mongoStore';
 import MongoIndexDashboard from './MongoIndexDashboard';
 import MongoIndexSearch from './MongoIndexSearch';
 import '../mongo/mongo.css';
@@ -9,7 +11,7 @@ import './mongo-index.css';
 /**
  * Adapter for SearchableValueComp to work with KeyValuesComp
  */
-const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType }) => {
+const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType, editedIndex }) => {
   const [searchResults, setSearchResults] = useState([]);
   
   const handleSearch = async (value) => {
@@ -18,21 +20,22 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType }) 
     }
     
     try {
-      const backendUrl = getBackendServerUrl();
-      let url;
+      let result;
       
       if (searchType === 'database') {
-        url = `${backendUrl}/mongo-index/search/databases?query=${encodeURIComponent(value)}`;
+        // Search databases using cache system
+        result = await searchDatabases(value);
       } else if (searchType === 'collection') {
         // Get the database from the same row
-        const dbValue = data; // This is actually the database value when searching collections
-        url = `${backendUrl}/mongo-index/search/collections?database=${encodeURIComponent(dbValue)}&query=${encodeURIComponent(value)}`;
+        const dbValue = editedIndex?.collections[index]?.database || '';
+        if (!dbValue) {
+          return { code: 0, data: [] };
+        }
+        // Search collections using cache system
+        result = await searchCollections(dbValue, value);
       }
       
-      const response = await fetch(url);
-      const result = await response.json();
-      
-      if (result.code === 0) {
+      if (result && result.code === 0) {
         const results = result.data.map(item => ({
           value: item,
           label: item
@@ -48,7 +51,9 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType }) 
   
   const handleUpdate = async (configKey, newValue) => {
     if (onChangeAttempt) {
-      onChangeAttempt(index, field, newValue);
+      // Map KeyValuesComp's 'key'/'value' to 'database'/'collection'
+      const mappedField = field === 'key' ? 'database' : field === 'value' ? 'collection' : field;
+      onChangeAttempt(index, mappedField, newValue);
     }
     return { code: 0, message: 'Updated successfully' };
   };
@@ -153,19 +158,10 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
     setError(null);
     
     try {
-      const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/update`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          esIndex: editedIndex.esIndex,
-          collections: editedIndex.collections.filter(c => c.database && c.collection)
-        })
+      const result = await updateMongoIndex(index.name, {
+        esIndex: editedIndex.esIndex,
+        collections: editedIndex.collections.filter(c => c.database && c.collection)
       });
-      
-      const result = await response.json();
       
       if (result.code === 0) {
         setIsEditing(false);
@@ -191,12 +187,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
     setShowDeleteConfirm(false);
     
     try {
-      const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/delete`, {
-        method: 'DELETE'
-      });
-      
-      const result = await response.json();
+      const result = await deleteMongoIndex(index.name);
       
       if (result.code === 0) {
         if (onDelete) {
@@ -222,10 +213,10 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
     key: coll.database || '',
     value: coll.collection || '',
     keyComp: isEditing 
-      ? (props) => <SearchableAdapter {...props} searchType="database" />
+      ? (props) => <SearchableAdapter {...props} searchType="database" editedIndex={editedIndex} />
       : undefined,
     valueComp: isEditing
-      ? (props) => <SearchableAdapter {...props} searchType="collection" />
+      ? (props) => <SearchableAdapter {...props} searchType="collection" editedIndex={editedIndex} />
       : undefined
   }));
   

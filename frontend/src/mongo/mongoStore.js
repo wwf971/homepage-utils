@@ -304,6 +304,28 @@ export async function createMongoCollection(databaseName, collectionName) {
   }
 }
 
+/**
+ * Delete a collection from a MongoDB database
+ */
+export async function deleteCollection(databaseName, collectionName) {
+  try {
+    const backendUrl = getBackendServerUrl();
+    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/delete`, {
+      method: 'DELETE'
+    });
+
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      return { code: 0, message: result.message || 'Collection deleted successfully' };
+    }
+    return { code: -1, message: result.message || 'Failed to delete collection' };
+  } catch (error) {
+    console.log('[ERROR]Failed to delete MongoDB collection:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
 // ========== MongoDB Document API ==========
 
 /**

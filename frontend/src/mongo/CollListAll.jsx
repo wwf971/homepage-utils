@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { SpinningCircle, RefreshIcon, PlusIcon } from '@wwf971/react-comp-misc';
+import { SpinningCircle, RefreshIcon, PlusIcon, Menu } from '@wwf971/react-comp-misc';
 import { 
   mongoSelectedDatabaseAtom,
   mongoCollectionsAtom,
   mongoSelectedCollectionAtom,
-  fetchMongoCollections,
-  createMongoCollection
+  fetchMongoCollections
 } from '../remote/dataStore';
+import CollDeleteConfirm from './CollDeleteConfirm';
+import CollCreateConfirm from './CollCreateConfirm';
+import CollIndexInfo from './CollIndexInfo';
 import './mongo.css';
 
 /**
@@ -18,10 +20,12 @@ import './mongo.css';
 const CollListAll = ({ hasSuccessfulTest }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showCreatePopup, setShowCreatePopup] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState('');
-  const [createError, setCreateError] = useState(null);
-  const [creating, setCreating] = useState(false);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [collectionToDelete, setCollectionToDelete] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [collectionForIndexInfo, setCollectionForIndexInfo] = useState(null);
+  const [showIndexInfo, setShowIndexInfo] = useState(false);
   
   const selectedDatabase = useAtomValue(mongoSelectedDatabaseAtom);
   const selectedCollection = useAtomValue(mongoSelectedCollectionAtom);
@@ -51,6 +55,94 @@ const CollListAll = ({ hasSuccessfulTest }) => {
     setSelectedCollection(collectionName);
   };
 
+  const handleCollectionContextMenu = (e, collectionName) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent backdrop from handling this
+    
+    // Select the collection
+    setSelectedCollection(collectionName);
+    
+    // Close existing menu first
+    setContextMenu(null);
+    
+    // Use requestAnimationFrame to ensure React completes unmount before remounting
+    requestAnimationFrame(() => {
+      setContextMenu({
+        position: { x: e.clientX, y: e.clientY },
+        collectionName
+      });
+    });
+  };
+
+  const handleBackdropContextMenu = (e) => {
+    e.preventDefault();
+    
+    // Temporarily hide backdrop to find element underneath
+    const backdrop = e.currentTarget;
+    backdrop.style.pointerEvents = 'none';
+    const clickedElement = document.elementFromPoint(e.clientX, e.clientY);
+    backdrop.style.pointerEvents = '';
+    
+    // Check if we clicked on a collection tag
+    const collectionTag = clickedElement?.closest('.mongo-tag-clickable');
+    
+    if (collectionTag) {
+      // Find the collection name from the tag
+      const collectionName = collectionTag.textContent;
+      
+      // Select the collection
+      setSelectedCollection(collectionName);
+      
+      // Close existing menu first
+      setContextMenu(null);
+      
+      // Use requestAnimationFrame to ensure React completes unmount before remounting
+      requestAnimationFrame(() => {
+        setContextMenu({
+          position: { x: e.clientX, y: e.clientY },
+          collectionName
+        });
+      });
+    } else {
+      // Right-click outside collection tags - just close menu
+      setContextMenu(null);
+    }
+  };
+
+  const handleMenuItemClick = (item) => {
+    if (item.name === 'Delete' && contextMenu) {
+      setCollectionToDelete(contextMenu.collectionName);
+      setShowDeleteConfirm(true);
+    } else if (item.name === 'Index Info' && contextMenu) {
+      setCollectionForIndexInfo(contextMenu.collectionName);
+      setShowIndexInfo(true);
+    }
+    setContextMenu(null);
+  };
+  
+  const handleIndexInfoClose = () => {
+    setShowIndexInfo(false);
+    setCollectionForIndexInfo(null);
+  };
+
+  const handleDeleteConfirm = (result) => {
+    setShowDeleteConfirm(false);
+    setCollectionToDelete(null);
+    
+    // If the deleted collection was selected, clear selection
+    if (selectedCollection === collectionToDelete) {
+      setSelectedCollection(null);
+    }
+    
+    // Refresh collections list
+    loadCollections();
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+    setCollectionToDelete(null);
+  };
+
   const loadCollections = async () => {
     if (!selectedDatabase) return;
 
@@ -69,46 +161,17 @@ const CollListAll = ({ hasSuccessfulTest }) => {
   };
 
   const handleCreateClick = () => {
-    setShowCreatePopup(true);
-    setNewCollectionName('');
-    setCreateError(null);
+    setShowCreateConfirm(true);
+  };
+
+  const handleCreateConfirm = (result) => {
+    setShowCreateConfirm(false);
+    // Reload collections
+    loadCollections();
   };
 
   const handleCreateCancel = () => {
-    setShowCreatePopup(false);
-    setNewCollectionName('');
-    setCreateError(null);
-  };
-
-  const handleCreateSubmit = async () => {
-    const trimmedName = newCollectionName.trim();
-    
-    if (!trimmedName) {
-      setCreateError('Collection name cannot be empty');
-      return;
-    }
-
-    // Frontend validation: check if collection already exists
-    if (collections.includes(trimmedName)) {
-      setCreateError(`Collection "${trimmedName}" already exists`);
-      return;
-    }
-
-    setCreating(true);
-    setCreateError(null);
-
-    const result = await createMongoCollection(selectedDatabase, trimmedName);
-    
-    if (result.code === 0) {
-      // Success - refresh collections list
-      setShowCreatePopup(false);
-      setNewCollectionName('');
-      loadCollections();
-    } else {
-      setCreateError(result.message);
-    }
-    
-    setCreating(false);
+    setShowCreateConfirm(false);
   };
 
   if (!selectedDatabase) {
@@ -116,9 +179,9 @@ const CollListAll = ({ hasSuccessfulTest }) => {
   }
 
   return (
-    <div className="mongo-collections-section" style={{ marginTop: '24px' }}>
+    <div className="mongo-collections-section">
       <div className="mongo-section-header">
-        <h3>Collections in "{selectedDatabase}"</h3>
+        <h3>Collections in "{selectedDatabase} Database"</h3>
         <div className="mongo-section-buttons">
           <button
             className="mongo-refresh-button"
@@ -140,21 +203,21 @@ const CollListAll = ({ hasSuccessfulTest }) => {
       </div>
       
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
           <SpinningCircle width={16} height={16} color="#666" />
           <span>Loading collections...</span>
         </div>
       )}
 
       {error && (
-        <div className="test-result error" style={{ marginTop: '12px' }}>
+        <div className="test-result error" style={{ marginTop: '4px' }}>
           <strong>✗ Error</strong>
           <div className="result-message">{error}</div>
         </div>
       )}
 
       {Array.isArray(collections) && !loading && (
-        <div style={{ marginTop: '12px' }}>
+        <div>
           <h4 style={{ marginBottom: '6px' }}>
             Found {collections.length} collection{collections.length !== 1 ? 's' : ''}:
           </h4>
@@ -167,6 +230,7 @@ const CollListAll = ({ hasSuccessfulTest }) => {
                   key={index} 
                   className={`mongo-tag mongo-tag-clickable ${selectedCollection === collection ? 'mongo-tag-selected' : ''}`}
                   onClick={() => handleCollectionClick(collection)}
+                  onContextMenu={(e) => handleCollectionContextMenu(e, collection)}
                 >
                   {collection}
                 </span>
@@ -176,81 +240,42 @@ const CollListAll = ({ hasSuccessfulTest }) => {
         </div>
       )}
 
-      {showCreatePopup && (
-        <div className="mongo-popup-overlay" onClick={handleCreateCancel}>
-          <div className="mongo-popup" onClick={(e) => e.stopPropagation()}>
-            <h3>Create New Collection</h3>
-            <div style={{ marginTop: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                Collection Name:
-              </label>
-              <input
-                type="text"
-                value={newCollectionName}
-                onChange={(e) => setNewCollectionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCreateSubmit();
-                  } else if (e.key === 'Escape') {
-                    handleCreateCancel();
-                  }
-                }}
-                placeholder="Enter collection name"
-                autoFocus
-                disabled={creating}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-            
-            {createError && (
-              <div className="test-result error" style={{ marginTop: '12px' }}>
-                <div className="result-message">{createError}</div>
-              </div>
-            )}
+      {showCreateConfirm && (
+        <CollCreateConfirm
+          dbName={selectedDatabase}
+          onConfirm={handleCreateConfirm}
+          onCancel={handleCreateCancel}
+        />
+      )}
 
-            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={handleCreateCancel}
-                disabled={creating}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  background: 'white',
-                  cursor: creating ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateSubmit}
-                disabled={creating}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: '4px',
-                  background: creating ? '#ccc' : '#007bff',
-                  color: 'white',
-                  cursor: creating ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                {creating && <SpinningCircle width={14} height={14} color="white" />}
-                {creating ? 'Creating...' : 'Create'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {contextMenu && (
+        <Menu
+          items={[
+            { type: 'item', name: 'Index Info' },
+            { type: 'item', name: 'Delete' }
+          ]}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onItemClick={handleMenuItemClick}
+          onContextMenu={handleBackdropContextMenu}
+        />
+      )}
+
+      {showDeleteConfirm && collectionToDelete && (
+        <CollDeleteConfirm
+          dbName={selectedDatabase}
+          collName={collectionToDelete}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+        />
+      )}
+      
+      {showIndexInfo && collectionForIndexInfo && (
+        <CollIndexInfo
+          dbName={selectedDatabase}
+          collName={collectionForIndexInfo}
+          onClose={handleIndexInfoClose}
+        />
       )}
     </div>
   );

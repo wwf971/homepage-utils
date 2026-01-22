@@ -20,9 +20,9 @@ import CreateDoc from './CreateDoc';
 import './elasticsearch.css';
 
 /**
- * ListDocs - Component for listing documents in a selected Elasticsearch index with pagination
+ * DocListAll - Component for listing documents in a selected Elasticsearch index with pagination
  */
-const ListDocs = () => {
+const DocListAll = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [docs, setDocs] = useState([]);
@@ -434,5 +434,5 @@ const ListDocs = () => {
   );
 };
 
-export default ListDocs;
+export default DocListAll;
 

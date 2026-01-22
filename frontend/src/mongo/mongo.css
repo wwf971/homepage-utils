@@ -44,11 +44,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
 }
 
 .mongo-section-header h4 {
   flex: 0 0 auto;
+}
+
+.mongo-collections-section {
+  margin-top: 12px;
 }
 
 .mongo-section-buttons {
@@ -239,7 +243,7 @@
 .mongo-popup {
   background: white;
   border-radius: 8px;
-  padding: 20px;
+  padding: 12px;
   min-width: 400px;
   max-width: 500px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);

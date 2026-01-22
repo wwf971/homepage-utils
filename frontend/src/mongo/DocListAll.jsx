@@ -15,11 +15,11 @@ import DocList from './DocList';
 import './mongo.css';
 
 /**
- * ListDocs - Component for listing documents in a selected MongoDB collection with pagination
+ * DocListAll - Component for listing documents in a selected MongoDB collection with pagination
  * 
  * @param {boolean} shouldLoad - Whether to load documents (controlled by parent)
  */
-const ListDocs = ({ shouldLoad = true }) => {
+const DocListAll = ({ shouldLoad = true }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -185,5 +185,5 @@ const ListDocs = ({ shouldLoad = true }) => {
   );
 };
 
-export default ListDocs;
+export default DocListAll;
 

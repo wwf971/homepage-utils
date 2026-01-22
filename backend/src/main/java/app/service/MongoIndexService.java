@@ -318,6 +318,66 @@ public class MongoIndexService {
     }
 
     /**
+     * Delete a collection and remove it from all indices that monitor it
+     * Also drops the actual MongoDB collection
+     */
+    public Map<String, Object> deleteCollectionFromIndices(String dbName, String collName) {
+        try {
+            // Find all indices monitoring this collection
+            Set<String> affectedIndices = getIndicesOfColl(dbName, collName);
+            
+            // Remove the collection from each index
+            MongoCollection<Document> metadataCollection = getMetadataCollection();
+            int updatedIndices = 0;
+            
+            for (String indexName : affectedIndices) {
+                Document filter = new Document("name", indexName);
+                Document index = metadataCollection.find(filter).first();
+                
+                if (index != null) {
+                    @SuppressWarnings("unchecked")
+                    List<Document> collections = (List<Document>) index.get("collections");
+                    
+                    if (collections != null) {
+                        // Remove the matching collection
+                        List<Document> updatedCollections = collections.stream()
+                            .filter(c -> !(c.getString("database").equals(dbName) && 
+                                         c.getString("collection").equals(collName)))
+                            .collect(Collectors.toList());
+                        
+                        // Update the index
+                        Document update = new Document("$set", new Document("collections", updatedCollections));
+                        metadataCollection.updateOne(filter, update);
+                        updatedIndices++;
+                    }
+                }
+            }
+            
+            // Drop the actual MongoDB collection
+            mongoService.deleteCollection(dbName, collName);
+            
+            // Rebuild the collection->indices mapping
+            buildIndicesOfColl();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("message", "Collection deleted successfully and removed from " + updatedIndices + " index(es)");
+            result.put("data", Map.of(
+                "database", dbName,
+                "collection", collName,
+                "affectedIndices", affectedIndices,
+                "updatedIndicesCount", updatedIndices
+            ));
+            return result;
+        } catch (Exception e) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", -1);
+            result.put("message", "Failed to delete collection: " + e.getMessage());
+            return result;
+        }
+    }
+
+    /**
      * Search databases (filter by query if provided)
      */
     public List<String> searchDatabases(String query) {

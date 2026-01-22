@@ -1,14 +1,11 @@
 .mongo-index-create-form {
-  margin-bottom: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 12px;
   overflow: visible;
 }
 
-.mongo-index-create-form h4 {
-  font-size: 14px;
+.mongo-index-create-title {
+  font-size: 16px;
   font-weight: 600;
+  margin-bottom: 12px;
 }
 
 .mongo-index-form-group {
@@ -125,21 +122,33 @@
   gap: 12px;
 }
 
-.mongo-index-collection-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  background-color: #fafafa;
-}
-
 .mongo-index-collection-field {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
+  gap: 6px;
+  min-height: 20px;
+  margin-bottom: 4px;
+}
+
+.mongo-index-collection-field label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+  min-width: 65px;
+}
+
+.mongo-index-collection-field .searchable-value-comp {
+  min-height: 24px;
+  flex: 1;
+}
+
+.mongo-index-collection-field .searchable-value-comp .value-display,
+.mongo-index-collection-field .searchable-value-comp input {
+  min-height: 24px;
+  line-height: 24px;
+  box-sizing: border-box;
 }
 
 .mongo-index-field-label {
@@ -177,6 +186,24 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   background-color: #fafafa;
+  overflow: visible;
+}
+
+/* Ensure dropdown can overflow in card - override KeyValuesComp default overflow:hidden */
+.mongo-index-card .keyvalues-container {
+  overflow: visible !important;
+}
+
+.mongo-index-card .keyvalues-list {
+  overflow: visible !important;
+}
+
+.mongo-index-card .keyvalues-row {
+  overflow: visible !important;
+}
+
+.mongo-index-card .keyvalues-cell {
+  overflow: visible !important;
 }
 
 .mongo-index-card-header {

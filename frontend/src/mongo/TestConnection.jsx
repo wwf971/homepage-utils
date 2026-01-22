@@ -6,13 +6,13 @@ import '../styles/testSection.css';
 import ListDatabases from './ListDatabases';
 import CollListAll from './CollListAll';
 import MongoDocSearch from './MongoDocSearch';
-import ListDocs from './ListDocs';
-import MongoIndex from '../mongo-index/MongoIndex';
+import DocListAll from './DocListAll';
+import MongoIndexPanel from '../mongo-index/MongoIndexPanel';
 
 /**
- * Wrapper component for ListDocs that handles tab focus logic and connection test requirements
+ * Wrapper component for DocListAll that handles tab focus logic and connection test requirements
  */
-const ListDocsTabWrapper = ({ hasSuccessfulTest, tabsState, tabKey }) => {
+const DocListAllTabWrapper = ({ hasSuccessfulTest, tabsState, tabKey }) => {
   const [hasBeenFocused, setHasBeenFocused] = useState(false);
   
   const isTabFocused = tabKey && tabsState ? tabsState[tabKey]?.isFocused : false;
@@ -26,7 +26,7 @@ const ListDocsTabWrapper = ({ hasSuccessfulTest, tabsState, tabKey }) => {
   // Only allow loading if both conditions are met: connection test passed AND tab has been focused
   const shouldLoad = hasSuccessfulTest && hasBeenFocused;
   
-  return <ListDocs shouldLoad={shouldLoad} />;
+  return <DocListAll shouldLoad={shouldLoad} />;
 };
 
 const ConnectionTest = ({ showDatabaseList = false }) => {
@@ -179,7 +179,7 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
                   </TabsOnTop.Tab>
                   
                   <TabsOnTop.Tab label="All Docs">
-                    <ListDocsTabWrapper
+                    <DocListAllTabWrapper
                 hasSuccessfulTest={result?.success || false}
               />
                   </TabsOnTop.Tab>
@@ -188,7 +188,7 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
             )}
           </>
         ) : (
-          <MongoIndex />
+          <MongoIndexPanel />
         )}
       </div>
     </div>

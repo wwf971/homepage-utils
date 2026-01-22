@@ -931,6 +931,22 @@ public class MongoService {
         database.createCollection(collectionName);
     }
 
+    public void deleteCollection(String databaseName, String collectionName) {
+        if (mongoClient == null) {
+            if (configCurrent != null) {
+                initializeConnection(configCurrent);
+            } else {
+                throw new RuntimeException("MongoDB client is not initialized");
+            }
+        }
+
+        com.mongodb.client.MongoDatabase database = mongoClient.getDatabase(databaseName);
+        com.mongodb.client.MongoCollection<org.bson.Document> collection = database.getCollection(collectionName);
+        
+        // Drop the collection
+        collection.drop();
+    }
+
     /**
      * Create an empty document in a collection (only contains _id)
      * 
