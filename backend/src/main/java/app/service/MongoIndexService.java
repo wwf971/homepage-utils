@@ -1,11 +1,20 @@
 package app.service;
 
 import app.util.TimeUtils;
+import com.mongodb.ClientSessionOptions;
+import com.mongodb.TransactionOptions;
+import com.mongodb.ReadConcern;
+import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
+import com.mongodb.client.ClientSession;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -38,6 +47,9 @@ public class MongoIndexService {
     
     @Autowired
     private ElasticSearchService elasticSearchService;
+
+    @Autowired
+    private MongoIndexQueueService indexQueueService;
 
     @Autowired(required = false)
     @org.springframework.context.annotation.Lazy
@@ -82,7 +94,6 @@ public class MongoIndexService {
 
         return database.getCollection(METADATA_COLLECTION);
     }
-
     /**
      * Build the reverse index mapping from collections to indices
      * Scans all indices and populates collectionToIndicesMap
@@ -344,25 +355,24 @@ public class MongoIndexService {
 
 
     /**
-     * Update a document with metadata management
+     * Update a document with metadata management using IndexQueue and transactions
      * 
      * @param indexName The mongo-index name
      * @param database Database name
      * @param collection Collection name
-     * @param docId The document ID
-     * @param updateDict Map of field paths to update (paths will be prefixed with "content.")
+     * @param docId The document custom ID
+     * @param updateDict Map of field paths to update (stored at document top level)
      * @param updateIndex Whether to trigger index update (default true)
      * @return Result map with code, message, and data
      */
     public Map<String, Object> updateDoc(String indexName, String database, String collection, String docId, 
                                          Map<String, Object> updateDict, boolean updateIndex) {
-        // Get index metadata
+        // Verify collection is part of index
         Map<String, Object> indexMeta = getIndex(indexName);
         if (indexMeta == null) {
             return createErrorResult("Index not found: " + indexName);
         }
 
-        // Verify that the specified collection is part of this index
         @SuppressWarnings("unchecked")
         List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
         boolean isCollectionInIndex = false;
@@ -379,208 +389,130 @@ public class MongoIndexService {
             return createErrorResult("Collection " + database + "." + collection + " is not part of index: " + indexName);
         }
 
-        long currentTime = TimeUtils.getCurrentTimestamp();
-        int currentTz = TimeUtils.getCurrentTimezoneOffset();
-        
-        // Convert docId string to appropriate type (ObjectId or String)
-        Object docIdObj = parseDocId(docId);
-
-        String dbName = database;
-        String collName = collection;
-
         MongoClient client = mongoService.getMongoClient();
-        MongoDatabase db = client.getDatabase(dbName);
-        MongoCollection<Document> coll = db.getCollection(collName);
-
-        // Find the document first to get custom ID for lock
-        Document doc = coll.find(Filters.eq("_id", docIdObj)).first();
-        if (doc == null) {
-            return createErrorResult("Document not found in " + dbName + "." + collName + " with _id: " + docId);
-        }
-
-        // Extract custom id from content for lock
-        Object content = doc.get("content");
-        String customId = null;
-        if (content instanceof Document) {
-            Object idObj = ((Document) content).get("id");
-            if (idObj != null) {
-                customId = idObj.toString();
-            }
-        } else if (content instanceof Map) {
-            Object idObj = ((Map<?, ?>) content).get("id");
-            if (idObj != null) {
-                customId = idObj.toString();
-            }
-        }
-
-        if (customId == null || customId.trim().isEmpty()) {
-            return createErrorResult("Document missing custom id field in content: MongoDB _id=" + docId);
+        Object mongoIdObj = parseDocId(docId);
+        
+        // Get IndexQueue entry (or create if missing)
+        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(database, collection, docId, mongoIdObj);
+        if (queueEntry == null) {
+            return createErrorResult("Document not found in " + database + "." + collection);
         }
 
         String esIndexName = (String) indexMeta.get("esIndex");
-        String lockKey = "doc-index-lock:" + esIndexName + ":" + customId;
-        RLock lock = null;
-        boolean lockAcquired = false;
         
         try {
-            // Try to get lock and acquire it
-            lock = redissonClient.getLock(lockKey);
-            lockAcquired = lock.tryLock(10, 30, TimeUnit.SECONDS);
-            
-            if (!lockAcquired) {
-                if (CONTINUE_ON_LOCK_FAILURE) {
-                    System.err.println("Warning: Could not acquire lock for document " + customId + ", continuing without lock");
-                } else {
-                    return createErrorResult("Failed to acquire lock for document: " + customId);
+            long currentTime = TimeUtils.getCurrentTimestamp();
+            int currentTz = TimeUtils.getCurrentTimezoneOffset();
+            Long currentVersion = queueEntry.getLong("updateVersion");
+            if (currentVersion == null) currentVersion = 0L;
+            long newVersion = currentVersion + 1;
+
+            // Start transaction
+            ClientSession session = client.startSession();
+            try {
+                session.startTransaction();
+                
+                MongoDatabase db = client.getDatabase(database);
+                MongoCollection<Document> coll = db.getCollection(collection);
+                MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(database);
+
+                // 1. Update main document (data at top level, no content wrapper)
+                List<Bson> docUpdates = new ArrayList<>();
+                for (Map.Entry<String, Object> entry : updateDict.entrySet()) {
+                    docUpdates.add(Updates.set(entry.getKey(), entry.getValue()));
                 }
-            }
-        } catch (Exception e) {
-            // Redis connection error or other lock-related exception
-            if (CONTINUE_ON_LOCK_FAILURE) {
-                System.err.println("Warning: Lock acquisition failed for document " + customId + " (Redis may be down), continuing without lock: " + e.getMessage());
-                lockAcquired = false;
-            } else {
-                return createErrorResult("Failed to acquire lock: " + e.getMessage());
-            }
-        }
-        
-        try {
-            // Prepare update operations
-            List<Bson> updates = new ArrayList<>();
+                
+                coll.updateOne(session, Filters.eq("_id", mongoIdObj), Updates.combine(docUpdates));
 
-            // Add content.* field updates
-            for (Map.Entry<String, Object> entry : updateDict.entrySet()) {
-                updates.add(Updates.set("content." + entry.getKey(), entry.getValue()));
-            }
-
-            // Update metadata
-            updates.add(Updates.set("updateAt", currentTime));
-            updates.add(Updates.set("updateAtTimeZone", currentTz));
-            
-            // Mark document as needing index update
-            updates.add(Updates.set("shouldUpdateIndex", true));
-
-            // Increment or initialize updateVersion
-            Long currentVersion = doc.getLong("updateVersion");
-            if (currentVersion == null) {
-                updates.add(Updates.set("updateVersion", 1L));
-            } else {
-                updates.add(Updates.set("updateVersion", currentVersion + 1));
-            }
-
-            // Initialize createAt if not exists (-1 means unknown)
-            if (doc.get("createAt") == null) {
-                updates.add(Updates.set("createAt", -1L));
-                updates.add(Updates.set("createAtTimeZone", -1));
-            } else {
-                // If createAt exists but createAtTimeZone is missing, set to -1 (unknown)
-                if (doc.get("createAtTimeZone") == null) {
-                    updates.add(Updates.set("createAtTimeZone", -1));
+                // 2. Upsert IndexQueue with new version and status=-1
+                Bson queueFilter = Filters.and(
+                    Filters.eq("docId", docId),
+                    // Filters.eq("collection", collection), // docId is unique globally
+                    Filters.lt("updateVersion", newVersion)
+                );
+                
+                Document queueUpdate = new Document("$set", new Document()
+                    .append("collection", collection)
+                    .append("updateVersion", newVersion)
+                    .append("status", -1)
+                    .append("updateAt", currentTime)
+                    .append("updateAtTimeZone", currentTz)
+                    .append("mongoId", mongoIdObj.toString())
+                );
+                
+                // Initialize createAt if this is first time
+                if (queueEntry.get("createAt") == null) {
+                    queueUpdate.get("$set", Document.class)
+                        .append("createAt", currentTime)
+                        .append("createAtTimeZone", currentTz);
                 }
-            }
-            
-            // Initialize content if not exists (empty object)
-            if (doc.get("content") == null) {
-                updates.add(Updates.set("content", new Document()));
-            }
+                
+                indexQueue.updateOne(session, queueFilter, queueUpdate, new UpdateOptions().upsert(true));
 
-            // Perform update
-            coll.updateOne(Filters.eq("_id", docIdObj), Updates.combine(updates));
-
-            // Trigger index update asynchronously if requested
-            if (updateIndex) {
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        // Metadata should already be initialized by updateDoc, but ensure it
-                        MongoClient asyncClient = mongoService.getMongoClient();
-                        MongoDatabase asyncDatabase = asyncClient.getDatabase(dbName);
-                        MongoCollection<Document> asyncCollection = asyncDatabase.getCollection(collName);
-                        ensureDocMetadata(asyncCollection, docIdObj, currentTime);
-                        
-                        createIndexForDoc(indexName, dbName, collName, docIdObj, currentTime);
-                    } catch (Exception e) {
-                        System.err.println("Failed to index document: " + e.getMessage());
-                    }
-                });
+                // Commit transaction
+                session.commitTransaction();
+                
+                // Trigger async indexing if requested
+                if (updateIndex) {
+                    createIndexAfterUpdateDoc(indexName, database, collection, mongoIdObj, docId, 
+                                            newVersion, currentTime, esIndexName);
+                }
+                
+                Map<String, Object> result = new HashMap<>();
+                result.put("code", 0);
+                result.put("message", "Document updated successfully");
+                result.put("data", Map.of("docId", docId, "updateAt", currentTime, "updateVersion", newVersion));
+                return result;
+                
+            } catch (Exception e) {
+                session.abortTransaction();
+                throw e;
+            } finally {
+                session.close();
             }
         } catch (Exception e) {
             return createErrorResult("Failed to update document: " + e.getMessage());
-        } finally {
-            // Release lock if it was acquired
-            if (lockAcquired && lock != null) {
-                try {
-                    lock.unlock();
-                } catch (Exception e) {
-                    System.err.println("Warning: Failed to release lock: " + e.getMessage());
-                }
-            }
         }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("code", 0);
-        result.put("message", "Document updated successfully");
-        result.put("data", Map.of("docId", docId, "updateAt", currentTime));
-        return result;
     }
 
     /**
-     * Get a document (returns only the content)
+     * Get a document (returns document data at top level)
      * 
      * @param indexName The mongo-index name
      * @param database Database name
      * @param collection Collection name
-     * @param docId The document ID
-     * @return Result map with code, message, and data (content only)
+     * @param docId The document custom ID
+     * @return Result map with code, message, and data (document at top level)
      */
-    public Map<String, Object> getDoc(String indexName, String database, String collection, String docId) {
-        Map<String, Object> indexMeta = getIndex(indexName);
-        if (indexMeta == null) {
-            return createErrorResult("Index not found: " + indexName);
-        }
-
-        // Verify that the specified collection is part of this index
-        @SuppressWarnings("unchecked")
-        List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
-        boolean isCollectionInIndex = false;
-        if (collections != null) {
-            for (Map<String, String> collInfo : collections) {
-                if (database.equals(collInfo.get("database")) && collection.equals(collInfo.get("collection"))) {
-                    isCollectionInIndex = true;
-                    break;
-                }
-            }
-        }
-        
-        if (!isCollectionInIndex) {
-            return createErrorResult("Collection " + database + "." + collection + " is not part of index: " + indexName);
-        }
-        
-        // Convert docId string to appropriate type (ObjectId or String)
-        Object docIdObj = parseDocId(docId);
+    /**
+     * Get a document using raw CRUD (no index validation)
+     */
+    public Map<String, Object> getDocRaw(String database, String collection, String docId) {
+        Object mongoIdObj = parseDocId(docId);
 
         MongoClient client = mongoService.getMongoClient();
         MongoDatabase db = client.getDatabase(database);
         MongoCollection<Document> coll = db.getCollection(collection);
 
-        Document doc = coll.find(Filters.eq("_id", docIdObj)).first();
+        Document doc = coll.find(Filters.eq("_id", mongoIdObj)).first();
         if (doc == null) {
-            return createErrorResult("Document not found in " + database + "." + collection + " with _id: " + docId);
+            return createErrorResult("Document not found in " + database + "." + collection);
         }
         
-        Object content = doc.get("content");
+        // Return entire document
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
-        result.put("data", content != null ? content : new Document());
+        result.put("data", doc);
         return result;
     }
 
     /**
-     * Soft delete a document
+     * Soft delete a document using IndexQueue and transactions
      * 
      * @param indexName The mongo-index name
      * @param database Database name
      * @param collection Collection name
-     * @param docId The document ID
+     * @param docId The document custom ID
      * @return Result map
      */
     public Map<String, Object> deleteDoc(String indexName, String database, String collection, String docId) {
@@ -589,7 +521,7 @@ public class MongoIndexService {
             return createErrorResult("Index not found: " + indexName);
         }
 
-        // Verify that the specified collection is part of this index
+        // Verify collection is part of index
         @SuppressWarnings("unchecked")
         List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
         boolean isCollectionInIndex = false;
@@ -606,85 +538,223 @@ public class MongoIndexService {
             return createErrorResult("Collection " + database + "." + collection + " is not part of index: " + indexName);
         }
 
-        long currentTime = TimeUtils.getCurrentTimestamp();
-        
-        // Convert docId string to appropriate type (ObjectId or String)
-        Object docIdObj = parseDocId(docId);
-
-        String dbName = database;
-        String collName = collection;
-
         MongoClient client = mongoService.getMongoClient();
-        MongoDatabase db = client.getDatabase(dbName);
-        MongoCollection<Document> coll = db.getCollection(collName);
+        Object mongoIdObj = parseDocId(docId);
+        
+        // Get IndexQueue entry
+        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(database, collection, docId, mongoIdObj);
+        if (queueEntry == null) {
+            return createErrorResult("Document not found in " + database + "." + collection);
+        }
 
-        Document doc = coll.find(Filters.eq("_id", docIdObj)).first();
-        if (doc == null) {
-            return createErrorResult("Document not found in " + database + "." + collection + " with _id: " + docId);
-        }
-        // Prepare updates for soft delete
-        List<Bson> deleteUpdates = new ArrayList<>();
-        deleteUpdates.add(Updates.set("isDeleted", true));
-        deleteUpdates.add(Updates.set("isIndexDeleted", false));
-        deleteUpdates.add(Updates.set("updateAt", currentTime));
-        deleteUpdates.add(Updates.set("updateAtTimeZone", TimeUtils.getCurrentTimezoneOffset()));
-        
-        // Initialize createAt if missing (-1 means unknown)
-        if (doc.get("createAt") == null) {
-            deleteUpdates.add(Updates.set("createAt", -1L));
-            deleteUpdates.add(Updates.set("createAtTimeZone", -1));
-        } else {
-            // If createAt exists but createAtTimeZone is missing, set to -1 (unknown)
-            if (doc.get("createAtTimeZone") == null) {
-                deleteUpdates.add(Updates.set("createAtTimeZone", -1));
-            }
-        }
-        
-        // Initialize updateVersion if missing
-        Long currentVersion = doc.getLong("updateVersion");
-        long newVersion;
-        if (currentVersion == null) {
-            newVersion = 1L;
-            deleteUpdates.add(Updates.set("updateVersion", newVersion));
-        } else {
-            newVersion = currentVersion + 1;
-            deleteUpdates.add(Updates.set("updateVersion", newVersion));
-        }
-        
-        // Set soft delete flags
-        coll.updateOne(
-            Filters.eq("_id", docIdObj),
-            Updates.combine(deleteUpdates)
-        );
+        long currentTime = TimeUtils.getCurrentTimestamp();
+        int currentTz = TimeUtils.getCurrentTimezoneOffset();
+        Long currentVersion = queueEntry.getLong("updateVersion");
+        if (currentVersion == null) currentVersion = 0L;
+        long newVersion = currentVersion + 1;
 
-        // Trigger index deletion asynchronously
-        final long deleteVersion = newVersion;
+        // Start transaction
+        ClientSession session = client.startSession();
+        try {
+            session.startTransaction();
+            
+            MongoDatabase db = client.getDatabase(database);
+            MongoCollection<Document> coll = db.getCollection(collection);
+            MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(database);
+
+            // 1. Delete main document
+            coll.deleteOne(session, Filters.eq("_id", mongoIdObj));
+
+            // 2. Update IndexQueue: mark as deleted, increment version, status=-1
+            Bson queueFilter = Filters.and(
+                Filters.eq("docId", docId),
+                // Filters.eq("collection", collection), // docId is unique globally
+                Filters.lt("updateVersion", newVersion)
+            );
+            
+            Document queueUpdate = new Document("$set", new Document()
+                .append("collection", collection)
+                .append("updateVersion", newVersion)
+                .append("status", -1)
+                .append("updateAt", currentTime)
+                .append("updateAtTimeZone", currentTz)
+                .append("isDeleted", true)
+                .append("mongoId", mongoIdObj.toString())
+            );
+            
+            indexQueue.updateOne(session, queueFilter, queueUpdate, new UpdateOptions().upsert(true));
+
+            // Commit transaction
+            session.commitTransaction();
+            
+            // Trigger async ES deletion
+            final long deleteVersion = newVersion;
+            final String esIndexName = (String) indexMeta.get("esIndex");
+            CompletableFuture.runAsync(() -> {
+                try {
+                    deleteFromIndex(indexName, docId, deleteVersion);
+                    
+                    // Acquire lock before marking as deleted in queue
+                    String lockKey = "doc-index-lock:" + esIndexName + ":" + docId;
+                    RLock asyncLock = redissonClient.getLock(lockKey);
+                    boolean asyncLockAcquired = false;
+                    
+                    try {
+                        asyncLockAcquired = asyncLock.tryLock(10, 30, TimeUnit.SECONDS);
+                        
+                        if (!asyncLockAcquired) {
+                            if (CONTINUE_ON_LOCK_FAILURE) {
+                                System.err.println("Warning: Could not acquire lock for marking deleted: " + docId);
+                            } else {
+                                throw new RuntimeException("Failed to acquire lock for marking deleted: " + docId);
+                            }
+                        }
+                        
+                        // Re-check queue entry version to ensure no update happened during deletion
+                        MongoCollection<Document> asyncQueue = indexQueueService.getIndexQueueCollection(database);
+                        Document currentQueueEntry = asyncQueue.find(Filters.eq("docId", docId)).first();
+                        
+                        if (currentQueueEntry == null) {
+                            System.err.println("Warning: IndexQueue entry disappeared for doc " + docId);
+                            return;
+                        }
+                        
+                        Long reCheckedVersion = currentQueueEntry.getLong("updateVersion");
+                        if (reCheckedVersion == null) {
+                            reCheckedVersion = 0L;
+                        }
+                        
+                        // Only mark as indexed if version matches
+                        if (reCheckedVersion.equals(deleteVersion)) {
+                            asyncQueue.updateOne(
+                                Filters.eq("docId", docId),
+                                Updates.combine(
+                                    Updates.set("status", 0),
+                                    Updates.set("indexVersion", deleteVersion)
+                                )
+                            );
+                            System.out.println("Marked doc " + docId + " as deleted in ES (version " + deleteVersion + ")");
+                        } else if (reCheckedVersion > deleteVersion) {
+                            System.out.println("Doc " + docId + " was updated during deletion (current: " + reCheckedVersion + 
+                                ", deleted: " + deleteVersion + "). Skipping status update - newer version needs indexing.");
+                        }
+                        
+                    } catch (Exception lockEx) {
+                        if (CONTINUE_ON_LOCK_FAILURE) {
+                            System.err.println("Warning: Lock operation failed during async deletion: " + lockEx.getMessage());
+                        } else {
+                            throw lockEx;
+                        }
+                    } finally {
+                        if (asyncLockAcquired && asyncLock != null) {
+                            try {
+                                asyncLock.unlock();
+                            } catch (Exception e) {
+                                System.err.println("Warning: Failed to release async lock: " + e.getMessage());
+                            }
+                        }
+                    }
+                    
+                } catch (Exception e) {
+                    System.err.println("Failed to delete from ES index: " + e.getMessage());
+                }
+            });
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("message", "Document deleted successfully");
+            result.put("data", Map.of("docId", docId, "updateVersion", newVersion));
+            return result;
+            
+        } catch (Exception e) {
+            session.abortTransaction();
+            return createErrorResult("Failed to delete document: " + e.getMessage());
+        } finally {
+            session.close();
+        }
+    }
+
+    /**
+     * Trigger async indexing after document update
+     * Indexes the document to ES and marks it as indexed in IndexQueue
+     * Uses locking to prevent race conditions with concurrent updates
+     */
+    private void createIndexAfterUpdateDoc(String indexName, String database, String collection, 
+                                           Object mongoIdObj, String docId, long newVersion, long updateTime,
+                                           String esIndexName) {
         CompletableFuture.runAsync(() -> {
             try {
-                deleteFromIndex(indexName, docId, deleteVersion);
-                // Mark as index-deleted
-                coll.updateOne(
-                    Filters.eq("_id", docIdObj),
-                    Updates.set("isIndexDeleted", true)
-                );
-                // If both flags are true, actually delete
-                coll.deleteOne(
-                    Filters.and(
-                        Filters.eq("_id", docIdObj),
-                        Filters.eq("isDeleted", true),
-                        Filters.eq("isIndexDeleted", true)
-                    )
-                );
+                createIndexForDoc(indexName, database, collection, mongoIdObj, updateTime);
+                
+                // Acquire lock before marking as indexed to prevent race condition
+                // Use same lock key format as createIndexForDoc
+                String lockKey = "doc-index-lock:" + esIndexName + ":" + docId;
+                RLock asyncLock = redissonClient.getLock(lockKey);
+                boolean asyncLockAcquired = false;
+                
+                try {
+                    asyncLockAcquired = asyncLock.tryLock(10, 30, TimeUnit.SECONDS);
+                    
+                    if (!asyncLockAcquired) {
+                        if (CONTINUE_ON_LOCK_FAILURE) {
+                            System.err.println("Warning: Could not acquire lock for marking indexed: " + docId);
+                        } else {
+                            throw new RuntimeException("Failed to acquire lock for marking indexed: " + docId);
+                        }
+                    }
+                    
+                    // Re-check queue entry version to ensure no update happened during indexing
+                    MongoCollection<Document> asyncQueue = indexQueueService.getIndexQueueCollection(database);
+                    Document currentQueueEntry = asyncQueue.find(Filters.eq("docId", docId)).first();
+                    
+                    if (currentQueueEntry == null) {
+                        System.err.println("Warning: IndexQueue entry disappeared for doc " + docId);
+                        return;
+                    }
+                    
+                    Long currentVersion = currentQueueEntry.getLong("updateVersion");
+                    if (currentVersion == null) {
+                        currentVersion = 0L;
+                    }
+                    
+                    // Only mark as indexed if version matches what we just indexed
+                    if (currentVersion.equals(newVersion)) {
+                        asyncQueue.updateOne(
+                            Filters.eq("docId", docId),
+                            Updates.combine(
+                                Updates.set("status", 0),
+                                Updates.set("indexVersion", newVersion)
+                            )
+                        );
+                        System.out.println("Marked doc " + docId + " as indexed (version " + newVersion + ")");
+                    } else if (currentVersion > newVersion) {
+                        System.out.println("Doc " + docId + " was updated during indexing (current: " + currentVersion + 
+                            ", indexed: " + newVersion + "). Skipping status update - newer version needs indexing.");
+                    } else {
+                        System.err.println("Warning: Doc " + docId + " queue version (" + currentVersion + 
+                            ") is older than indexed version (" + newVersion + "). This should not happen.");
+                    }
+                    
+                } catch (Exception lockEx) {
+                    if (CONTINUE_ON_LOCK_FAILURE) {
+                        System.err.println("Warning: Lock operation failed during async indexing: " + lockEx.getMessage());
+                    } else {
+                        throw lockEx;
+                    }
+                } finally {
+                    if (asyncLockAcquired && asyncLock != null) {
+                        try {
+                            asyncLock.unlock();
+                        } catch (Exception e) {
+                            System.err.println("Warning: Failed to release async lock: " + e.getMessage());
+                        }
+                    }
+                }
+                
             } catch (Exception e) {
-                System.err.println("Failed to delete from index: " + e.getMessage());
+                System.err.println("Failed to index document: " + e.getMessage());
             }
         });
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("code", 0);
-        result.put("message", "Document marked for deletion");
-        result.put("data", Map.of("docId", docId));
-        return result;
     }
 
     /**
@@ -707,79 +777,10 @@ public class MongoIndexService {
         return idString;
     }
 
-    /**
-     * Ensure document has all required metadata fields initialized
-     * 
-     * @param collection MongoDB collection
-     * @param docId Document ID
-     * @param updateAtTimestamp The updateAt timestamp to use if initializing (if null, uses current time)
-     */
-    private void ensureDocMetadata(MongoCollection<Document> collection, Object docId, Long updateAtTimestamp) {
-        Document doc = collection.find(Filters.eq("_id", docId)).first();
-        if (doc == null) {
-            throw new RuntimeException("Document not found: " + docId);
-        }
-
-        List<Bson> metadataUpdates = new ArrayList<>();
-        boolean needsMetadataUpdate = false;
-        
-        long currentTime = TimeUtils.getCurrentTimestamp();
-        int currentTz = TimeUtils.getCurrentTimezoneOffset();
-        
-        // Initialize createAt if missing (-1 means unknown)
-        if (doc.get("createAt") == null) {
-            metadataUpdates.add(Updates.set("createAt", -1L));
-            metadataUpdates.add(Updates.set("createAtTimeZone", -1));
-            needsMetadataUpdate = true;
-        } else {
-            // If createAt exists but createAtTimeZone is missing, set to -1 (unknown)
-            if (doc.get("createAtTimeZone") == null) {
-                metadataUpdates.add(Updates.set("createAtTimeZone", -1));
-                needsMetadataUpdate = true;
-            }
-        }
-        
-        // Initialize updateAt if missing
-        if (doc.get("updateAt") == null) {
-            long updateAt = (updateAtTimestamp != null) ? updateAtTimestamp : currentTime;
-            metadataUpdates.add(Updates.set("updateAt", updateAt));
-            metadataUpdates.add(Updates.set("updateAtTimeZone", currentTz));
-            needsMetadataUpdate = true;
-        } else {
-            // If updateAt exists but updateAtTimeZone is missing, set to -1 (unknown)
-            if (doc.get("updateAtTimeZone") == null) {
-                metadataUpdates.add(Updates.set("updateAtTimeZone", -1));
-                needsMetadataUpdate = true;
-            }
-        }
-        
-        // Initialize updateVersion if missing
-        if (doc.get("updateVersion") == null) {
-            metadataUpdates.add(Updates.set("updateVersion", 0L));
-            needsMetadataUpdate = true;
-        }
-        
-        // Initialize content if missing (empty object)
-        if (doc.get("content") == null) {
-            metadataUpdates.add(Updates.set("content", new Document()));
-            needsMetadataUpdate = true;
-        }
-        
-        // Initialize shouldUpdateIndex if missing (default to true for migrated docs)
-        if (doc.get("shouldUpdateIndex") == null) {
-            metadataUpdates.add(Updates.set("shouldUpdateIndex", true));
-            needsMetadataUpdate = true;
-        }
-        
-        // Apply metadata updates if needed
-        if (needsMetadataUpdate) {
-            collection.updateOne(Filters.eq("_id", docId), Updates.combine(metadataUpdates));
-        }
-    }
 
     /**
      * Index a single document to Elasticsearch
-     * Assumes document metadata is already initialized
+     * Uses IndexQueue for metadata
      * 
      * @param indexName The mongo-index name
      * @param dbName Database name
@@ -796,38 +797,31 @@ public class MongoIndexService {
 
         String esIndexName = (String) indexMeta.get("esIndex");
 
-        // Get the document
+        // Get the document and IndexQueue entry
         MongoClient client = mongoService.getMongoClient();
         MongoDatabase database = client.getDatabase(dbName);
         MongoCollection<Document> collection = database.getCollection(collName);
 
-        // Metadata should already be initialized by caller
         Document doc = collection.find(Filters.eq("_id", docId)).first();
         if (doc == null) {
             throw new RuntimeException("Document not found: " + docId);
         }
 
-        Object content = doc.get("content");
-        if (content == null) {
-            content = new Document(); // Fallback (should not happen after above initialization)
+        // Extract custom id from document (data is at top level now)
+        Object idObj = doc.get("id");
+        if (idObj == null) {
+            throw new RuntimeException("Document missing id field: MongoDB _id=" + docId);
+        }
+        String customId = idObj.toString();
+
+        if (customId.trim().isEmpty()) {
+            throw new RuntimeException("Document has empty id field: MongoDB _id=" + docId);
         }
 
-        // Extract custom id from content
-        String customId = null;
-        if (content instanceof Document) {
-            Object idObj = ((Document) content).get("id");
-            if (idObj != null) {
-                customId = idObj.toString();
-            }
-        } else if (content instanceof Map) {
-            Object idObj = ((Map<?, ?>) content).get("id");
-            if (idObj != null) {
-                customId = idObj.toString();
-            }
-        }
-
-        if (customId == null || customId.trim().isEmpty()) {
-            throw new RuntimeException("Document missing custom id field in content: MongoDB _id=" + docId);
+        // Get IndexQueue entry for metadata
+        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, customId, docId);
+        if (queueEntry == null) {
+            throw new RuntimeException("Failed to get IndexQueue entry for document: " + customId);
         }
 
         // Acquire distributed lock for this document
@@ -858,93 +852,80 @@ public class MongoIndexService {
         }
         
         try {
-            // Re-read document after acquiring lock (or not) to get latest version
+            // Re-read document and queue entry after acquiring lock
             doc = collection.find(Filters.eq("_id", docId)).first();
             if (doc == null) {
                 throw new RuntimeException("Document not found: " + docId);
             }
             
-            // Read version and timestamp metadata
-            Long docUpdateAt = doc.getLong("updateAt");
+            queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, customId, docId);
+            if (queueEntry == null) {
+                throw new RuntimeException("Failed to get IndexQueue entry for document: " + customId);
+            }
+            
+            // Read version and timestamp metadata from IndexQueue
+            Long docUpdateAt = queueEntry.getLong("updateAt");
+            Long docUpdateVersion = queueEntry.getLong("updateVersion");
+            Integer docUpdateAtTimeZone = queueEntry.getInteger("updateAtTimeZone");
+
             if (docUpdateAt == null) {
-                // Initialize updateAt if missing (e.g., migrated documents)
                 docUpdateAt = TimeUtils.getCurrentTimestamp();
-                collection.updateOne(
-                    Filters.eq("_id", docId),
-                    Updates.set("updateAt", docUpdateAt)
-                );
             }
-
-            Long docUpdateVersion = doc.getLong("updateVersion");
             if (docUpdateVersion == null) {
-                // Initialize updateVersion if missing (e.g., migrated documents)
                 docUpdateVersion = 0L;
-                collection.updateOne(
-                    Filters.eq("_id", docId),
-                    Updates.set("updateVersion", docUpdateVersion)
-                );
             }
 
-            Integer docUpdateAtTimeZone = doc.getInteger("updateAtTimeZone");
-
-            // Re-read content
-            content = doc.get("content");
-            if (content == null) {
-                content = new Document();
-            }
-
-            // Flatten the content for indexing
-            List<Map<String, String>> flattened = flattenJson(content, null);
+            // Flatten the document for indexing (data is at top level now)
+            List<Map<String, String>> flattened = flattenJson(doc, null);
 
             // Index to Elasticsearch with custom id, version, and metadata
             elasticSearchService.indexDoc(esIndexName, customId, dbName, collName, flattened, 
                                          docUpdateVersion, docUpdateAt, docUpdateAtTimeZone);
 
             if(CHECK_BEFORE_SETTING_INDEX_VERSION) {
-                // After successful ES indexing, verify MongoDB doc hasn't been updated in the meantime
-                Document currentDoc = collection.find(Filters.eq("_id", docId)).first();
-                if (currentDoc == null) {
-                    System.err.println("Warning: Document disappeared after ES indexing: " + docId);
+                // After successful ES indexing, verify queue entry hasn't been updated in the meantime
+                MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(dbName);
+                Document currentQueueEntry = indexQueue.find(Filters.eq("docId", customId)).first();
+                if (currentQueueEntry == null) {
+                    System.err.println("Warning: IndexQueue entry disappeared after ES indexing: " + customId);
                     return;
                 }
                 
-                Long currentUpdateVersion = currentDoc.getLong("updateVersion");
+                Long currentUpdateVersion = currentQueueEntry.getLong("updateVersion");
                 if (currentUpdateVersion == null) {
                     currentUpdateVersion = 0L;
                 }
                 
-                Long currentIndexVersion = currentDoc.getLong("indexVersion");
+                Long currentIndexVersion = currentQueueEntry.getLong("indexVersion");
                 if (currentIndexVersion == null) {
                     currentIndexVersion = 0L;
                 }
                 
                 // Check if document was updated after we read it (race condition detected)
                 if (currentUpdateVersion > docUpdateVersion) {
-                    System.err.println("Warning: Document " + docId + " was updated during indexing. " +
+                    System.err.println("Warning: Document " + customId + " was updated during indexing. " +
                         "Original version: " + docUpdateVersion + ", current version: " + currentUpdateVersion + 
                         ". Aborting indexVersion update to avoid overwriting newer version.");
                     return;
                 }
                 
                 // Check if indexVersion has already been set to this version or higher
-                // (another process may have already indexed this version or a newer one)
                 if (currentIndexVersion >= docUpdateVersion) {
-                    System.err.println("Warning: Document " + docId + " indexVersion already at " + currentIndexVersion + 
+                    System.err.println("Warning: Document " + customId + " indexVersion already at " + currentIndexVersion + 
                         ", which is >= target version " + docUpdateVersion + 
                         ". Aborting to avoid overwriting or redundant update.");
                     return;
                 }
             }
 
-            // Set indexVersion and indexAt (auxiliary) to match the version we just indexed
-            // Clear shouldUpdateIndex flag since indexing is complete
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set("indexVersion", docUpdateVersion));
-            updates.add(Updates.set("indexAt", docUpdateAt));
-            updates.add(Updates.set("shouldUpdateIndex", false));
-            collection.updateOne(
-                Filters.eq("_id", docId),
-                Updates.combine(updates)
+            // Update IndexQueue: set status=0 (indexed) and indexVersion
+            MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(dbName);
+            indexQueue.updateOne(
+                Filters.eq("docId", customId),
+                Updates.combine(
+                    Updates.set("status", 0),
+                    Updates.set("indexVersion", docUpdateVersion)
+                )
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to index document to Elasticsearch: " + e.getMessage(), e);
@@ -1089,24 +1070,23 @@ public class MongoIndexService {
                 
             for (Document doc : cursor) {
                 try {
-                    Object docId = doc.get("_id");
-                    if (docId != null) {
-                        // Ensure document has all required metadata
-                        Long existingUpdateAt = doc.getLong("updateAt");
-                        ensureDocMetadata(collection, docId, existingUpdateAt);
+                    Object mongoIdObj = doc.get("_id");
+                    if (mongoIdObj != null) {
+                        String docId = mongoIdObj.toString();
                         
-                        // Now fetch the updateAt (guaranteed to exist after ensureDocMetadata)
-                        doc = collection.find(Filters.eq("_id", docId)).first();
-                        if (doc == null) {
-                            throw new RuntimeException("Document disappeared: " + docId);
+                        // Get or create IndexQueue entry for this document
+                        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, docId, mongoIdObj);
+                        if (queueEntry == null) {
+                            System.err.println("Failed to get/create IndexQueue entry for doc: " + docId);
+                            continue;
                         }
                         
-                        Long updateAt = doc.getLong("updateAt");
+                        Long updateAt = queueEntry.getLong("updateAt");
                         if (updateAt == null) {
-                            throw new RuntimeException("updateAt is null after initialization for doc: " + docId);
+                            updateAt = TimeUtils.getCurrentTimestamp();
                         }
                         
-                        createIndexForDoc(indexName, dbName, collName, docId, updateAt);
+                        createIndexForDoc(indexName, dbName, collName, mongoIdObj, updateAt);
                         indexedDocs++;
                     }
                 } catch (Exception e) {
@@ -1137,14 +1117,14 @@ public class MongoIndexService {
     }
 
     /**
-     * Rebuild index for documents marked with shouldUpdateIndex=true
-     * Much faster than full rebuild as it only processes documents needing reindex
+     * Rebuild index for documents with status=-1 in IndexQueue (needs indexing)
+     * Much faster than full rebuild as it only processes changed documents
      * 
      * @param indexName The mongo-index name
      * @param maxDocs Maximum number of documents to index (null for all)
      * @return Result map with statistics
      */
-    public Map<String, Object> rebuildIndexOnShouldUpdateIndex(String indexName, Integer maxDocs) {
+    public Map<String, Object> rebuildIndexForDocsWithOldIndex(String indexName, Integer maxDocs) {
         Map<String, Object> indexMeta = getIndex(indexName);
         if (indexMeta == null) {
             return createErrorResult("Index not found: " + indexName);
@@ -1157,69 +1137,56 @@ public class MongoIndexService {
         int indexedDocs = 0;
         List<String> errors = new ArrayList<>();
 
-        // Scan all collections for documents with shouldUpdateIndex=true
+        // Scan all databases for IndexQueue entries with status=-1
         for (Map<String, String> collInfo : collections) {
             if (maxDocs != null && indexedDocs >= maxDocs) {
-                break; // Already indexed enough documents
+                break;
             }
 
             String dbName = collInfo.get("database");
             String collName = collInfo.get("collection");
 
             MongoClient client = mongoService.getMongoClient();
-            MongoDatabase database = client.getDatabase(dbName);
-            MongoCollection<Document> collection = database.getCollection(collName);
+            MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(dbName);
 
-            // Ensure index on shouldUpdateIndex field exists for fast query
-            try {
-                collection.createIndex(new Document("shouldUpdateIndex", 1));
-            } catch (Exception e) {
-                System.err.println("Warning: Could not create index on shouldUpdateIndex: " + e.getMessage());
-            }
-
-            // Count docs needing reindex
-            Bson filter = Filters.eq("shouldUpdateIndex", true);
-            long count = collection.countDocuments(filter);
+            // Count docs needing reindex in this collection
+            Bson filter = Filters.and(
+                Filters.eq("collection", collName),
+                Filters.eq("status", -1)
+            );
+            long count = indexQueue.countDocuments(filter);
             totalDocsNeedingReindex += count;
 
-            // Determine how many documents to fetch from this collection
+            // Determine how many documents to fetch
             int remaining = maxDocs != null ? (maxDocs - indexedDocs) : Integer.MAX_VALUE;
             
-            // Query only documents with shouldUpdateIndex=true (with limit if specified)
+            // Query IndexQueue for docs needing indexing
             FindIterable<Document> cursor = maxDocs != null 
-                ? collection.find(filter).limit(remaining)
-                : collection.find(filter);
+                ? indexQueue.find(filter).sort(new Document("updateVersion", 1)).limit(remaining)
+                : indexQueue.find(filter).sort(new Document("updateVersion", 1));
                 
-            for (Document doc : cursor) {
+            for (Document queueEntry : cursor) {
                 try {
-                    Object docId = doc.get("_id");
-                    if (docId != null) {
-                        // Ensure document has all required metadata
-                        Long existingUpdateAt = doc.getLong("updateAt");
-                        ensureDocMetadata(collection, docId, existingUpdateAt);
-                        
-                        // Now fetch the updateAt (guaranteed to exist after ensureDocMetadata)
-                        doc = collection.find(Filters.eq("_id", docId)).first();
-                        if (doc == null) {
-                            throw new RuntimeException("Document disappeared: " + docId);
-                        }
-                        
-                        Long updateAt = doc.getLong("updateAt");
+                    String docId = queueEntry.getString("docId");
+                    String mongoIdStr = queueEntry.getString("mongoId");
+                    
+                    if (docId != null && mongoIdStr != null) {
+                        Object mongoId = parseDocId(mongoIdStr);
+                        Long updateAt = queueEntry.getLong("updateAt");
                         if (updateAt == null) {
-                            throw new RuntimeException("updateAt is null after initialization for doc: " + docId);
+                            updateAt = TimeUtils.getCurrentTimestamp();
                         }
                         
-                        createIndexForDoc(indexName, dbName, collName, docId, updateAt);
+                        createIndexForDoc(indexName, dbName, collName, mongoId, updateAt);
                         indexedDocs++;
                     }
                 } catch (Exception e) {
-                    String errorMsg = "Failed to index doc " + doc.get("_id") + ": " + e.getMessage();
+                    String errorMsg = "Failed to index doc " + queueEntry.getString("docId") + ": " + e.getMessage();
                     errors.add(errorMsg);
                     System.err.println(errorMsg);
                     e.printStackTrace();
                 }
                 
-                // Double-check we haven't exceeded the limit
                 if (maxDocs != null && indexedDocs >= maxDocs) {
                     break;
                 }

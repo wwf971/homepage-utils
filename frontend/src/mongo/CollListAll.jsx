@@ -11,11 +11,11 @@ import {
 import './mongo.css';
 
 /**
- * ListCollections - Component for listing all collections in a selected MongoDB database
+ * CollListAll - Component for listing all collections in a selected MongoDB database
  * 
  * @param {boolean} hasSuccessfulTest - Whether a successful test result exists
  */
-const ListCollections = ({ hasSuccessfulTest }) => {
+const CollListAll = ({ hasSuccessfulTest }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showCreatePopup, setShowCreatePopup] = useState(false);
@@ -256,5 +256,5 @@ const ListCollections = ({ hasSuccessfulTest }) => {
   );
 };
 
-export default ListCollections;
+export default CollListAll;
 

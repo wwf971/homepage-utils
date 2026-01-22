@@ -22,11 +22,11 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType }) 
       let url;
       
       if (searchType === 'database') {
-        url = `${backendUrl}/mongo/index/search/databases?query=${encodeURIComponent(value)}`;
+        url = `${backendUrl}/mongo-index/search/databases?query=${encodeURIComponent(value)}`;
       } else if (searchType === 'collection') {
         // Get the database from the same row
         const dbValue = data; // This is actually the database value when searching collections
-        url = `${backendUrl}/mongo/index/search/collections?database=${encodeURIComponent(dbValue)}&query=${encodeURIComponent(value)}`;
+        url = `${backendUrl}/mongo-index/search/collections?database=${encodeURIComponent(dbValue)}&query=${encodeURIComponent(value)}`;
       }
       
       const response = await fetch(url);
@@ -93,7 +93,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
       // Fetch the updated document from backend to get the latest state
       try {
         const backendUrl = getBackendServerUrl();
-        const response = await fetch(`${backendUrl}/mongo/index/${encodeURIComponent(index.name)}`);
+        const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}`);
         const fetchResult = await response.json();
         
         if (fetchResult.code === 0) {
@@ -154,7 +154,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
     
     try {
       const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo/index/${encodeURIComponent(index.name)}`, {
+      const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -192,7 +192,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
     
     try {
       const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo/index/${encodeURIComponent(index.name)}`, {
+      const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/delete`, {
         method: 'DELETE'
       });
       

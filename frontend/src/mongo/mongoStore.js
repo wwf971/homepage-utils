@@ -247,7 +247,7 @@ export async function updateMongoConfig(key, value) {
 export async function fetchMongoDatabases() {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/mongo/db/`);
+    const response = await fetch(`${backendUrl}/mongo/db/list`);
     const result = await response.json();
     
     if (result.code === 0 && result.data) {
@@ -266,7 +266,7 @@ export async function fetchMongoDatabases() {
 export async function fetchMongoCollections(databaseName) {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/`);
+    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/list`);
     const result = await response.json();
     
     if (result.code === 0 && result.data) {
@@ -285,14 +285,11 @@ export async function fetchMongoCollections(databaseName) {
 export async function createMongoCollection(databaseName, collectionName) {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/`, {
+    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: collectionName
-      })
+      }
     });
 
     const result = await response.json();
@@ -316,7 +313,7 @@ export async function fetchMongoDocuments(databaseName, collectionName, page = 1
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/docs/?page=${page}&pageSize=${pageSize}`
+      `${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/docs/list?page=${page}&pageSize=${pageSize}`
     );
     const result = await response.json();
     
@@ -343,7 +340,7 @@ export async function createMongoDocument(databaseName, collectionName) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/docs/`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/docs/create`,
       {
         method: 'POST',
         headers: {
@@ -371,7 +368,7 @@ export async function deleteMongoDocument(databaseName, collectionName, docId) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/docs/${encodeURIComponent(docId)}/`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/${encodeURIComponent(collectionName)}/docs/${encodeURIComponent(docId)}/delete`,
       {
         method: 'DELETE'
       }
@@ -407,7 +404,7 @@ export async function updateDocField(database, collection, docId, path, value) {
     
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
       {
         method: 'PATCH',
         headers: {
@@ -446,7 +443,7 @@ export async function replaceDocFields(database, collection, docId, fields) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
       {
         method: 'PATCH',
         headers: {
@@ -487,7 +484,7 @@ export async function deleteDocField(database, collection, docId, path) {
     
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
       {
         method: 'PATCH',
         headers: {
@@ -575,7 +572,7 @@ export async function createDocField(database, collection, docId, path, key, val
       // Replace the entire parent object (or use simple $set for root)
       const backendUrl = getBackendServerUrl();
     const response = await fetch(
-        `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+        `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
         {
           method: 'PATCH',
           headers: {
@@ -602,7 +599,7 @@ export async function createDocField(database, collection, docId, path, key, val
       
       const backendUrl = getBackendServerUrl();
     const response = await fetch(
-        `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+        `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
         {
           method: 'PATCH',
           headers: {
@@ -646,7 +643,7 @@ export async function addArrayItem(database, collection, docId, arrayPath, value
     
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
       {
         method: 'PATCH',
         headers: {
@@ -688,7 +685,7 @@ export async function removeArrayItem(database, collection, docId, path) {
     
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
       {
         method: 'PATCH',
         headers: {
@@ -743,7 +740,7 @@ export async function listDatabases() {
     }
 
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/mongo/db/`);
+    const response = await fetch(`${backendUrl}/mongo/db/list`);
     const result = await response.json();
     
     if (result.code === 0) {
@@ -784,7 +781,7 @@ export async function listCollections(databaseName) {
     }
 
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/`);
+    const response = await fetch(`${backendUrl}/mongo/db/${encodeURIComponent(databaseName)}/coll/list`);
     const result = await response.json();
     
     if (result.code === 0) {

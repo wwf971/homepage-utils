@@ -713,7 +713,7 @@ export function useMongoDocEditor(database, collection, document) {
               const mongoPath = ''; // Empty path means root
               const backendUrl = getBackendServerUrl();
     const response = await fetch(
-                `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+                `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
                 {
                   method: 'PATCH',
                   headers: {
@@ -878,7 +878,7 @@ export function useMongoDocEditor(database, collection, document) {
             const mongoPath = '';
             const backendUrl = getBackendServerUrl();
     const response = await fetch(
-              `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}`,
+              `${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/docs/${encodeURIComponent(docId)}/update`,
               {
                 method: 'PATCH',
                 headers: {

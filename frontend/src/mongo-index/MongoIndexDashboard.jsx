@@ -20,7 +20,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
     try {
       const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo/index/${encodeURIComponent(index.name)}/stats`);
+      const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/stats`);
       const result = await response.json();
 
       if (result.code === 0) {
@@ -46,8 +46,8 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
     try {
       const backendUrl = getBackendServerUrl();
       const url = maxDocs 
-        ? `${backendUrl}/mongo/index/${encodeURIComponent(index.name)}/rebuild?maxDocs=${maxDocs}`
-        : `${backendUrl}/mongo/index/${encodeURIComponent(index.name)}/rebuild`;
+        ? `${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/rebuild?maxDocs=${maxDocs}`
+        : `${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/rebuild`;
       
       const response = await fetch(url, {
         method: 'POST'

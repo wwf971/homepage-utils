@@ -36,7 +36,7 @@ const MongoIndexSearch = ({ indexName }) => {
     try {
       const backendUrl = getBackendServerUrl();
       const response = await fetch(
-        `${backendUrl}/mongo/index/${encodeURIComponent(indexName)}/search`,
+        `${backendUrl}/mongo-index/${encodeURIComponent(indexName)}/search`,
         {
           method: 'POST',
           headers: {

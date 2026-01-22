@@ -91,7 +91,7 @@ public class MongoController {
         }
     }
 
-    @GetMapping({"db/", "db"})
+    @GetMapping({"db/list", "db/list/"})
     public ApiResponse<java.util.List<String>> listDatabases() {
         try {
             java.util.List<String> databases = mongoService.listAllDatabases();
@@ -102,40 +102,52 @@ public class MongoController {
         }
     }
 
-    @GetMapping({"db/{databaseName}/coll/", "db/{databaseName}/coll"})
-    public ApiResponse<java.util.List<String>> listCollections(@PathVariable String databaseName) {
+    @GetMapping({"db/{dbName}/coll/list", "db/{dbName}/coll/list/"})
+    public ApiResponse<java.util.List<String>> listCollections(@PathVariable String dbName) {
         try {
-            java.util.List<String> collections = mongoService.listCollectionsInDatabase(databaseName);
+            java.util.List<String> collections = mongoService.listCollectionsInDatabase(dbName);
             return new ApiResponse<>(0, collections, "Collections retrieved successfully");
         } catch (Exception e) {
-            System.err.println("Failed to list collections in database '" + databaseName + "': " + e.getMessage());
+            System.err.println("Failed to list collections in database '" + dbName + "': " + e.getMessage());
             return new ApiResponse<>(-1, null, "Failed to list collections: " + e.getMessage());
         }
     }
 
-    @PostMapping({"db/{databaseName}/coll/", "db/{databaseName}/coll"})
+    @PostMapping({"db/{dbName}/coll/{collName}/create", "db/{dbName}/coll/{collName}/create/"})
     public ApiResponse<Void> createCollection(
-            @PathVariable String databaseName,
-            @RequestBody java.util.Map<String, String> request) {
+            @PathVariable String dbName,
+            @PathVariable String collName) {
         try {
-            String collectionName = request.get("name");
-            if (collectionName == null || collectionName.trim().isEmpty()) {
+            if (collName == null || collName.trim().isEmpty()) {
                 return new ApiResponse<>(-1, null, "Collection name is required");
             }
             
-            mongoService.createCollection(databaseName, collectionName.trim());
-            return new ApiResponse<>(0, null, "Collection '" + collectionName + "' created successfully");
+            mongoService.createCollection(dbName, collName.trim());
+            return new ApiResponse<>(0, null, "Collection '" + collName + "' created successfully");
         } catch (Exception e) {
             System.err.println("Failed to create collection: " + e.getMessage());
             return new ApiResponse<>(-1, null, e.getMessage());
         }
     }
 
+    @DeleteMapping({"db/{dbName}/coll/{collName}/delete", "db/{dbName}/coll/{collName}/delete/"})
+    public ApiResponse<Void> deleteCollection(
+            @PathVariable String dbName,
+            @PathVariable String collName) {
+        try {
+            mongoService.deleteCollection(dbName, collName);
+            return new ApiResponse<>(0, null, "Collection '" + collName + "' deleted successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to delete collection: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to delete collection: " + e.getMessage());
+        }
+    }
+
     // Query single document (first match) with optional path extraction
-    @GetMapping({"db/{databaseName}/coll/{collectionName}/doc/", "db/{databaseName}/coll/{collectionName}/doc"})
+    @GetMapping({"db/{dbName}/coll/{collName}/doc/query", "db/{dbName}/coll/{collName}/doc/query/"})
     public ApiResponse<Object> querySingleDocument(
-            @PathVariable String databaseName,
-            @PathVariable String collectionName,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @RequestParam java.util.Map<String, String> allParams) {
         try {
             java.util.Map<String, String> params = new java.util.HashMap<>(allParams);
@@ -150,7 +162,7 @@ public class MongoController {
             // Query for first matching document
             // Example url: /mongo/db/test/coll/test/doc?key1=value1&path=.&sort=field1&sortOrder=asc
             Object result = mongoService.queryDocument(
-                databaseName, collectionName, params, extractPath, sortBy, sortOrder);
+                dbName, collName, params, extractPath, sortBy, sortOrder);
             
             return new ApiResponse<>(0, result, "Document query executed successfully");
         } catch (Exception e) {
@@ -160,10 +172,10 @@ public class MongoController {
     }
 
     // Query all matching documents or list with pagination
-    @GetMapping({"db/{databaseName}/coll/{collectionName}/docs/", "db/{databaseName}/coll/{collectionName}/docs"})
+    @GetMapping({"db/{dbName}/coll/{collName}/docs/list", "db/{dbName}/coll/{collName}/docs/list/"})
     public ApiResponse<Object> listOrQueryAllDocuments(
-            @PathVariable String databaseName,
-            @PathVariable String collectionName,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam java.util.Map<String, String> allParams) {
@@ -178,13 +190,13 @@ public class MongoController {
             if (params.isEmpty()) {
                 // No filter params: list all documents with pagination
                 java.util.Map<String, Object> result = mongoService.listDocumentsInCollection(
-                    databaseName, collectionName, page, pageSize);
+                    dbName, collName, page, pageSize);
                 return new ApiResponse<>(0, result, "Documents retrieved successfully");
             } else {
                 // Has filter params: query all matching documents with pagination
                 // Example url: /mongo/db/test/coll/test/docs?key1=value1&sort=field1,field2&sortOrder=asc&page=1&pageSize=20
                 java.util.Map<String, Object> result = mongoService.queryAllDocuments(
-                    databaseName, collectionName, params, sortBy, sortOrder, page, pageSize);
+                    dbName, collName, params, sortBy, sortOrder, page, pageSize);
                 
                 return new ApiResponse<>(0, result, "Query executed successfully");
             }
@@ -194,12 +206,12 @@ public class MongoController {
         }
     }
 
-    @PostMapping({"db/{databaseName}/coll/{collectionName}/docs/", "db/{databaseName}/coll/{collectionName}/docs"})
+    @PostMapping({"db/{dbName}/coll/{collName}/docs/create", "db/{dbName}/coll/{collName}/docs/create/"})
     public ApiResponse<org.bson.Document> createEmptyDocument(
-            @PathVariable String databaseName,
-            @PathVariable String collectionName) {
+            @PathVariable String dbName,
+            @PathVariable String collName) {
         try {
-            org.bson.Document newDoc = mongoService.createEmptyDocument(databaseName, collectionName);
+            org.bson.Document newDoc = mongoService.createEmptyDocument(dbName, collName);
             return new ApiResponse<>(0, newDoc, "Empty document created successfully");
         } catch (Exception e) {
             System.err.println("Failed to create empty document: " + e.getMessage());
@@ -207,10 +219,10 @@ public class MongoController {
         }
     }
 
-    @PatchMapping({"db/{databaseName}/coll/{collectionName}/docs/{docId}", "db/{databaseName}/coll/{collectionName}/docs/{docId}/"})
+    @PatchMapping({"db/{dbName}/coll/{collName}/docs/{docId}/update", "db/{dbName}/coll/{collName}/docs/{docId}/update/"})
     public ApiResponse<org.bson.Document> updateDocument(
-            @PathVariable String databaseName,
-            @PathVariable String collectionName,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @PathVariable String docId,
             @RequestBody java.util.Map<String, Object> updateRequest) {
         try {
@@ -220,7 +232,7 @@ public class MongoController {
             Integer position = updateRequest.containsKey("position") ? (Integer) updateRequest.get("position") : null;
 
             org.bson.Document updatedDoc = mongoService.updateDocument(
-                databaseName, collectionName, docId, action, path, value, position);
+                dbName, collName, docId, action, path, value, position);
             
             return new ApiResponse<>(0, updatedDoc, "Document updated successfully");
         } catch (Exception e) {
@@ -229,13 +241,13 @@ public class MongoController {
         }
     }
 
-    @DeleteMapping({"db/{databaseName}/coll/{collectionName}/docs/{docId}", "db/{databaseName}/coll/{collectionName}/docs/{docId}/"})
+    @DeleteMapping({"db/{dbName}/coll/{collName}/docs/{docId}/delete", "db/{dbName}/coll/{collName}/docs/{docId}/delete/"})
     public ApiResponse<Void> deleteDocument(
-            @PathVariable String databaseName,
-            @PathVariable String collectionName,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @PathVariable String docId) {
         try {
-            mongoService.deleteDocument(databaseName, collectionName, docId);
+            mongoService.deleteDocument(dbName, collName, docId);
             return new ApiResponse<>(0, null, "Document deleted successfully");
         } catch (Exception e) {
             System.err.println("Failed to delete document '" + docId + "': " + e.getMessage());

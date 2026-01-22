@@ -15,7 +15,7 @@ import java.util.Set;
  * Handles CRUD operations for indices that track MongoDB collections
  */
 @RestController
-@RequestMapping("/mongo/index")
+@RequestMapping("/mongo-index")
 public class MongoIndexController {
 
     @Autowired
@@ -27,7 +27,7 @@ public class MongoIndexController {
     /**
      * List all MongoDB-ES indices
      */
-    @GetMapping({"", "/"})
+    @GetMapping({"/list", "/list/"})
     public ApiResponse<List<Map<String, Object>>> listIndices() {
         try {
             List<Map<String, Object>> indices = mongoIndexService.listIndices();
@@ -66,7 +66,7 @@ public class MongoIndexController {
      *   ]
      * }
      */
-    @PostMapping({"", "/"})
+    @PostMapping({"/create", "/create/"})
     public ApiResponse<Map<String, Object>> createIndex(@RequestBody Map<String, Object> requestBody) {
         try {
             String name = (String) requestBody.get("name");
@@ -95,7 +95,7 @@ public class MongoIndexController {
     /**
      * Update an existing index
      */
-    @PutMapping("/{indexName}")
+    @PutMapping({"/{indexName}/update", "/{indexName}/update/"})
     public ApiResponse<Map<String, Object>> updateIndexCollections(
             @PathVariable String indexName,
             @RequestBody Map<String, Object> requestBody) {
@@ -118,7 +118,7 @@ public class MongoIndexController {
     /**
      * Delete an index
      */
-    @DeleteMapping("/{indexName}")
+    @DeleteMapping({"/{indexName}/delete", "/{indexName}/delete/"})
     public ApiResponse<Void> deleteIndex(@PathVariable String indexName) {
         try {
             boolean deleted = mongoIndexService.deleteIndex(indexName);
@@ -181,6 +181,48 @@ public class MongoIndexController {
     }
 
     /**
+     * Get all indices that monitor a specific collection (alternative URL pattern)
+     * Path params: dbName, collName
+     */
+    @GetMapping({"db/{dbName}/coll/{collName}/index/list", "db/{dbName}/coll/{collName}/index/list/"})
+    public ApiResponse<Set<String>> getIndicesOfCollectionByPath(
+            @PathVariable String dbName,
+            @PathVariable String collName) {
+        try {
+            Set<String> indices = mongoIndexService.getIndicesOfColl(dbName, collName);
+            return new ApiResponse<>(0, indices, 
+                "Found " + indices.size() + " index(es) monitoring " + dbName + "." + collName);
+        } catch (Exception e) {
+            System.err.println("Failed to get indices for collection: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to get indices for collection: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Delete a collection and remove it from all indices that monitor it
+     * Path params: dbName, collName
+     */
+    @DeleteMapping({"db/{dbName}/coll/{collName}/delete", "db/{dbName}/coll/{collName}/delete/"})
+    public ApiResponse<java.util.Map<String, Object>> deleteCollectionFromIndices(
+            @PathVariable String dbName,
+            @PathVariable String collName) {
+        try {
+            java.util.Map<String, Object> result = mongoIndexService.deleteCollectionFromIndices(dbName, collName);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> data = (java.util.Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, (String) result.get("message"));
+        } catch (Exception e) {
+            System.err.println("Failed to delete collection from indices: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to delete collection from indices: " + e.getMessage());
+        }
+    }
+
+    /**
      * Manually trigger rebuild of the collection->indices mapping
      */
     @PostMapping("/rebuild-collection-mapping")
@@ -205,11 +247,11 @@ public class MongoIndexController {
      *   "updateIndex": true/false (optional, default true)
      * }
      */
-    @PutMapping("/{indexName}/doc/{database}/{collection}/{docId}")
+    @PutMapping({"/{indexName}/doc/{dbName}/{collName}/{docId}/update", "/{indexName}/doc/{dbName}/{collName}/{docId}/update/"})
     public ApiResponse<Map<String, Object>> updateDoc(
             @PathVariable String indexName,
-            @PathVariable String database,
-            @PathVariable String collection,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @PathVariable String docId,
             @RequestBody Map<String, Object> requestBody) {
         try {
@@ -224,7 +266,7 @@ public class MongoIndexController {
                 return new ApiResponse<>(-1, null, "updateDict is required");
             }
 
-            Map<String, Object> result = mongoIndexService.updateDoc(indexName, database, collection, docId, updateDict, updateIndex);
+            Map<String, Object> result = mongoIndexService.updateDoc(indexName, dbName, collName, docId, updateDict, updateIndex);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));
@@ -241,16 +283,16 @@ public class MongoIndexController {
     }
 
     /**
-     * Get a document (returns content only)
+     * Get a document (calls raw CRUD API)
      */
-    @GetMapping("/{indexName}/doc/{database}/{collection}/{docId}")
+    @GetMapping({"/{indexName}/doc/{dbName}/{collName}/{docId}/get", "/{indexName}/doc/{dbName}/{collName}/{docId}/get/"})
     public ApiResponse<Object> getDoc(
             @PathVariable String indexName,
-            @PathVariable String database,
-            @PathVariable String collection,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @PathVariable String docId) {
         try {
-            Map<String, Object> result = mongoIndexService.getDoc(indexName, database, collection, docId);
+            Map<String, Object> result = mongoIndexService.getDocRaw(dbName, collName, docId);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));
@@ -266,14 +308,14 @@ public class MongoIndexController {
     /**
      * Delete a document (soft delete)
      */
-    @DeleteMapping("/{indexName}/doc/{database}/{collection}/{docId}")
+    @DeleteMapping({"/{indexName}/doc/{dbName}/{collName}/{docId}/delete", "/{indexName}/doc/{dbName}/{collName}/{docId}/delete/"})
     public ApiResponse<Void> deleteDoc(
             @PathVariable String indexName,
-            @PathVariable String database,
-            @PathVariable String collection,
+            @PathVariable String dbName,
+            @PathVariable String collName,
             @PathVariable String docId) {
         try {
-            Map<String, Object> result = mongoIndexService.deleteDoc(indexName, database, collection, docId);
+            Map<String, Object> result = mongoIndexService.deleteDoc(indexName, dbName, collName, docId);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));
@@ -316,8 +358,8 @@ public class MongoIndexController {
     }
 
     /**
-     * Incremental rebuild: only reindex documents marked with shouldUpdateIndex=true
-     * Much faster than full rebuild as it uses MongoDB index on shouldUpdateIndex field
+     * Incremental rebuild: only reindex documents with status=-1 in IndexQueue
+     * Much faster than full rebuild as it uses IndexQueue
      * Optional query param: maxDocs (e.g., ?maxDocs=10 to rebuild only 10 docs)
      */
     @PostMapping("/{indexName}/rebuild-incremental")
@@ -325,7 +367,7 @@ public class MongoIndexController {
             @PathVariable String indexName,
             @RequestParam(required = false) Integer maxDocs) {
         try {
-            Map<String, Object> result = mongoIndexService.rebuildIndexOnShouldUpdateIndex(indexName, maxDocs);
+            Map<String, Object> result = mongoIndexService.rebuildIndexForDocsWithOldIndex(indexName, maxDocs);
             
             if ((Integer) result.get("code") != 0) {
                 return new ApiResponse<>(-1, null, (String) result.get("message"));

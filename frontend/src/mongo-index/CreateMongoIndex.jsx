@@ -229,7 +229,7 @@ const CreateMongoIndex = ({ onCreated, onCancel }) => {
     
     try {
       const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo/index/`, {
+      const response = await fetch(`${backendUrl}/mongo-index/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

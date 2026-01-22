@@ -40,10 +40,10 @@ const EditableValueAdapter = ({ data, onChangeAttempt, isEditable, field, index,
 /**
  * MongoDocSearch - Component for searching MongoDB documents with filters
  * 
- * @param {string} selectedDatabase - Currently selected database
- * @param {string} selectedCollection - Currently selected collection
+ * @param {string} dbName - Currently selected database
+ * @param {string} collName - Currently selected collection
  */
-const MongoDocSearch = ({ selectedDatabase, selectedCollection }) => {
+const MongoDocSearch = ({ dbName, collName }) => {
   const [filterPairs, setFilterPairs] = useState([
     { key: '', value: '' }
   ]);
@@ -110,7 +110,7 @@ const MongoDocSearch = ({ selectedDatabase, selectedCollection }) => {
   };
 
   const handleSearch = async (targetPage = 1) => {
-    if (!selectedDatabase || !selectedCollection) {
+    if (!dbName || !collName) {
       setError('Please select a database and collection first');
       return;
     }
@@ -150,7 +150,7 @@ const MongoDocSearch = ({ selectedDatabase, selectedCollection }) => {
       params.append('page', String(targetPage));
       params.append('pageSize', String(pageSize));
 
-      const url = `${backendUrl}/mongo/db/${selectedDatabase}/coll/${selectedCollection}/docs?${params.toString()}`;
+      const url = `${backendUrl}/mongo/db/${dbName}/coll/${collName}/docs/list?${params.toString()}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -209,7 +209,7 @@ const MongoDocSearch = ({ selectedDatabase, selectedCollection }) => {
     handleSearch(newPage);
   };
 
-  if (!selectedCollection) {
+  if (!collName) {
     return null;
   }
 
@@ -224,7 +224,7 @@ const MongoDocSearch = ({ selectedDatabase, selectedCollection }) => {
   return (
     <div className="mongo-search-section" style={{ marginTop: '6px' }}>
       <div className="mongo-section-header">
-        <h3>Search Documents in "{selectedCollection}"</h3>
+        <h3>Search Documents in "{collName}"</h3>
       </div>
 
       <div style={{ marginTop: '12px' }}>

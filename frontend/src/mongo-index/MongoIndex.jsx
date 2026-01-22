@@ -20,7 +20,7 @@ const MongoIndex = () => {
     
     try {
       const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo/index/`);
+      const response = await fetch(`${backendUrl}/mongo-index/list`);
       const result = await response.json();
       
       if (result.code === 0) {

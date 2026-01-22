@@ -4,7 +4,7 @@ import { KeyValues, SpinningCircle, TabsOnTop } from '@wwf971/react-comp-misc';
 import { mongoComputedConfigAtom, mongoSelectedDatabaseAtom, mongoSelectedCollectionAtom, getBackendServerUrl } from '../remote/dataStore';
 import '../styles/testSection.css';
 import ListDatabases from './ListDatabases';
-import ListCollections from './ListCollections';
+import CollListAll from './CollListAll';
 import MongoDocSearch from './MongoDocSearch';
 import ListDocs from './ListDocs';
 import MongoIndex from '../mongo-index/MongoIndex';
@@ -163,7 +163,7 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
             />
             
             {selectedDatabase && (
-              <ListCollections
+              <CollListAll
                 hasSuccessfulTest={result?.success || false}
               />
             )}
@@ -173,8 +173,8 @@ const ConnectionTest = ({ showDatabaseList = false }) => {
                 <TabsOnTop defaultTab="Search Docs" autoSwitchToNewTab={false}>
                   <TabsOnTop.Tab label="Search Docs">
                     <MongoDocSearch
-                      selectedDatabase={selectedDatabase}
-                      selectedCollection={selectedCollection}
+                      dbName={selectedDatabase}
+                      collName={selectedCollection}
                     />
                   </TabsOnTop.Tab>
                   
