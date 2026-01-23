@@ -9,7 +9,8 @@ import {
 import JdbcConfigPanel from './jdbc/JdbcConfigPanel';
 import JdbcConnectionTest from './jdbc/JdbcConnectionTest';
 import MongoConfigPanel from './mongo/MongoConfigPanel';
-import MongoTestConnection from './mongo/TestConnection';
+import MongoPanel from './mongo/MongoPanel';
+import MongoIndexPanel from './mongo-index/MongoIndexPanel';
 import {ConfigPanel as EsConfigPanel} from './elasticsearch/ConfigPanel';
 import {TestConnection as EsTestConnection} from './elasticsearch/TestConnection';
 import {RedisConfigPanel} from './redis/RedisConfigPanel';
@@ -61,15 +62,15 @@ function App() {
                 </Panel>
               </SubTab>
               
-              <SubTab label="Test Connection">
+              <SubTab label="Data">
                 <Panel>
-                  <MongoTestConnection showDatabaseList={true} />
+                  <MongoPanel />
                 </Panel>
               </SubTab>
               
-              <SubTab label="ES Index">
+              <SubTab label="Index">
                 <Panel>
-                  <MongoTestConnection showDatabaseList={false} />
+                  <MongoIndexPanel />
                 </Panel>
               </SubTab>
             </SubTab>
