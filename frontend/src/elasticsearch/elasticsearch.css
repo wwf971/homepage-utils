@@ -13,9 +13,6 @@
   margin-bottom: 12px;
 }
 
-.es-section-header h3 {
-  margin: 0;
-}
 
 .es-refresh-button {
   padding: 4px 0px;
@@ -73,7 +70,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 2px;
 }
 
 .es-index-info-header h4 {
@@ -88,7 +85,7 @@
   border-radius: 2px;
   cursor: pointer;
   font-size: 13px;
-  height: 28px;
+  height: 20px;
   display: flex;
   align-items: center;
 }
@@ -181,7 +178,7 @@
   border-radius: 2px;
   cursor: pointer;
   font-size: 12px;
-  height: 28px;
+  height: 20px;
   display: flex;
   align-items: center;
 }
@@ -228,10 +225,6 @@
   border-bottom: 1px solid #eee;
 }
 
-.es-create-panel-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
 
 .es-close-button {
   background: none;

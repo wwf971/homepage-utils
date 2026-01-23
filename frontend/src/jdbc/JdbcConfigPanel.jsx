@@ -13,7 +13,7 @@ import {
   fetchJdbcComputedConfig,
   updateJdbcConfig
 } from '../remote/dataStore';
-import '../styles/configPanel.css';
+import '../styles/common.css';
 
 const JdbcConfigPanel = () => {
   const appConfig = useAtomValue(jdbcAppConfigAtom);
@@ -132,7 +132,7 @@ const JdbcConfigPanel = () => {
         <TabsOnTop.Tab label="application.properties">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>JDBC Configuration from application.properties</h3>
+              <div className="section-title">JDBC Configuration from application.properties</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -161,7 +161,7 @@ const JdbcConfigPanel = () => {
         <TabsOnTop.Tab label="Local Override">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>JDBC Configuration from Local Storage (Editable)</h3>
+              <div className="section-title">JDBC Configuration from Local Storage (Editable)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -194,7 +194,7 @@ const JdbcConfigPanel = () => {
         <TabsOnTop.Tab label="Computed Config">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>JDBC Computed Configuration (Read-only)</h3>
+              <div className="section-title">JDBC Computed Configuration (Read-only)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}

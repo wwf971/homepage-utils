@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
-import { createElasticsearchIndex, invalidateIndicesCache } from './EsStore';
+import { createEsIndex, invalidateIndicesCache } from './EsStore';
 import './elasticsearch.css';
 
 /**
@@ -117,7 +117,7 @@ const CreateIndex = ({ onClose, onSuccess }) => {
     setCreating(true);
     setError(null);
 
-    const result = await createElasticsearchIndex(indexName.trim(), validation.value);
+    const result = await createEsIndex(indexName.trim(), validation.value);
     
     if (result.code === 0) {
       invalidateIndicesCache();
@@ -144,7 +144,7 @@ const CreateIndex = ({ onClose, onSuccess }) => {
     <div className="es-create-panel-backdrop" onClick={handleBackdropClick}>
       <div className="es-create-panel">
         <div className="es-create-panel-header">
-          <h3>Create New Index</h3>
+          <div className="panel-title">Create New Index</div>
           <button 
             onClick={onClose} 
             disabled={creating}

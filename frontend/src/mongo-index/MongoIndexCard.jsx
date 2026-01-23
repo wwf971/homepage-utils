@@ -342,7 +342,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
             <div className="doc-editor-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0 }}>MongoDB Index Metadata</h3>
+                  <div className="panel-title">MongoDB Index Metadata</div>
                   <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                     Index: {index.name}
                   </div>
@@ -379,7 +379,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
             <div className="doc-editor-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0 }}>Edit MongoDB Index Metadata</h3>
+                  <div className="panel-title">Edit MongoDB Index Metadata</div>
                   <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                     Index: {index.name}
                   </div>

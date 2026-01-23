@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { rabbitMQComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
-import '../styles/testSection.css';
+import '../styles/common.css';
 import './rabbitmq.css';
 
 export const TestConnectionRabbitMQ = () => {
@@ -73,7 +73,7 @@ export const TestConnectionRabbitMQ = () => {
 
   return (
     <div className="main-panel">
-      <h3>Test RabbitMQ Connection</h3>
+      <div className="panel-title">Test RabbitMQ Connection</div>
       
       <div className="test-config-section">
         <div className="test-section-title">Current Config (Computed)</div>

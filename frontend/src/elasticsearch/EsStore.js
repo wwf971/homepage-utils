@@ -28,7 +28,7 @@ function isCacheValid(timestamp, ttl) {
  * Fetch all Elasticsearch indices (with cache)
  * @param {boolean} forceRefresh - If true, bypass cache and fetch from server
  */
-export async function fetchElasticsearchIndices(forceRefresh = false) {
+export async function fetchEsIndices(forceRefresh = false) {
   // Check cache first
   if (!forceRefresh && isCacheValid(cache.indices.timestamp, cache.indices.ttl)) {
     return { code: 0, data: cache.indices.data };
@@ -58,7 +58,7 @@ export async function fetchElasticsearchIndices(forceRefresh = false) {
  * @param {string} indexName - Name of the index
  * @param {boolean} forceRefresh - If true, bypass cache and fetch from server
  */
-export async function fetchElasticsearchIndexInfo(indexName, forceRefresh = false) {
+export async function fetchEsIndexInfo(indexName, forceRefresh = false) {
   // Check cache first
   const cached = cache.indexInfo[indexName];
   if (!forceRefresh && cached && isCacheValid(cached.timestamp, cache.indexInfoTtl)) {
@@ -116,7 +116,7 @@ export async function deleteElasticsearchIndex(indexName) {
  * @param {string} oldName - Current name of the index
  * @param {string} newName - New name for the index
  */
-export async function renameElasticsearchIndex(oldName, newName) {
+export async function renameEsIndex(oldName, newName) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(`${backendUrl}/elasticsearch/indices/${encodeURIComponent(oldName)}/rename/`, {
@@ -147,7 +147,7 @@ export async function renameElasticsearchIndex(oldName, newName) {
  * @param {string} indexName - Name of the index to create
  * @param {object} body - Index body (settings and mappings)
  */
-export async function createElasticsearchIndex(indexName, body = {}) {
+export async function createEsIndex(indexName, body = {}) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(`${backendUrl}/elasticsearch/indices/`, {
@@ -206,7 +206,7 @@ export function clearAllCaches() {
  * @param {number} page - Page number (1-based)
  * @param {number} pageSize - Number of documents per page
  */
-export async function fetchElasticsearchDocuments(indexName, page = 1, pageSize = 20) {
+export async function fetchEsDocs(indexName, page = 1, pageSize = 20) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
@@ -235,7 +235,7 @@ export async function fetchElasticsearchDocuments(indexName, page = 1, pageSize 
  * @param {string} indexName - Name of the index
  * @param {string} docId - Document ID
  */
-export async function deleteElasticsearchDocument(indexName, docId) {
+export async function deleteEsDoc(indexName, docId) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
@@ -261,7 +261,7 @@ export async function deleteElasticsearchDocument(indexName, docId) {
  * @param {string} indexName - Name of the index
  * @param {object} body - Document body (optional, empty object creates empty doc)
  */
-export async function createElasticsearchDocument(indexName, body = {}) {
+export async function createEsDoc(indexName, body = {}) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
@@ -325,7 +325,7 @@ export async function searchEsDocs(indexName, searchParams) {
  * @param {string} docId - Document ID
  * @param {object} newDoc - New document content
  */
-export async function updateEsDocument(indexName, docId, newDoc) {
+export async function updateEsDoc(indexName, docId, newDoc) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(

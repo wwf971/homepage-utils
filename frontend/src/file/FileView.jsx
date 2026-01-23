@@ -242,7 +242,7 @@ const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
         <div className="file-view-header">
           <div className="file-view-header-content">
             <div className="file-view-title-row">
-              <h3 className="file-view-title">{file.name}</h3>
+              <div className="file-view-title">{file.name}</div>
               {contentType && (
                 <span className="file-view-mime-type">{contentType}</span>
               )}
@@ -350,7 +350,7 @@ const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="file-view-mongo-header">
-              <h3>Edit MongoDB Document</h3>
+              <div className="panel-title">Edit MongoDB Document</div>
               <button 
                 className="file-view-mongo-close"
                 onClick={() => setShowMongoDoc(false)}

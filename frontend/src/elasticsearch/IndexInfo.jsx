@@ -3,9 +3,9 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { SpinningCircle, JsonRaw, RefreshIcon, DeleteIcon } from '@wwf971/react-comp-misc';
 import { esSelectedIndexAtom, esIndicesAtom } from '../remote/dataStore';
 import { 
-  fetchElasticsearchIndexInfo,
+  fetchEsIndexInfo,
   deleteElasticsearchIndex,
-  renameElasticsearchIndex,
+  renameEsIndex,
   invalidateIndicesCache
 } from './EsStore';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -15,8 +15,8 @@ import './elasticsearch.css';
  * IndexInfo - Component for displaying information about a selected Elasticsearch index
  */
 const IndexInfo = () => {
-  const selectedIndex = useAtomValue(esSelectedIndexAtom);
-  const setSelectedIndex = useSetAtom(esSelectedIndexAtom);
+  const selectedIndexName = useAtomValue(esSelectedIndexAtom);
+  const setSelectedIndexName = useSetAtom(esSelectedIndexAtom);
   const setIndices = useSetAtom(esIndicesAtom);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -28,23 +28,23 @@ const IndexInfo = () => {
   const editableRef = useRef(null);
 
   useEffect(() => {
-    if (selectedIndex) {
+    if (selectedIndexName) {
       loadIndexInfo();
     } else {
       setIndexInfo(null);
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIndex]);
+  }, [selectedIndexName]);
 
   const loadIndexInfo = async (forceRefresh = false) => {
-    if (!selectedIndex) return;
+    if (!selectedIndexName) return;
 
     setLoading(true);
     setError(null);
     setIndexInfo(null);
 
-    const result = await fetchElasticsearchIndexInfo(selectedIndex, forceRefresh);
+    const result = await fetchEsIndexInfo(selectedIndexName, forceRefresh);
     
     if (result.code === 0) {
       setIndexInfo(result.data);
@@ -64,17 +64,17 @@ const IndexInfo = () => {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedIndex) return;
+    if (!selectedIndexName) return;
     
     setShowDeleteConfirm(false);
     setOperationInProgress(true);
     setError(null);
 
-    const result = await deleteElasticsearchIndex(selectedIndex);
+    const result = await deleteElasticsearchIndex(selectedIndexName);
     
     if (result.code === 0) {
       // Clear selection and trigger indices refresh
-      setSelectedIndex(null);
+      setSelectedIndexName(null);
       invalidateIndicesCache();
       // Trigger refresh event
       window.dispatchEvent(new CustomEvent('elasticsearch-indices-changed'));
@@ -117,7 +117,7 @@ const IndexInfo = () => {
   const handleRenameCancel = () => {
     setIsRenaming(false);
     if (editableRef.current) {
-      editableRef.current.textContent = selectedIndex;
+      editableRef.current.textContent = selectedIndexName;
     }
   };
 
@@ -126,7 +126,7 @@ const IndexInfo = () => {
     
     const newIndexName = editableRef.current.textContent.trim();
     
-    if (!selectedIndex || !newIndexName || newIndexName === selectedIndex) {
+    if (!selectedIndexName || !newIndexName || newIndexName === selectedIndexName) {
       setIsRenaming(false);
       return;
     }
@@ -134,11 +134,11 @@ const IndexInfo = () => {
     setOperationInProgress(true);
     setError(null);
 
-    const result = await renameElasticsearchIndex(selectedIndex, newIndexName);
+    const result = await renameEsIndex(selectedIndexName, newIndexName);
     
     if (result.code === 0) {
       // Update selection to new name
-      setSelectedIndex(newIndexName);
+      setSelectedIndexName(newIndexName);
       invalidateIndicesCache();
       // Trigger refresh event
       window.dispatchEvent(new CustomEvent('elasticsearch-indices-changed'));
@@ -147,7 +147,7 @@ const IndexInfo = () => {
       setError(result.message);
       // Revert the text
       if (editableRef.current) {
-        editableRef.current.textContent = selectedIndex;
+        editableRef.current.textContent = selectedIndexName;
       }
       setIsRenaming(false);
     }
@@ -155,7 +155,7 @@ const IndexInfo = () => {
     setOperationInProgress(false);
   };
 
-  if (!selectedIndex) {
+  if (!selectedIndexName) {
     return (
       <div className="es-index-info">
         <p style={{ color: '#666', fontStyle: 'italic' }}>
@@ -178,7 +178,7 @@ const IndexInfo = () => {
             onBlur={isRenaming ? handleRenameSubmit : undefined}
             className={`es-index-name ${isRenaming ? 'editing' : ''}`}
           >
-            {selectedIndex}
+            {selectedIndexName}
           </span>
           {!isRenaming && (
             <button
@@ -263,13 +263,13 @@ const IndexInfo = () => {
         <JsonRaw
           data={indexInfo}
           onClose={() => setShowRawJson(false)}
-          title={`Index Info: ${selectedIndex}`}
+          title={`Index Info: ${selectedIndexName}`}
         />
       )}
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}
-        message={`Are you sure you want to delete index "${selectedIndex}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete index "${selectedIndexName}"? This action cannot be undone.`}
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
         confirmText="Delete"

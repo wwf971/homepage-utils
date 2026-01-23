@@ -16,16 +16,16 @@ const EsDocSearch = () => {
   const [error, setError] = useState(null);
   const [results, setResults] = useState([]);
   
-  const selectedIndex = useAtomValue(esSelectedIndexAtom);
+  const selectedIndexName = useAtomValue(esSelectedIndexAtom);
 
   const handleSearch = async () => {
-    if (!selectedIndex || !query.trim()) return;
+    if (!selectedIndexName || !query.trim()) return;
 
     setSearching(true);
     setError(null);
     setResults([]);
 
-    const result = await searchEsDocs(selectedIndex, {
+    const result = await searchEsDocs(selectedIndexName, {
       query: query.trim(),
       search_in_paths: searchInKeys,
       search_in_values: searchInValues
@@ -60,14 +60,14 @@ const EsDocSearch = () => {
     );
   };
 
-  if (!selectedIndex) {
+  if (!selectedIndexName) {
     return null;
   }
 
   return (
     <div className="es-search-section">
       <div className="es-section-header">
-        <h3>Search Documents in "{selectedIndex}"</h3>
+        <div className="section-title">Search Documents in "{selectedIndexName}"</div>
       </div>
 
       <div style={{ marginBottom: '12px' }}>

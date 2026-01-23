@@ -132,7 +132,7 @@ const DocListAll = ({ shouldLoad = true }) => {
   return (
     <div className="mongo-all-docs-section" style={{ marginTop: '8px' }}>
       <div className="mongo-section-header">
-        <h3>Documents in "{selectedCollection}"</h3>
+        <div className="section-title">Documents in "{selectedCollection}"</div>
         <div className="mongo-section-buttons">
           <button
             className="mongo-refresh-button"

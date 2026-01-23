@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { redisComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
-import '../styles/testSection.css';
+import '../styles/common.css';
 
 export const TestConnectionRedisson = () => {
   const [testing, setTesting] = useState(false);
@@ -71,7 +71,7 @@ export const TestConnectionRedisson = () => {
 
   return (
     <div className="main-panel">
-      <h3>Test Redisson Connection</h3>
+      <div className="panel-title">Test Redisson Connection</div>
       
       <div className="test-config-section">
         <div className="test-section-title">Current Config (Computed)</div>

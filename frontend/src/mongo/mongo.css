@@ -198,13 +198,6 @@
   background-color: #f8f9fa;
 }
 
-.doc-editor-header > h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-}
-
 .doc-editor-close-button {
   background: none;
   border: none;
@@ -249,9 +242,3 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.mongo-popup h3 {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  font-weight: 500;
-  color: #333;
-}

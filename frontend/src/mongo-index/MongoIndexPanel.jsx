@@ -59,7 +59,7 @@ const MongoIndexPanel = () => {
   return (
     <div className="mongo-index-section" style={{ marginTop: '8px' }}>
       <div className="mongo-section-header">
-        <h3>MongoDB-Elasticsearch Indices</h3>
+        <div className="section-title">MongoDB-Elasticsearch Indices</div>
         <div className="mongo-section-buttons">
           <button
             className="mongo-refresh-button"

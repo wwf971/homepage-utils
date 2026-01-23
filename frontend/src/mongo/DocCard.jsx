@@ -145,7 +145,7 @@ const DocCard = ({ doc, index, onDelete }) => {
             <div className="doc-editor-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0 }}>Document #{index + 1}</h3>
+                  <div className="panel-title">Document #{index + 1}</div>
                   {docUrl && (
                     <div className="fetch-file-url-row" style={{ marginTop: '4px' }}>
                       <span className="fetch-file-url" title={docUrl}>{docUrl}</span>

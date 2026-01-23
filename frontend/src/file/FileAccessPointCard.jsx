@@ -540,7 +540,7 @@ const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, 
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
               <div>
-                <h3>{fileAccessPoint.content?.name || 'File Access Point'}</h3>
+                <div className="panel-title">{fileAccessPoint.content?.name || 'File Access Point'}</div>
                 <div style={{ 
                   fontSize: '12px', 
                   color: '#666', 
@@ -586,7 +586,7 @@ const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, 
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
               <div>
-                <h3>Raw JSON - {fileAccessPoint.content?.name || 'File Access Point'}</h3>
+                <div className="panel-title">Raw JSON - {fileAccessPoint.content?.name || 'File Access Point'}</div>
                 <div style={{ 
                   fontSize: '12px', 
                   color: '#666', 

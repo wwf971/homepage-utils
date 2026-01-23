@@ -1,6 +1,6 @@
 /* Backend server specific styles */
 /* Import common config panel styles */
-@import '../styles/configPanel.css';
+@import '../styles/common.css';
 
 .key-with-info {
   display: flex;

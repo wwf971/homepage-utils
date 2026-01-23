@@ -29,7 +29,7 @@ import {
   rabbitMQComputedConfigAtom
 } from './dataStore';
 import { clearFileCache, fileCacheAtom } from '../file/fileStore';
-import '../styles/configPanel.css';
+import '../styles/common.css';
 import './backendServer.css';
 
 const BackendServerConfig = () => {

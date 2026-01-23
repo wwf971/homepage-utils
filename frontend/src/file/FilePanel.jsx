@@ -75,7 +75,7 @@ const FilePanel = () => {
   return (
     <div className="main-panel">
       <div className="file-panel-header">
-        <h3>File Access Points</h3>
+        <div className="panel-title">File Access Points</div>
         <button
           className="refresh-button"
           onClick={handleRefresh}

@@ -13,7 +13,7 @@ import {
   fetchRabbitMQComputedConfig,
   updateRabbitMQConfig
 } from '../remote/dataStore';
-import '../styles/configPanel.css';
+import '../styles/common.css';
 
 export const RabbitMQConfigPanel = () => {
   const appConfig = useAtomValue(rabbitMQAppConfigAtom);
@@ -142,7 +142,7 @@ export const RabbitMQConfigPanel = () => {
         <TabsOnTop.Tab label="application.properties">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>RabbitMQ Configuration from application.properties</h3>
+              <div className="section-title">RabbitMQ Configuration from application.properties</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -171,7 +171,7 @@ export const RabbitMQConfigPanel = () => {
         <TabsOnTop.Tab label="Local Override">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>RabbitMQ Configuration from Local Storage (Editable)</h3>
+              <div className="section-title">RabbitMQ Configuration from Local Storage (Editable)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -204,7 +204,7 @@ export const RabbitMQConfigPanel = () => {
         <TabsOnTop.Tab label="Computed Config">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>RabbitMQ Computed Configuration (Read-only)</h3>
+              <div className="section-title">RabbitMQ Computed Configuration (Read-only)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}

@@ -12,7 +12,7 @@ import {
   fetchMongoComputedConfig,
   updateMongoConfig
 } from '../remote/dataStore';
-import '../styles/configPanel.css';
+import '../styles/common.css';
 
 const MongoConfigPanel = () => {
   const appConfig = useAtomValue(mongoAppConfigAtom);
@@ -182,7 +182,7 @@ const MongoConfigPanel = () => {
         <TabsOnTop.Tab label="application.properties">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>MongoDB Configuration from application.properties</h3>
+              <div className="section-title">MongoDB Configuration from application.properties</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -211,7 +211,7 @@ const MongoConfigPanel = () => {
         <TabsOnTop.Tab label="Local Override">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>MongoDB Configuration from Local Storage (Editable)</h3>
+              <div className="section-title">MongoDB Configuration from Local Storage (Editable)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -248,7 +248,7 @@ const MongoConfigPanel = () => {
         <TabsOnTop.Tab label="Computed Config">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>MongoDB Computed Configuration (Read-only)</h3>
+              <div className="section-title">MongoDB Computed Configuration (Read-only)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}

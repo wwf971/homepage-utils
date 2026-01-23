@@ -449,7 +449,7 @@ export async function updateElasticsearchConfig(key, value) {
 /**
  * Fetch all Elasticsearch indices
  */
-export async function fetchElasticsearchIndices() {
+export async function fetchEsIndices() {
   try {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/elasticsearch/indices/`);
@@ -468,7 +468,7 @@ export async function fetchElasticsearchIndices() {
 /**
  * Fetch information about a specific Elasticsearch index
  */
-export async function fetchElasticsearchIndexInfo(indexName) {
+export async function fetchEsIndexInfo(indexName) {
   try {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}`);

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { jdbcComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
-import '../styles/testSection.css';
+import '../styles/common.css';
 
 const JdbcConnectionTest = () => {
   const [testing, setTesting] = useState(false);

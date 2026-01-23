@@ -3,9 +3,9 @@ import { useAtomValue } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon, DeleteIcon, JsonComp } from '@wwf971/react-comp-misc';
 import { esSelectedIndexAtom } from '../remote/dataStore';
 import { 
-  fetchElasticsearchDocuments,
-  deleteElasticsearchDocument,
-  updateEsDocument
+  fetchEsDocs,
+  deleteEsDoc,
+  updateEsDoc
 } from './EsStore';
 import {
   handlePseudoOperation,
@@ -22,7 +22,7 @@ import './elasticsearch.css';
 /**
  * DocListAll - Component for listing documents in a selected Elasticsearch index with pagination
  */
-const DocListAll = () => {
+const EsDocListAll = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [docs, setDocs] = useState([]);
@@ -35,10 +35,10 @@ const DocListAll = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   
-  const selectedIndex = useAtomValue(esSelectedIndexAtom);
+  const selectedIndexName = useAtomValue(esSelectedIndexAtom);
 
   useEffect(() => {
-    if (selectedIndex) {
+    if (selectedIndexName) {
       setDocs([]);
       setPage(1);
       loadDocuments(1);
@@ -48,15 +48,15 @@ const DocListAll = () => {
       setPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIndex]);
+  }, [selectedIndexName]);
 
   const loadDocuments = async (targetPage) => {
-    if (!selectedIndex) return;
+    if (!selectedIndexName) return;
 
     setLoading(true);
     setError(null);
 
-    const result = await fetchElasticsearchDocuments(selectedIndex, targetPage, pageSize);
+    const result = await fetchEsDocs(selectedIndexName, targetPage, pageSize);
     
     if (result.code === 0) {
       console.log('Loaded docs:', result.data);
@@ -75,7 +75,7 @@ const DocListAll = () => {
   };
 
   const handleRefresh = () => {
-    if (selectedIndex) {
+    if (selectedIndexName) {
       setDocs([]);
       loadDocuments(page);
     }
@@ -97,11 +97,11 @@ const DocListAll = () => {
     const { docId } = deleteConfirm;
     setDeleteConfirm({ show: false, docId: null });
     
-    if (!selectedIndex || !docId) return;
+    if (!selectedIndexName || !docId) return;
 
     setError(null);
 
-    const result = await deleteElasticsearchDocument(selectedIndex, docId);
+    const result = await deleteEsDoc(selectedIndexName, docId);
     
     if (result.code === 0) {
       // Remove the document from the current docs array
@@ -186,7 +186,7 @@ const DocListAll = () => {
       const updatedDoc = createArrayItem(path, newValue, editingDoc);
       const docToSend = prepareDocForBackend(updatedDoc);
       
-      const result = await updateEsDocument(selectedIndex, editingDoc._id, docToSend);
+      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend);
       
       if (result.code === 0) {
         setDocs(prevDocs => 
@@ -210,7 +210,7 @@ const DocListAll = () => {
       const updatedDoc = createDictEntry(path, newValue, _key, editingDoc);
       const docToSend = prepareDocForBackend(updatedDoc);
       
-      const result = await updateEsDocument(selectedIndex, editingDoc._id, docToSend);
+      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend);
       
       if (result.code === 0) {
         setDocs(prevDocs => 
@@ -232,7 +232,7 @@ const DocListAll = () => {
     const updatedDoc = applyValueChange(_action, path, newValue, editingDoc);
     const docToSend = prepareDocForBackend(updatedDoc);
     
-    const result = await updateEsDocument(selectedIndex, editingDoc._id, docToSend);
+    const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend);
     
     if (result.code === 0) {
       setDocs(prevDocs => 
@@ -247,7 +247,7 @@ const DocListAll = () => {
     return result;
   };
 
-  if (!selectedIndex) {
+  if (!selectedIndexName) {
     return null;
   }
 
@@ -256,7 +256,7 @@ const DocListAll = () => {
   return (
     <div className="es-docs-section">
       <div className="es-section-header">
-        <h3>Documents in "{selectedIndex}"</h3>
+        <div className="section-title">Documents in "{selectedIndexName}"</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
             className="es-refresh-button"
@@ -367,7 +367,7 @@ const DocListAll = () => {
 
       {shouldShowCreatePanel && (
         <CreateDoc
-          indexName={selectedIndex}
+          indexName={selectedIndexName}
           onClose={() => setShouldShowCreatePanel(false)}
           onSuccess={handleCreateSuccess}
         />
@@ -378,7 +378,7 @@ const DocListAll = () => {
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <h3 style={{ margin: 0 }}>Edit Document: {editingDoc._id}</h3>
+                <div className="panel-title">Edit Document: {editingDoc._id}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {isUpdating && (
                     <span style={{ 
@@ -434,5 +434,5 @@ const DocListAll = () => {
   );
 };
 
-export default DocListAll;
+export default EsDocListAll;
 

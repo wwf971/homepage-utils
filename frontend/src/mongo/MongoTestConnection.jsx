@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { mongoComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
-import '../styles/testSection.css';
+import '../styles/common.css';
 
 /**
  * MongoDB connection test area component
@@ -90,7 +90,7 @@ const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection 
 
   return (
     <div className="main-panel">
-      <h3>MongoDB Connection</h3>
+      <div className="panel-title">MongoDB Connection</div>
       
       <div className="test-config-section">
         <div className="test-section-title">Current Config(Computed)</div>

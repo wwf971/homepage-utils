@@ -360,7 +360,7 @@ const RemoteConfig = () => {
 
   return (
     <div className="config-section">
-      <h3>Remote Configuration (MongoDB)</h3>
+      <div className="section-title">Remote Configuration (MongoDB)</div>
       <p className="config-hint">
         Store configuration remotely in MongoDB. This layer overrides local config.
       </p>

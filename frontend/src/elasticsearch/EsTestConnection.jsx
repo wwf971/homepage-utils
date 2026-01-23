@@ -1,15 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
-import { esComputedConfigAtom, esSelectedIndexAtom, getBackendServerUrl } from '../remote/dataStore';
-import '../styles/testSection.css';
-import ListIndices from './ListIndices';
-import IndexInfo from './IndexInfo';
-import EsDocListAll from './ListDocs';
-import EsDocSearch from './EsDocSearch';
+import { esComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
+import '../styles/common.css';
 
-export const TestConnection = ({ showIndexList = false }) => {
-  const selectedIndex = useAtomValue(esSelectedIndexAtom);
+/**
+ * ElasticSearch connection test area component
+ */
+export const EsTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection }) => {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
   const config = useAtomValue(esComputedConfigAtom);
@@ -25,7 +23,7 @@ export const TestConnection = ({ showIndexList = false }) => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-    }, 130000);
+    }, 100000);
     
     try {
       const backendUrl = getBackendServerUrl();
@@ -44,8 +42,14 @@ export const TestConnection = ({ showIndexList = false }) => {
       
       setResult(testResult);
       
+      // Notify parent about test result
+      if (onTestResult) {
+        onTestResult(testResult);
+      }
+      
       // Auto-fetch indices after successful test
-      if (testResult.success && showIndexList) {
+      if (testResult.success && onTestSuccess) {
+        onTestSuccess();
         // Trigger index fetch by dispatching a custom event
         window.dispatchEvent(new CustomEvent('elasticsearch-test-success'));
       }
@@ -68,6 +72,9 @@ export const TestConnection = ({ showIndexList = false }) => {
       }
       
       setResult(testResult);
+      if (onTestResult) {
+        onTestResult(testResult);
+      }
       return testResult;
     } finally {
       setTesting(false);
@@ -82,8 +89,8 @@ export const TestConnection = ({ showIndexList = false }) => {
   };
 
   return (
-    <div className="main-panel">
-      <h3>Test Elasticsearch Connection</h3>
+    <>
+      <div className="panel-title">Test Elasticsearch Connection</div>
       
       <div className="test-config-section">
         <div className="section-title">Current Config(Computed)</div>
@@ -100,10 +107,10 @@ export const TestConnection = ({ showIndexList = false }) => {
         <div className="test-buttons">
           <button 
             onClick={handleTest} 
-            disabled={testing}
+            disabled={testing || isTestingConnection}
             className="test-button"
           >
-            {testing ? (
+            {(testing || isTestingConnection) ? (
               <>
                 <SpinningCircle width={16} height={16} color="white" />
                 <span style={{ marginLeft: '8px' }}>Testing...</span>
@@ -130,27 +137,8 @@ export const TestConnection = ({ showIndexList = false }) => {
           </div>
         )}
       </div>
-
-      {showIndexList && (
-        <>
-          <ListIndices 
-            onTestConnection={handleTest}
-            hasSuccessfulTest={result?.success}
-            isTestingConnection={testing}
-          />
-          
-          {selectedIndex && (
-            <>
-              <IndexInfo />
-              <EsDocSearch />
-              <EsDocListAll />
-            </>
-          )}
-        </>
-      )}
-    </div>
+    </>
   );
 };
 
-export default TestConnection;
-
+export default EsTestConnection;

@@ -181,7 +181,7 @@ const CollListAll = ({ hasSuccessfulTest }) => {
   return (
     <div className="mongo-collections-section">
       <div className="mongo-section-header">
-        <h3>Collections in "{selectedDatabase} Database"</h3>
+        <div className="section-title">Collections in "{selectedDatabase} Database"</div>
         <div className="mongo-section-buttons">
           <button
             className="mongo-refresh-button"

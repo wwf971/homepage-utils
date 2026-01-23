@@ -13,7 +13,8 @@ import {
   fetchElasticsearchComputedConfig,
   updateElasticsearchConfig
 } from '../remote/dataStore';
-import '../styles/configPanel.css';
+import '../styles/common.css';
+import EsTestConnection from './EsTestConnection';
 
 export const ConfigPanel = () => {
   const appConfig = useAtomValue(esAppConfigAtom);
@@ -25,6 +26,8 @@ export const ConfigPanel = () => {
   const setComputedConfig = useSetAtom(esComputedConfigAtom);
   const setConfigError = useSetAtom(esConfigErrorAtom);
   const [loading, setLoading] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   useEffect(() => {
     loadAllConfigs();
@@ -114,6 +117,10 @@ export const ConfigPanel = () => {
     });
   }, [localConfig, computedConfig, handleLocalUpdate]);
 
+  const handleTestResult = (result) => {
+    setTestResult(result);
+  };
+
   return (
     <div className="main-panel">
       {configError && (
@@ -132,7 +139,7 @@ export const ConfigPanel = () => {
         <TabsOnTop.Tab label="application.properties">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>Elasticsearch Configuration from application.properties</h3>
+              <div className="section-title">Elasticsearch Configuration from application.properties</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -161,7 +168,7 @@ export const ConfigPanel = () => {
         <TabsOnTop.Tab label="Local Override">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>Elasticsearch Configuration from Local Storage (Editable)</h3>
+              <div className="section-title">Elasticsearch Configuration from Local Storage (Editable)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -194,7 +201,7 @@ export const ConfigPanel = () => {
         <TabsOnTop.Tab label="Computed Config">
           <div className="config-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0 }}>Elasticsearch Computed Configuration (Read-only)</h3>
+              <div className="section-title">Elasticsearch Computed Configuration (Read-only)</div>
               <button
                 onClick={loadAllConfigs}
                 disabled={loading}
@@ -219,6 +226,14 @@ export const ConfigPanel = () => {
           </div>
         </TabsOnTop.Tab>
       </TabsOnTop>
+
+      <div style={{ marginTop: '12px' }}></div>
+      
+      <EsTestConnection 
+        onTestSuccess={() => {}}
+        onTestResult={handleTestResult}
+        isTestingConnection={isTestingConnection}
+      />
     </div>
   );
 };

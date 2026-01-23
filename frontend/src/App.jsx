@@ -11,8 +11,8 @@ import JdbcConnectionTest from './jdbc/JdbcConnectionTest';
 import MongoConfigPanel from './mongo/MongoConfigPanel';
 import MongoPanel from './mongo/MongoPanel';
 import MongoIndexPanel from './mongo-index/MongoIndexPanel';
-import {ConfigPanel as EsConfigPanel} from './elasticsearch/ConfigPanel';
-import {TestConnection as EsTestConnection} from './elasticsearch/TestConnection';
+import EsPanelConfig from './elasticsearch/EsPanelConfig';
+import EsPanelData from './elasticsearch/EsPanelData';
 import {RedisConfigPanel} from './redis/RedisConfigPanel';
 import {TestConnectionRedis} from './redis/TestConnectionRedis';
 import {TestConnectionRedisson} from './redis/TestConnectionRedisson';
@@ -80,13 +80,13 @@ function App() {
             <SubTab label="ElasticSearch">
               <SubTab label="Config" isDefault={true}>
                 <Panel>
-                  <EsConfigPanel />
+                  <EsPanelConfig />
                 </Panel>
               </SubTab>
               
-              <SubTab label="Test">
+              <SubTab label="Data">
                 <Panel>
-                  <EsTestConnection showIndexList={true} />
+                  <EsPanelData />
                 </Panel>
               </SubTab>
             </SubTab>

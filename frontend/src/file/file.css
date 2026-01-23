@@ -6,11 +6,6 @@
   margin-bottom: 12px;
 }
 
-.file-panel-header > h3 {
-  font-size: 18px;
-  font-weight: 500;
-  color: #333;
-}
 
 .file-access-points-list {
   display: flex;
@@ -137,12 +132,6 @@
   background: #f5f5f5;
 }
 
-.doc-editor-header h3 {
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-  margin: 0;
-}
 
 .doc-editor-close-button {
   background: none;
@@ -884,12 +873,6 @@
   background: #f8f8f8;
 }
 
-.file-view-mongo-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-  color: #333;
-}
 
 .file-view-mongo-close {
   background: none;

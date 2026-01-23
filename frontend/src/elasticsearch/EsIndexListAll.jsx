@@ -5,26 +5,26 @@ import {
   esIndicesAtom, 
   esSelectedIndexAtom
 } from '../remote/dataStore';
-import { fetchElasticsearchIndices } from './EsStore';
+import { fetchEsIndices } from './EsStore';
 import CreateIndex from './CreateIndex';
 import './elasticsearch.css';
 
 /**
- * ListIndices - Component for listing all indices in Elasticsearch
+ * EsIndexListAll - Component for listing all indices in Elasticsearch
  * 
  * @param {Function} onTestConnection - Callback to trigger connection test
  * @param {boolean} hasSuccessfulTest - Whether a successful test result exists
  * @param {boolean} isTestingConnection - Whether a connection test is in progress
  */
-const ListIndices = ({ onTestConnection, hasSuccessfulTest, isTestingConnection }) => {
+const EsIndexListAll = ({ onTestConnection, hasSuccessfulTest, isTestingConnection }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   
   const indices = useAtomValue(esIndicesAtom);
-  const selectedIndex = useAtomValue(esSelectedIndexAtom);
+  const selectedIndexName = useAtomValue(esSelectedIndexAtom);
   const setIndices = useSetAtom(esIndicesAtom);
-  const setSelectedIndex = useSetAtom(esSelectedIndexAtom);
+  const setSelectedIndexName = useSetAtom(esSelectedIndexAtom);
 
   // Auto-fetch indices when test succeeds
   React.useEffect(() => {
@@ -60,7 +60,7 @@ const ListIndices = ({ onTestConnection, hasSuccessfulTest, isTestingConnection 
     setLoading(true);
     setError(null);
 
-    const result = await fetchElasticsearchIndices(forceRefresh);
+    const result = await fetchEsIndices(forceRefresh);
     
     if (result.code === 0) {
       setIndices(result.data);
@@ -72,18 +72,18 @@ const ListIndices = ({ onTestConnection, hasSuccessfulTest, isTestingConnection 
   };
 
   const handleIndexClick = (indexName) => {
-    setSelectedIndex(indexName);
+    setSelectedIndexName(indexName);
   };
 
   const handleCreateSuccess = (newIndexName) => {
     // Select the newly created index
-    setSelectedIndex(newIndexName);
+    setSelectedIndexName(newIndexName);
   };
 
   return (
     <div className="es-indices-section">
       <div className="es-section-header">
-        <h3>Elasticsearch Indices</h3>
+        <div className="section-title">Elasticsearch Indices</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button 
             onClick={() => setShowCreatePanel(true)}
@@ -142,7 +142,7 @@ const ListIndices = ({ onTestConnection, hasSuccessfulTest, isTestingConnection 
             {indices.map((index, idx) => (
               <span 
                 key={idx} 
-                className={`es-tag es-tag-clickable ${selectedIndex === index ? 'es-tag-selected' : ''}`}
+                className={`es-tag es-tag-clickable ${selectedIndexName === index ? 'es-tag-selected' : ''}`}
                 onClick={() => handleIndexClick(index)}
               >
                 {index}
@@ -170,5 +170,5 @@ const ListIndices = ({ onTestConnection, hasSuccessfulTest, isTestingConnection 
   );
 };
 
-export default ListIndices;
+export default EsIndexListAll;
 

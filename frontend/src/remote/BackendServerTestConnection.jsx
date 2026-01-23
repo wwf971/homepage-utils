@@ -26,7 +26,7 @@ import {
   rabbitMQLocalConfigAtom,
   rabbitMQComputedConfigAtom
 } from './dataStore';
-import '../styles/testSection.css';
+import '../styles/common.css';
 import './backendServer.css';
 
 const BackendServerTestConnection = () => {

@@ -224,7 +224,7 @@ const MongoDocSearch = ({ dbName, collName }) => {
   return (
     <div className="mongo-search-section" style={{ marginTop: '6px' }}>
       <div className="mongo-section-header">
-        <h3>Search Documents in "{collName}"</h3>
+        <div className="section-title">Search Documents in "{collName}"</div>
       </div>
 
       <div style={{ marginTop: '12px' }}>

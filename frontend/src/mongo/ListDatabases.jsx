@@ -68,7 +68,7 @@ const ListDatabases = ({ onTestConnection, hasSuccessfulTest, isTestingConnectio
   return (
     <div className="mongo-databases-section" style={{ marginTop: '12px' }}>
       <div className="mongo-section-header">
-        <h3>MongoDB Databases</h3>
+        <div className="section-title">MongoDB Databases</div>
         <button 
           onClick={loadDatabases}
           disabled={loading || isTestingConnection}

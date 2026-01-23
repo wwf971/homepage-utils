@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
-import { createElasticsearchDocument } from './EsStore';
+import { createEsDoc } from './EsStore';
 import './elasticsearch.css';
 
 /**
@@ -57,7 +57,7 @@ const CreateDoc = ({ indexName, onClose, onSuccess }) => {
     setCreating(true);
     setError(null);
 
-    const result = await createElasticsearchDocument(indexName, validation.value);
+    const result = await createEsDoc(indexName, validation.value);
     
     if (result.code === 0) {
       if (onSuccess) {
@@ -81,7 +81,7 @@ const CreateDoc = ({ indexName, onClose, onSuccess }) => {
     <div className="es-create-panel-backdrop" onClick={handleBackdropClick}>
       <div className="es-create-panel">
         <div className="es-create-panel-header">
-          <h3>Create New Document in "{indexName}"</h3>
+          <div className="panel-title">Create New Document in "{indexName}"</div>
           <button 
             onClick={onClose} 
             disabled={creating}
