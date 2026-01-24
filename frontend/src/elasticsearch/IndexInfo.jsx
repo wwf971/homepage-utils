@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { SpinningCircle, JsonRaw, RefreshIcon, DeleteIcon } from '@wwf971/react-comp-misc';
-import { esSelectedIndexAtom, esIndicesAtom } from '../remote/dataStore';
+import { esSelectedIndexAtom } from '../remote/dataStore';
 import { 
   fetchEsIndexInfo,
   deleteElasticsearchIndex,
-  renameEsIndex,
-  invalidateIndicesCache
+  renameEsIndex
 } from './EsStore';
 import ConfirmDialog from '../components/ConfirmDialog';
 import './elasticsearch.css';
@@ -17,7 +16,6 @@ import './elasticsearch.css';
 const IndexInfo = () => {
   const selectedIndexName = useAtomValue(esSelectedIndexAtom);
   const setSelectedIndexName = useSetAtom(esSelectedIndexAtom);
-  const setIndices = useSetAtom(esIndicesAtom);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [indexInfo, setIndexInfo] = useState(null);
@@ -26,6 +24,11 @@ const IndexInfo = () => {
   const [operationInProgress, setOperationInProgress] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const editableRef = useRef(null);
+  
+  // Get the store to access getter/setter functions
+  const store = useStore();
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
 
   useEffect(() => {
     if (selectedIndexName) {
@@ -70,12 +73,12 @@ const IndexInfo = () => {
     setOperationInProgress(true);
     setError(null);
 
-    const result = await deleteElasticsearchIndex(selectedIndexName);
+    const result = await deleteElasticsearchIndex(selectedIndexName, setAtomValue, getAtomValue);
     
     if (result.code === 0) {
+      // Cache invalidation is already handled inside deleteElasticsearchIndex
       // Clear selection and trigger indices refresh
       setSelectedIndexName(null);
-      invalidateIndicesCache();
       // Trigger refresh event
       window.dispatchEvent(new CustomEvent('elasticsearch-indices-changed'));
     } else {
@@ -134,12 +137,12 @@ const IndexInfo = () => {
     setOperationInProgress(true);
     setError(null);
 
-    const result = await renameEsIndex(selectedIndexName, newIndexName);
+    const result = await renameEsIndex(selectedIndexName, newIndexName, setAtomValue, getAtomValue);
     
     if (result.code === 0) {
+      // Cache invalidation is already handled inside renameEsIndex
       // Update selection to new name
       setSelectedIndexName(newIndexName);
-      invalidateIndicesCache();
       // Trigger refresh event
       window.dispatchEvent(new CustomEvent('elasticsearch-indices-changed'));
       setIsRenaming(false);

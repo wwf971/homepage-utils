@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { useStore } from 'jotai';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
-import { createEsDoc } from './EsStore';
+import { createEsDoc, getDocAtom } from './EsStore';
 import './elasticsearch.css';
 
 /**
@@ -15,6 +16,10 @@ const CreateDoc = ({ indexName, onClose, onSuccess }) => {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
   const [jsonError, setJsonError] = useState(null);
+  
+  const store = useStore();
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
 
   const validateJson = (jsonStr) => {
     if (!jsonStr.trim()) {
@@ -57,11 +62,14 @@ const CreateDoc = ({ indexName, onClose, onSuccess }) => {
     setCreating(true);
     setError(null);
 
-    const result = await createEsDoc(indexName, validation.value);
+    const result = await createEsDoc(indexName, validation.value, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
       if (onSuccess) {
-        onSuccess(result.data);
+        // Read created doc from atom
+        const docAtom = getDocAtom(indexName, result.docId);
+        const newDoc = getAtomValue(docAtom);
+        onSuccess(newDoc);
       }
       onClose();
     } else {

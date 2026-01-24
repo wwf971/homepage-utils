@@ -1,28 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon } from '@wwf971/react-comp-misc';
-import { fetchMongoIndices } from './mongoIndexStore';
+import { 
+  fetchMongoIndices, 
+  mongoIndicesLoadingAtom, 
+  mongoIndicesErrorAtom 
+} from './mongoIndexStore';
+import { getIndexAtom, esIndexNamesAtom } from '../elasticsearch/EsStore';
 import MongoIndexCard from './MongoIndexCard';
 import MongoIndexCreate from './MongoIndexCreate';
 import '../mongo/mongo.css';
 
 /**
+ * Wrapper that reads the individual ES index atom for a specific index
+ * This ensures fine-grained reactivity - only re-renders when THIS index changes
+ * 
+ * Filters out non-mongo-indices by returning null
+ */
+const MongoIndexCardWrapper = ({ indexName, onUpdate, onDelete, onJsonEdit }) => {
+  const indexAtom = getIndexAtom(indexName);
+  const indexData = useAtomValue(indexAtom);
+  
+  // Skip if not a mongo-index
+  if (!indexData || !indexData.isMongoIndex || !indexData.mongoData) {
+    return null;
+  }
+  
+  return (
+    <MongoIndexCard
+      index={indexData.mongoData}
+      onUpdate={onUpdate}
+      onDelete={onDelete}
+      onJsonEdit={onJsonEdit}
+    />
+  );
+};
+
+/**
  * MongoIndexPanel - Main component for managing MongoDB-ES indices
  */
 const MongoIndexPanel = () => {
-  const [indices, setIndices] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const allIndexNames = useAtomValue(esIndexNamesAtom);  // All ES index names
+  const [loading, setLoading] = useAtom(mongoIndicesLoadingAtom);
+  const [error, setError] = useAtom(mongoIndicesErrorAtom);
   const [showCreateForm, setShowCreateForm] = useState(false);
   
-  const loadIndices = async () => {
+  // Defensive: ensure allIndexNames is an array of strings
+  const safeIndexNames = useMemo(() => {
+    if (!Array.isArray(allIndexNames)) {
+      console.warn('allIndexNames is not an array:', allIndexNames);
+      return [];
+    }
+    const filtered = allIndexNames.filter(name => {
+      if (typeof name !== 'string') {
+        console.error('Non-string index name found:', name);
+        return false;
+      }
+      return true;
+    });
+    return filtered;
+  }, [allIndexNames]);
+  
+  // Get the store to access getter/setter functions
+  const store = useStore();
+  
+  // Helper to get atom values (for passing to store functions)
+  const getAtomValue = (atom) => store.get(atom);
+  
+  // Helper to set atom values (for passing to store functions)
+  const setAtomValue = (atom, value) => store.set(atom, value);
+  
+  const loadIndices = async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = await fetchMongoIndices();
+      const result = await fetchMongoIndices(forceRefresh, getAtomValue, setAtomValue);
       
       if (result.code === 0) {
-        setIndices(result.data || []);
+        // No need to setIndices - the derived atom will update automatically
       } else {
         setError(result.message || 'Failed to load indices');
       }
@@ -38,26 +94,24 @@ const MongoIndexPanel = () => {
   }, []);
   
   const handleRefresh = () => {
-    loadIndices();
+    loadIndices(true); // Force refresh
   };
   
   const handleIndexCreated = (newIndex) => {
-    setIndices(prev => [...prev, newIndex]);
+    // No need to manually update - the derived atom will update automatically
     setShowCreateForm(false);
   };
   
   const handleIndexUpdated = (updatedIndex) => {
-    setIndices(prev => prev.map(idx => 
-      idx.name === updatedIndex.name ? updatedIndex : idx
-    ));
+    // No need to manually update - the derived atom will update automatically
   };
   
   const handleIndexDeleted = (indexName) => {
-    setIndices(prev => prev.filter(idx => idx.name !== indexName));
+    // No need to manually update - the derived atom will update automatically
   };
   
   return (
-    <div className="mongo-index-section" style={{ marginTop: '8px' }}>
+    <div className="main-panel">
       <div className="mongo-section-header">
         <div className="section-title">MongoDB-Elasticsearch Indices</div>
         <div className="mongo-section-buttons">
@@ -80,7 +134,7 @@ const MongoIndexPanel = () => {
         </div>
       </div>
       
-      <div style={{ fontSize: '12px', color: '#666', marginTop: '8px', marginBottom: '12px' }}>
+      <div style={{ fontSize: '12px', color: '#666' }}>
         Manage Elasticsearch indices that track MongoDB collections for search functionality.
       </div>
       
@@ -94,12 +148,12 @@ const MongoIndexPanel = () => {
       {error && (
         <div className="test-result error" style={{ marginTop: '6px' }}>
           <strong>✗ Error</strong>
-          <div className="result-message">{error}</div>
+          <div className="result-message">{typeof error === 'string' ? error : JSON.stringify(error)}</div>
         </div>
       )}
       
       
-      {!loading && indices.length === 0 && !showCreateForm && (
+      {!loading && safeIndexNames.length === 0 && !showCreateForm && (
         <div style={{ 
           padding: '24px', 
           textAlign: 'center', 
@@ -111,12 +165,12 @@ const MongoIndexPanel = () => {
         </div>
       )}
       
-      {!loading && indices.length > 0 && (
-        <div style={{ marginTop: '12px' }}>
-          {indices.map(index => (
-            <MongoIndexCard
-              key={index.name}
-              index={index}
+      {!loading && safeIndexNames.length > 0 && (
+        <div>
+          {safeIndexNames.map(name => (
+            <MongoIndexCardWrapper
+              key={name}
+              indexName={name}
               onUpdate={handleIndexUpdated}
               onDelete={handleIndexDeleted}
               onJsonEdit={handleIndexUpdated}

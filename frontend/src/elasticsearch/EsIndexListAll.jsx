@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon } from '@wwf971/react-comp-misc';
 import { 
-  esIndicesAtom, 
   esSelectedIndexAtom
 } from '../remote/dataStore';
-import { fetchEsIndices } from './EsStore';
+import { fetchAllEsIndices, esIndexNamesAtom } from './EsStore';
 import CreateIndex from './CreateIndex';
 import './elasticsearch.css';
 
@@ -21,10 +20,14 @@ const EsIndexListAll = ({ onTestConnection, hasSuccessfulTest, isTestingConnecti
   const [error, setError] = useState(null);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   
-  const indices = useAtomValue(esIndicesAtom);
+  const indexNames = useAtomValue(esIndexNamesAtom);  // Just the names
   const selectedIndexName = useAtomValue(esSelectedIndexAtom);
-  const setIndices = useSetAtom(esIndicesAtom);
   const setSelectedIndexName = useSetAtom(esSelectedIndexAtom);
+  
+  // Get the store to access getter/setter functions
+  const store = useStore();
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
 
   // Auto-fetch indices when test succeeds
   React.useEffect(() => {
@@ -55,15 +58,13 @@ const EsIndexListAll = ({ onTestConnection, hasSuccessfulTest, isTestingConnecti
       }
     }
 
-    // Clear previous indices and show spinner
-    setIndices([]);
     setLoading(true);
     setError(null);
 
-    const result = await fetchEsIndices(forceRefresh);
+    const result = await fetchAllEsIndices(forceRefresh, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
-      setIndices(result.data);
+      // Data is now in individual atoms, no need to set anything
     } else {
       setError(result.message);
     }
@@ -133,26 +134,26 @@ const EsIndexListAll = ({ onTestConnection, hasSuccessfulTest, isTestingConnecti
         </div>
       )}
 
-      {!loading && Array.isArray(indices) && indices.length > 0 && (
+      {!loading && Array.isArray(indexNames) && indexNames.length > 0 && (
         <div style={{ marginTop: '12px' }}>
           <h4 style={{ marginBottom: '8px' }}>
-            Found {indices.length} {indices.length !== 1 ? 'indices' : 'index'}:
+            Found {indexNames.length} {indexNames.length !== 1 ? 'indices' : 'index'}:
           </h4>
           <div className="es-tags-container">
-            {indices.map((index, idx) => (
+            {indexNames.map((indexName, idx) => (
               <span 
                 key={idx} 
-                className={`es-tag es-tag-clickable ${selectedIndexName === index ? 'es-tag-selected' : ''}`}
-                onClick={() => handleIndexClick(index)}
+                className={`es-tag es-tag-clickable ${selectedIndexName === indexName ? 'es-tag-selected' : ''}`}
+                onClick={() => handleIndexClick(indexName)}
               >
-                {index}
+                {indexName}
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {!loading && Array.isArray(indices) && indices.length === 0 && !error && (
+      {!loading && Array.isArray(indexNames) && indexNames.length === 0 && !error && (
         <div style={{ marginTop: '12px' }}>
           <p style={{ color: '#666', fontStyle: 'italic' }}>
             No indices found. Click the + button to create a new index.

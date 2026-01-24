@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { useStore } from 'jotai';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
-import { createEsIndex, invalidateIndicesCache } from './EsStore';
+import { createEsIndex } from './EsStore';
 import './elasticsearch.css';
 
 /**
@@ -12,10 +13,14 @@ import './elasticsearch.css';
 const CreateIndex = ({ onClose, onSuccess }) => {
   const [indexName, setIndexName] = useState('');
   const [indexMapping, setIndexMapping] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [creating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   const [jsonError, setJsonError] = useState(null);
   const [isCharLevelIndex, setIsCharLevelIndex] = useState(false);
+  
+  const store = useStore();
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
 
   const validateJson = (jsonStr) => {
     if (!jsonStr.trim()) {
@@ -114,13 +119,13 @@ const CreateIndex = ({ onClose, onSuccess }) => {
       return;
     }
 
-    setCreating(true);
+    setIsCreating(true);
     setError(null);
 
-    const result = await createEsIndex(indexName.trim(), validation.value);
+    const result = await createEsIndex(indexName.trim(), validation.value, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
-      invalidateIndicesCache();
+      // Cache invalidation is already handled inside createEsIndex
       // Trigger refresh event
       window.dispatchEvent(new CustomEvent('elasticsearch-indices-changed'));
       if (onSuccess) {
@@ -131,7 +136,7 @@ const CreateIndex = ({ onClose, onSuccess }) => {
       setError(result.message);
     }
     
-    setCreating(false);
+    setIsCreating(false);
   };
 
   const handleBackdropClick = (e) => {

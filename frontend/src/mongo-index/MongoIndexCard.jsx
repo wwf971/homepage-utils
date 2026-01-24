@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useStore } from 'jotai';
 import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonComp } from '@wwf971/react-comp-misc';
 import { getBackendServerUrl } from '../remote/dataStore';
 import { updateMongoIndex, deleteMongoIndex } from './mongoIndexStore';
@@ -82,6 +83,11 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [isRebuilding, setIsRebuilding] = useState(false);
   
+  // Get the store to access getter/setter functions
+  const store = useStore();
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
+  
   // Use doc editor for this specific index document
   // Note: mongo-index collection is stored in the main configured database (usually 'main'), not 'metadata'
   const { handleChange: handleDocChange, isUpdating } = useMongoDocEditor(
@@ -161,7 +167,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
       const result = await updateMongoIndex(index.name, {
         esIndex: editedIndex.esIndex,
         collections: editedIndex.collections.filter(c => c.database && c.collection)
-      });
+      }, setAtomValue, getAtomValue);
       
       if (result.code === 0) {
         setIsEditing(false);
@@ -187,7 +193,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
     setShowDeleteConfirm(false);
     
     try {
-      const result = await deleteMongoIndex(index.name);
+      const result = await deleteMongoIndex(index.name, setAtomValue, getAtomValue);
       
       if (result.code === 0) {
         if (onDelete) {
@@ -296,7 +302,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
       </div>
       
       <div className="mongo-index-card-section-title">
-        Monitored Collections:
+        MongoDB Collections Monitored:
       </div>
       
       {collections.length === 0 ? (
@@ -309,7 +315,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
           onChangeAttempt={isEditing ? handleCollectionChange : undefined}
           isKeyEditable={isEditing}
           isValueEditable={isEditing}
-          keyColWidth="200px"
+          keyColWidth="min"
         />
       )}
       

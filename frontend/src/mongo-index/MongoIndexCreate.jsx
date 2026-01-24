@@ -1,4 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useStore } from 'jotai';
 import { KeyValuesComp, SearchableValueComp, SpinningCircle, PlusIcon } from '@wwf971/react-comp-misc';
 import { searchDatabases, searchCollections } from '../mongo/mongoStore';
 import { createMongoIndex } from './mongoIndexStore';
@@ -180,6 +181,11 @@ const MongoIndexCreate = forwardRef(({ onCreated, onCancel, embedded = false, in
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   
+  // Get the store to access getter/setter functions
+  const store = useStore();
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
+  
   const handleCollectionChange = (idx, field, newValue) => {
     setCollections(prev => {
       const updated = [...prev];
@@ -267,7 +273,7 @@ const MongoIndexCreate = forwardRef(({ onCreated, onCancel, embedded = false, in
     
     try {
       const data = getData();
-      const result = await createMongoIndex(data.name, data.esIndex, data.collections);
+      const result = await createMongoIndex(data.name, data.esIndex, data.collections, setAtomValue, getAtomValue);
       
       if (result.code === 0) {
         if (onCreated) {

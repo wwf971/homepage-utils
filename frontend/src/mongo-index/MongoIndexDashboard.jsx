@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc';
+import { SpinningCircle, RefreshIcon, KeyValuesComp } from '@wwf971/react-comp-misc';
 import { getBackendServerUrl } from '../remote/dataStore';
 import './mongo-index.css';
 
@@ -137,20 +137,15 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
       {stats && (
         <div className="mongo-index-dashboard-stats">
-          <div className="mongo-index-dashboard-stat-row">
-            <span className="mongo-index-dashboard-stat-label">ES Index:</span>
-            <span className="mongo-index-dashboard-stat-value">{stats.esIndexName}</span>
-          </div>
-
-          <div className="mongo-index-dashboard-stat-row">
-            <span className="mongo-index-dashboard-stat-label">Total MongoDB Docs:</span>
-            <span className="mongo-index-dashboard-stat-value">{stats.totalMongoDocsCount}</span>
-          </div>
-
-          <div className="mongo-index-dashboard-stat-row">
-            <span className="mongo-index-dashboard-stat-label">ES Index Docs:</span>
-            <span className="mongo-index-dashboard-stat-value">{stats.esDocsCount}</span>
-          </div>
+          <KeyValuesComp
+            data={[
+              { key: 'ES Index Name', value: stats.esIndexName },
+              { key: 'MongoDB Doc Num', value: stats.totalMongoDocsCount },
+              { key: 'ES Index Doc Num', value: stats.esDocsCount }
+            ]}
+            isEditable={false}
+            keyColWidth="min"
+          />
 
           {stats.collections && stats.collections.length > 0 && (
             <div className="mongo-index-dashboard-collections">

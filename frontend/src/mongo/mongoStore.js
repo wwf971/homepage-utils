@@ -31,13 +31,13 @@ export const mongoSelectedDatabaseAtom = atom(null);
 export const mongoCollectionsAtom = atom([]);
 export const mongoSelectedCollectionAtom = atom(null);
 
-// ========== MongoDB Documents Atoms ==========
+// ========== MongoDB Docs Atoms ==========
 export const mongoDocsAtom = atom([]);
 export const mongoDocsPageAtom = atom(1);
 export const mongoDocsTotalAtom = atom(0);
 export const mongoDocsPageSizeAtom = atom(20);
 
-// ========== MongoDB Configuration API ==========
+// ========== MongoDB Config API ==========
 
 /**
  * Fetch MongoDB app config (from application.properties)

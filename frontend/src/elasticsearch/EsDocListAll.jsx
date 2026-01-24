@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useStore } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon, DeleteIcon, JsonComp } from '@wwf971/react-comp-misc';
 import { esSelectedIndexAtom } from '../remote/dataStore';
 import { 
   fetchEsDocs,
   deleteEsDoc,
-  updateEsDoc
+  updateEsDoc,
+  getDocListAtom,
+  getDocAtom
 } from './EsStore';
 import {
   handlePseudoOperation,
@@ -36,6 +38,10 @@ const EsDocListAll = () => {
   const [updateError, setUpdateError] = useState(null);
   
   const selectedIndexName = useAtomValue(esSelectedIndexAtom);
+  const store = useStore();
+  
+  const getAtomValue = (atom) => store.get(atom);
+  const setAtomValue = (atom, value) => store.set(atom, value);
 
   useEffect(() => {
     if (selectedIndexName) {
@@ -56,17 +62,36 @@ const EsDocListAll = () => {
     setLoading(true);
     setError(null);
 
-    const result = await fetchEsDocs(selectedIndexName, targetPage, pageSize);
+    const result = await fetchEsDocs(selectedIndexName, targetPage, pageSize, false, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
-      console.log('Loaded docs:', result.data);
-      if (result.data.length > 0) {
-        console.log('First doc sample:', result.data[0]);
-        console.log('First doc keys:', Object.keys(result.data[0]));
+      // Read from atoms
+      const docListAtom = getDocListAtom(selectedIndexName);
+      const docListData = getAtomValue(docListAtom);
+      
+      if (docListData) {
+        const { docIds = [], total: docTotal = 0, page: docPage = 1 } = docListData;
+        
+        // Get actual documents from individual doc atoms
+        const loadedDocs = docIds.map(docId => {
+          const docAtom = getDocAtom(selectedIndexName, docId);
+          return getAtomValue(docAtom);
+        }).filter(doc => doc !== null && doc !== undefined);
+        
+        console.log('Loaded docs:', loadedDocs);
+        if (loadedDocs.length > 0) {
+          console.log('First doc sample:', loadedDocs[0]);
+          console.log('First doc keys:', Object.keys(loadedDocs[0]));
+        }
+        
+        setDocs(loadedDocs);
+        setTotal(docTotal);
+        setPage(docPage);
+      } else {
+        setDocs([]);
+        setTotal(0);
+        setPage(targetPage);
       }
-      setDocs(result.data);
-      setTotal(result.total);
-      setPage(result.page);
     } else {
       setError(result.message);
     }
@@ -101,7 +126,7 @@ const EsDocListAll = () => {
 
     setError(null);
 
-    const result = await deleteEsDoc(selectedIndexName, docId);
+    const result = await deleteEsDoc(selectedIndexName, docId, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
       // Remove the document from the current docs array
@@ -186,13 +211,17 @@ const EsDocListAll = () => {
       const updatedDoc = createArrayItem(path, newValue, editingDoc);
       const docToSend = prepareDocForBackend(updatedDoc);
       
-      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend);
+      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
       
       if (result.code === 0) {
+        // Read updated doc from atom
+        const docAtom = getDocAtom(selectedIndexName, editingDoc._id);
+        const newDoc = getAtomValue(docAtom);
+        
         setDocs(prevDocs => 
-          prevDocs.map(d => d._id === editingDoc._id ? result.data : d)
+          prevDocs.map(d => d._id === editingDoc._id ? newDoc : d)
         );
-        setEditingDoc(result.data);
+        setEditingDoc(newDoc);
       } else {
         setUpdateError(result.message);
       }
@@ -210,13 +239,17 @@ const EsDocListAll = () => {
       const updatedDoc = createDictEntry(path, newValue, _key, editingDoc);
       const docToSend = prepareDocForBackend(updatedDoc);
       
-      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend);
+      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
       
       if (result.code === 0) {
+        // Read updated doc from atom
+        const docAtom = getDocAtom(selectedIndexName, editingDoc._id);
+        const newDoc = getAtomValue(docAtom);
+        
         setDocs(prevDocs => 
-          prevDocs.map(d => d._id === editingDoc._id ? result.data : d)
+          prevDocs.map(d => d._id === editingDoc._id ? newDoc : d)
         );
-        setEditingDoc(result.data);
+        setEditingDoc(newDoc);
       } else {
         setUpdateError(result.message);
       }
@@ -232,13 +265,17 @@ const EsDocListAll = () => {
     const updatedDoc = applyValueChange(_action, path, newValue, editingDoc);
     const docToSend = prepareDocForBackend(updatedDoc);
     
-    const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend);
+    const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
+      // Read updated doc from atom
+      const docAtom = getDocAtom(selectedIndexName, editingDoc._id);
+      const newDoc = getAtomValue(docAtom);
+      
       setDocs(prevDocs => 
-        prevDocs.map(d => d._id === editingDoc._id ? result.data : d)
+        prevDocs.map(d => d._id === editingDoc._id ? newDoc : d)
       );
-      setEditingDoc(result.data);
+      setEditingDoc(newDoc);
     } else {
       setUpdateError(result.message);
     }
