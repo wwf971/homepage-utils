@@ -900,7 +900,7 @@ public class ElasticSearchController {
      * Search documents in a character-level index
      */
     @PostMapping("indices/{indexName}/search/")
-    public ApiResponse<java.util.List<java.util.Map<String, Object>>> searchDocuments(
+    public ApiResponse<java.util.Map<String, Object>> searchDocuments(
         @PathVariable String indexName,
         @RequestBody java.util.Map<String, Object> searchParams
     ) {
@@ -908,6 +908,8 @@ public class ElasticSearchController {
             String query = (String) searchParams.get("query");
             Boolean searchInPaths = (Boolean) searchParams.get("search_in_paths");
             Boolean searchInValues = (Boolean) searchParams.get("search_in_values");
+            Integer page = (Integer) searchParams.get("page");
+            Integer pageSize = (Integer) searchParams.get("page_size");
             
             if (query == null || query.trim().isEmpty()) {
                 return ApiResponse.error(-1, "Query parameter is required");
@@ -915,6 +917,9 @@ public class ElasticSearchController {
             
             if (searchInPaths == null) searchInPaths = false;
             if (searchInValues == null) searchInValues = true;
+            if (page == null || page < 1) page = 1;
+            if (pageSize == null || pageSize < 1) pageSize = 20;
+            if (pageSize > 100) pageSize = 100;
             
             ElasticSearchConfig config = configService.getConfigCurrent();
             
@@ -1018,9 +1023,13 @@ public class ElasticSearchController {
             nestedQuery.put("query", java.util.Map.of("bool", boolQuery));
             nestedQuery.put("inner_hits", innerHits);
             
+            int from = (page - 1) * pageSize;
+            
             java.util.Map<String, Object> searchQuery = new java.util.HashMap<>();
             searchQuery.put("query", java.util.Map.of("nested", nestedQuery));
-            searchQuery.put("size", 100);
+            searchQuery.put("from", from);
+            searchQuery.put("size", pageSize);
+            searchQuery.put("track_total_hits", true);
             
             // Execute the search
             String searchUri = baseUri + indexName + "/_search";
@@ -1081,7 +1090,18 @@ public class ElasticSearchController {
             
             @SuppressWarnings("unchecked")
             java.util.Map<String, Object> hits = (java.util.Map<String, Object>) searchResult.get("hits");
+            
+            long totalHits = 0;
             if (hits != null) {
+                Object totalObj = hits.get("total");
+                if (totalObj instanceof java.util.Map) {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Object> totalMap = (java.util.Map<String, Object>) totalObj;
+                    totalHits = ((Number) totalMap.get("value")).longValue();
+                } else if (totalObj instanceof Number) {
+                    totalHits = ((Number) totalObj).longValue();
+                }
+                
                 @SuppressWarnings("unchecked")
                 java.util.List<java.util.Map<String, Object>> hitsList = 
                     (java.util.List<java.util.Map<String, Object>>) hits.get("hits");
@@ -1131,18 +1151,17 @@ public class ElasticSearchController {
                                                 java.util.List<String> pathHighlights = 
                                                     (java.util.List<String>) highlight.get("flat.path");
                                                 if (pathHighlights != null && !pathHighlights.isEmpty()) {
-                                                    String highlighted = pathHighlights.get(0);
-                                                    int startIdx = highlighted.indexOf("[[HIGHLIGHT_START]]");
-                                                    int endIdx = highlighted.indexOf("[[HIGHLIGHT_END]]");
-                                                    
-                                                    if (startIdx >= 0 && endIdx > startIdx) {
-                                                        java.util.Map<String, Object> match = new java.util.HashMap<>();
-                                                        match.put("key", path);
-                                                        match.put("value", value);
-                                                        match.put("match_in", "key");
-                                                        match.put("start_index", startIdx);
-                                                        match.put("end_index", endIdx - "[[HIGHLIGHT_START]]".length());
-                                                        matchedKeys.add(match);
+                                                    for (String highlighted : pathHighlights) {
+                                                        java.util.List<int[]> positions = extractPositionsFromHighlight(highlighted);
+                                                        for (int[] pos : positions) {
+                                                            java.util.Map<String, Object> match = new java.util.HashMap<>();
+                                                            match.put("key", path);
+                                                            match.put("value", value);
+                                                            match.put("match_in", "key");
+                                                            match.put("start_index", pos[0]);
+                                                            match.put("end_index", pos[1]);
+                                                            matchedKeys.add(match);
+                                                        }
                                                     }
                                                 }
                                                 
@@ -1151,18 +1170,17 @@ public class ElasticSearchController {
                                                 java.util.List<String> valueHighlights = 
                                                     (java.util.List<String>) highlight.get("flat.value");
                                                 if (valueHighlights != null && !valueHighlights.isEmpty()) {
-                                                    String highlighted = valueHighlights.get(0);
-                                                    int startIdx = highlighted.indexOf("[[HIGHLIGHT_START]]");
-                                                    int endIdx = highlighted.indexOf("[[HIGHLIGHT_END]]");
-                                                    
-                                                    if (startIdx >= 0 && endIdx > startIdx) {
-                                                        java.util.Map<String, Object> match = new java.util.HashMap<>();
-                                                        match.put("key", path);
-                                                        match.put("value", value);
-                                                        match.put("match_in", "value");
-                                                        match.put("start_index", startIdx);
-                                                        match.put("end_index", endIdx - "[[HIGHLIGHT_START]]".length());
-                                                        matchedKeys.add(match);
+                                                    for (String highlighted : valueHighlights) {
+                                                        java.util.List<int[]> positions = extractPositionsFromHighlight(highlighted);
+                                                        for (int[] pos : positions) {
+                                                            java.util.Map<String, Object> match = new java.util.HashMap<>();
+                                                            match.put("key", path);
+                                                            match.put("value", value);
+                                                            match.put("match_in", "value");
+                                                            match.put("start_index", pos[0]);
+                                                            match.put("end_index", pos[1]);
+                                                            matchedKeys.add(match);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1178,12 +1196,80 @@ public class ElasticSearchController {
                 }
             }
             
-            return ApiResponse.success(structuredResults, "Search completed successfully");
+            // Add pagination metadata
+            java.util.Map<String, Object> responseData = new java.util.HashMap<>();
+            responseData.put("results", structuredResults);
+            responseData.put("total", totalHits);
+            responseData.put("page", page);
+            responseData.put("page_size", pageSize);
+            responseData.put("total_pages", (int) Math.ceil((double) totalHits / pageSize));
+            
+            return ApiResponse.success(responseData, "Search completed successfully");
             
         } catch (Exception e) {
             e.printStackTrace();
             return ApiResponse.error(-1, "Failed to search documents: " + e.getMessage());
         }
+    }
+
+    /**
+     * Extract match positions from ES highlighted text.
+     * Translated from Python implementation in _3b_es_highlight.py
+     * 
+     * @param highlightedText Text with [[HIGHLIGHT_START]] and [[HIGHLIGHT_END]] tags
+     * @return List of [start_index, end_index] arrays
+     */
+    private java.util.List<int[]> extractPositionsFromHighlight(String highlightedText) {
+        java.util.List<int[]> positions = new java.util.ArrayList<>();
+        
+        String startTag = "[[HIGHLIGHT_START]]";
+        String endTag = "[[HIGHLIGHT_END]]";
+        int currentPos = 0;
+        
+        while (true) {
+            // Find next highlight start
+            int startIdx = highlightedText.indexOf(startTag, currentPos);
+            if (startIdx == -1) {
+                break;
+            }
+            
+            // Calculate position in original text (accounting for previous tags)
+            String beforeStart = highlightedText.substring(0, startIdx);
+            int startTagCount = countOccurrences(beforeStart, startTag);
+            int endTagCount = countOccurrences(beforeStart, endTag);
+            int originalPos = startIdx - (startTagCount * startTag.length()) - (endTagCount * endTag.length());
+            
+            // Find corresponding end tag
+            int endIdx = highlightedText.indexOf(endTag, startIdx);
+            if (endIdx == -1) {
+                break;
+            }
+            
+            // Extract the highlighted portion
+            int matchStart = originalPos;
+            String matchText = highlightedText.substring(startIdx + startTag.length(), endIdx);
+            int matchLength = matchText.length();
+            int matchEnd = matchStart + matchLength;
+            
+            positions.add(new int[]{matchStart, matchEnd});
+            
+            currentPos = endIdx + endTag.length();
+        }
+        
+        return positions;
+    }
+
+    /**
+     * Count occurrences of a substring in a string
+     */
+    private int countOccurrences(String str, String substr) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = str.indexOf(substr, idx)) != -1) {
+            count++;
+            idx += substr.length();
+        }
+        return count;
     }
 }
 

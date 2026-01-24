@@ -3,36 +3,52 @@ import { useAtomValue } from 'jotai';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
 import { esSelectedIndexAtom } from '../remote/dataStore';
 import { searchEsDocs } from './EsStore';
+import EsDocSearchResult from './EsDocSearchResult';
 import './elasticsearch.css';
 
 /**
  * EsDocSearch - Component for searching documents using character-level index
  */
 const EsDocSearch = () => {
+  const pageSize = 20;
   const [query, setQuery] = useState('');
   const [searchInKeys, setSearchInKeys] = useState(false);
   const [searchInValues, setSearchInValues] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [mergeMatches, setMergeMatches] = useState(true);
   
   const selectedIndexName = useAtomValue(esSelectedIndexAtom);
 
-  const handleSearch = async () => {
+  const handleSearch = async (page = 1) => {
     if (!selectedIndexName || !query.trim()) return;
 
     setSearching(true);
     setError(null);
-    setResults([]);
+    setHasSearched(true);
+    if (page === 1) {
+      setResults([]);
+      setCurrentPage(1);
+    }
 
     const result = await searchEsDocs(selectedIndexName, {
       query: query.trim(),
       search_in_paths: searchInKeys,
-      search_in_values: searchInValues
+      search_in_values: searchInValues,
+      page: page,
+      page_size: pageSize
     });
     
     if (result.code === 0) {
-      setResults(result.data);
+      setResults(result.data.results || []);
+      setTotalResults(result.data.total || 0);
+      setTotalPages(result.data.total_pages || 0);
+      setCurrentPage(page);
     } else {
       setError(result.message);
     }
@@ -42,22 +58,8 @@ const EsDocSearch = () => {
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !searching) {
-      handleSearch();
+      handleSearch(1);
     }
-  };
-
-  const highlightText = (text, startIndex, endIndex) => {
-    const before = text.substring(0, startIndex);
-    const match = text.substring(startIndex, endIndex);
-    const after = text.substring(endIndex);
-    
-    return (
-      <>
-        {before}
-        <span className="es-search-highlight">{match}</span>
-        {after}
-      </>
-    );
   };
 
   if (!selectedIndexName) {
@@ -82,7 +84,7 @@ const EsDocSearch = () => {
             disabled={searching}
           />
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch(1)}
             disabled={searching || !query.trim()}
             className="es-button-primary"
           >
@@ -116,6 +118,15 @@ const EsDocSearch = () => {
             />
             Search in field values
           </label>
+          <label className="es-checkbox-label">
+            <input
+              type="checkbox"
+              checked={mergeMatches}
+              onChange={(e) => setMergeMatches(e.target.checked)}
+              disabled={searching}
+            />
+            Merge matches for same field
+          </label>
         </div>
       </div>
 
@@ -128,58 +139,66 @@ const EsDocSearch = () => {
 
       {!searching && results.length > 0 && (
         <div style={{ marginTop: '12px' }}>
-          <h4 style={{ marginBottom: '8px' }}>
-            Found {results.length} document{results.length !== 1 ? 's' : ''} with matches
-          </h4>
+          <div className="es-search-results-header">
+            <div style={{ marginBottom: '8px' }}>
+              Found {totalResults} document{totalResults !== 1 ? 's' : ''} with matches
+              {totalPages > 1 && (
+                <span style={{ marginLeft: '8px', color: '#666' }}>
+                  (Page {currentPage} of {totalPages})
+                </span>
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div className="es-pagination">
+                <button
+                  onClick={() => handleSearch(1)}
+                  disabled={currentPage === 1 || searching}
+                  className="es-button-secondary"
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => handleSearch(currentPage - 1)}
+                  disabled={currentPage === 1 || searching}
+                  className="es-button-secondary"
+                >
+                  Previous
+                </button>
+                <span style={{ margin: '0 8px' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handleSearch(currentPage + 1)}
+                  disabled={currentPage === totalPages || searching}
+                  className="es-button-secondary"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => handleSearch(totalPages)}
+                  disabled={currentPage === totalPages || searching}
+                  className="es-button-secondary"
+                >
+                  Last
+                </button>
+              </div>
+            )}
+          </div>
           <div className="es-search-results">
             {results.map((doc, docIdx) => (
-              <div key={doc.id || docIdx} className="es-search-result-card">
-                <div className="es-search-result-header">
-                  <div>
-                    <strong>Document ID:</strong> {doc.id}
-                  </div>
-                  <span className="es-match-count">
-                    {doc.matched_keys.length} match{doc.matched_keys.length !== 1 ? 'es' : ''}
-                  </span>
-                </div>
-                <div className="es-search-matches">
-                  {doc.matched_keys.map((match, matchIdx) => (
-                    <div key={matchIdx} className="es-search-match">
-                      <div className="es-match-location">
-                        Match in <strong>{match.match_in}</strong> at position {match.start_index}-{match.end_index}
-                      </div>
-                      <div className="es-match-field">
-                        <span className="es-field-label">Key:</span>
-                        {match.match_in === 'key' ? (
-                          <code className="es-field-value">
-                            {highlightText(match.key, match.start_index, match.end_index)}
-                          </code>
-                        ) : (
-                          <code className="es-field-value">{match.key}</code>
-                        )}
-                      </div>
-                      <div className="es-match-field">
-                        <span className="es-field-label">Value:</span>
-                        {match.match_in === 'value' ? (
-                          <code className="es-field-value">
-                            {highlightText(match.value, match.start_index, match.end_index)}
-                          </code>
-                        ) : (
-                          <code className="es-field-value">{match.value}</code>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <EsDocSearchResult 
+                key={doc.id || docIdx} 
+                doc={doc} 
+                mergeMatchesForSameKey={mergeMatches}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {!searching && results.length === 0 && query && (
+      {!searching && results.length === 0 && hasSearched && (
         <p style={{ color: '#666', fontStyle: 'italic', marginTop: '12px' }}>
-          No matches found for "{query}"
+          No matches found
         </p>
       )}
     </div>

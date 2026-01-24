@@ -31,7 +31,8 @@ An elasticsearch-based index system for mongodb.
 - `DELETE /mongo-index/db/{dbName}/coll/{collName}/delete` Delete collection and remove from all indices
 
 ### Utility
-- `GET /mongo-index/search/databases?query=text` Search databases
+- `POST /elasticsearch/indices/{indexName}/search/` Character-level search in indexed documents
+  - See [[mongo_index_doc_search.md]] for details.
 - `GET /mongo-index/search/collections?database=db&query=text` Search collections
 - `GET /mongo-index/indices-of-collection?database=db&collection=coll` Get indices for collection
 - `POST /mongo-index/rebuild-collection-mapping` Rebuild collection→indices mapping

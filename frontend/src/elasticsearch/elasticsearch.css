@@ -487,6 +487,17 @@
   cursor: pointer;
 }
 
+.es-search-results-header {
+  margin-bottom: 12px;
+}
+
+.es-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
 .es-search-results {
   display: flex;
   flex-direction: column;

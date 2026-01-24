@@ -225,6 +225,10 @@ public class ElasticSearchService {
         if (updateAtTimeZone != null) {
             doc.put("updateAtTimeZone", updateAtTimeZone);
         }
+        Map<String, Object> source = new HashMap<>();
+        source.put("dbName", database);
+        source.put("collName", collection);
+        doc.put("source", source);
 
         // Build URI with if_seq_no and if_primary_term if we have them
         String indexUri = baseUri + indexName + "/_doc/" + docId;
