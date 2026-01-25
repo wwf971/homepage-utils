@@ -25,11 +25,11 @@ export const EsPanelData = () => {
             </TabsOnTop.Tab>
             
             <TabsOnTop.Tab label="Search">
-              <EsDocSearch />
+              <EsDocSearch indexName={selectedIndexName} />
             </TabsOnTop.Tab>
             
             <TabsOnTop.Tab label="All Docs">
-              <EsDocListAll />
+              <EsDocListAll indexName={selectedIndexName} />
             </TabsOnTop.Tab>
           </TabsOnTop>
         </div>

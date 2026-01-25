@@ -63,6 +63,66 @@ public class ElasticSearchService {
     }
 
     /**
+     * Count documents by source (database and collection)
+     */
+    public long countDocNumBySource(String indexName, String dbName, String collName) throws Exception {
+        String baseUri = getBaseUri();
+        String countUri = baseUri + indexName + "/_count";
+        
+        // Build query to filter by source.dbName and source.collName
+        Map<String, Object> query = new HashMap<>();
+        Map<String, Object> bool = new HashMap<>();
+        List<Map<String, Object>> must = new ArrayList<>();
+        
+        Map<String, Object> dbMatch = new HashMap<>();
+        Map<String, Object> dbTerm = new HashMap<>();
+        dbTerm.put("source.dbName.keyword", dbName);
+        dbMatch.put("term", dbTerm);
+        must.add(dbMatch);
+        
+        Map<String, Object> collMatch = new HashMap<>();
+        Map<String, Object> collTerm = new HashMap<>();
+        collTerm.put("source.collName.keyword", collName);
+        collMatch.put("term", collTerm);
+        must.add(collMatch);
+        
+        bool.put("must", must);
+        query.put("bool", bool);
+        
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", query);
+        
+        HttpURLConnection connection = setupConnection(countUri, "POST");
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "application/json");
+        
+        String jsonBody = objectMapper.writeValueAsString(body);
+        System.out.println("ES Count Query for " + dbName + "." + collName + ": " + jsonBody);
+        
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = jsonBody.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+        
+        int responseCode = connection.getResponseCode();
+        if (responseCode != 200) {
+            String errorResponse = readResponse(connection);
+            throw new Exception("Failed to count documents: HTTP " + responseCode + " - " + errorResponse);
+        }
+        
+        String response = readResponse(connection);
+        System.out.println("ES Count Response: " + response);
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = objectMapper.readValue(response, Map.class);
+        
+        long count = ((Number) result.get("count")).longValue();
+        System.out.println("Found " + count + " documents for " + dbName + "." + collName);
+        
+        return count;
+    }
+
+    /**
      * Read response from connection
      */
     private String readResponse(HttpURLConnection connection) throws Exception {

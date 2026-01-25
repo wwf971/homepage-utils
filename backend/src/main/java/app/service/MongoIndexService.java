@@ -868,14 +868,15 @@ public class MongoIndexService {
         }
 
         // Extract custom id from document (data is at top level now)
+        // Fall back to MongoDB _id if no custom "id" field exists
         Object idObj = doc.get("id");
-        if (idObj == null) {
-            throw new RuntimeException("Document missing id field: MongoDB _id=" + docId);
-        }
-        String customId = idObj.toString();
-
-        if (customId.trim().isEmpty()) {
-            throw new RuntimeException("Document has empty id field: MongoDB _id=" + docId);
+        String customId;
+        if (idObj == null || idObj.toString().trim().isEmpty()) {
+            // Use MongoDB _id as the document id
+            customId = docId.toString();
+            System.out.println("Document " + docId + " has no 'id' field, using MongoDB _id as document id");
+        } else {
+            customId = idObj.toString().trim();
         }
 
         // Get IndexQueue entry for metadata
@@ -1177,6 +1178,104 @@ public class MongoIndexService {
     }
 
     /**
+     * Rebuild index for a specific collection only (does not clear other collections from ES)
+     * 
+     * @param indexName The mongo-index name
+     * @param dbName Database name
+     * @param collName Collection name
+     * @param maxDocs Maximum number of documents to index (null for all)
+     * @return Result map with statistics
+     */
+    public Map<String, Object> rebuildIndexForMongoCollection(String indexName, String dbName, String collName, Integer maxDocs) {
+        Map<String, Object> indexMeta = getIndex(indexName);
+        if (indexMeta == null) {
+            return createErrorResult("Index not found: " + indexName);
+        }
+
+        String esIndexName = (String) indexMeta.get("esIndex");
+        
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
+
+        // Verify collection is part of this index
+        boolean found = false;
+        for (Map<String, String> collInfo : collections) {
+            if (dbName.equals(collInfo.get("database")) && collName.equals(collInfo.get("collection"))) {
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found) {
+            return createErrorResult("Collection " + dbName + "." + collName + " is not part of index: " + indexName);
+        }
+
+        int indexedDocs = 0;
+        List<String> errors = new ArrayList<>();
+
+        try {
+            MongoClient client = mongoService.getMongoClient();
+            MongoDatabase database = client.getDatabase(dbName);
+            MongoCollection<Document> collection = database.getCollection(collName);
+
+            // Count total docs
+            long totalDocs = collection.countDocuments();
+            
+            // Index each document (with limit if specified)
+            FindIterable<Document> cursor = maxDocs != null 
+                ? collection.find().limit(maxDocs)
+                : collection.find();
+                
+            for (Document doc : cursor) {
+                try {
+                    Object mongoIdObj = doc.get("_id");
+                    if (mongoIdObj != null) {
+                        String docId = mongoIdObj.toString();
+                        
+                        // Get or create IndexQueue entry for this document
+                        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, docId, mongoIdObj);
+                        if (queueEntry == null) {
+                            System.err.println("Failed to get/create IndexQueue entry for doc: " + docId);
+                            continue;
+                        }
+                        
+                        Long updateAt = queueEntry.getLong("updateAt");
+                        if (updateAt == null) {
+                            updateAt = TimeUtils.getCurrentTimestamp();
+                        }
+                        
+                        createIndexForDoc(indexName, dbName, collName, mongoIdObj, updateAt);
+                        indexedDocs++;
+                    }
+                } catch (Exception e) {
+                    String errorMsg = "Failed to index doc " + doc.get("_id") + ": " + e.getMessage();
+                    errors.add(errorMsg);
+                    System.err.println(errorMsg);
+                    e.printStackTrace();
+                }
+                
+                if (maxDocs != null && indexedDocs >= maxDocs) {
+                    break;
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("message", maxDocs != null 
+                ? "Collection rebuild completed (limited to " + maxDocs + " docs)" 
+                : "Collection rebuild completed");
+            Map<String, Object> data = new HashMap<>();
+            data.put("totalDocs", totalDocs);
+            data.put("indexedDocs", indexedDocs);
+            data.put("errors", errors);
+            result.put("data", data);
+            return result;
+        } catch (Exception e) {
+            return createErrorResult("Failed to rebuild collection: " + e.getMessage());
+        }
+    }
+
+    /**
      * Rebuild index for documents with status=-1 in IndexQueue (needs indexing)
      * Much faster than full rebuild as it only processes changed documents
      * 
@@ -1297,10 +1396,19 @@ public class MongoIndexService {
             long count = collection.countDocuments();
             totalDocs += count;
 
+            // Count indexed documents in ES for this collection
+            long indexedCount = 0;
+            try {
+                indexedCount = elasticSearchService.countDocNumBySource(esIndexName, dbName, collName);
+            } catch (Exception e) {
+                System.err.println("Failed to count indexed docs for " + dbName + "." + collName + ": " + e.getMessage());
+            }
+
             Map<String, Object> stat = new HashMap<>();
             stat.put("database", dbName);
             stat.put("collection", collName);
             stat.put("docCount", count);
+            stat.put("indexedDocCount", indexedCount);
             collectionStats.add(stat);
         }
 

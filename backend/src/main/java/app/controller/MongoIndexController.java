@@ -384,6 +384,33 @@ public class MongoIndexController {
     }
 
     /**
+     * Rebuild index for a specific collection only
+     * Optional query param: maxDocs (e.g., ?maxDocs=10 to rebuild only 10 docs)
+     */
+    @PostMapping("/{indexName}/rebuild-collection/{dbName}/{collName}")
+    public ApiResponse<Map<String, Object>> rebuildIndexForMongoCollection(
+            @PathVariable String indexName,
+            @PathVariable String dbName,
+            @PathVariable String collName,
+            @RequestParam(required = false) Integer maxDocs) {
+        try {
+            Map<String, Object> result = mongoIndexService.rebuildIndexForMongoCollection(indexName, dbName, collName, maxDocs);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, (String) result.get("message"));
+        } catch (Exception e) {
+            System.err.println("Failed to rebuild collection: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to rebuild collection: " + e.getMessage());
+        }
+    }
+
+    /**
      * Get statistics for an index
      */
     @GetMapping("/{indexName}/stats")

@@ -65,7 +65,7 @@ export async function fetchFileAccessPoints() {
     
     // Fetch each document by ID
     const fetchPromises = ids.map(id => 
-      fetch(`${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/doc/?id=${id}`)
+      fetch(`${backendUrl}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/doc/query?id=${encodeURIComponent(id)}`)
         .then(res => res.json())
         .then(result => result.code === 0 ? result.data : null)
     );

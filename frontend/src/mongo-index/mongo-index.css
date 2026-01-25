@@ -438,6 +438,27 @@
   margin-bottom: 8px;
 }
 
+.mongo-index-dashboard-rebuild-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.mongo-index-dashboard-close-button {
+  padding: 0px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: #666;
+}
+
+.mongo-index-dashboard-close-button:hover {
+  color: #333;
+}
+
 .mongo-index-dashboard-rebuild-errors {
   color: #d32f2f;
   margin-top: 4px;
@@ -501,7 +522,53 @@
 .mongo-index-dashboard-collections-title {
   font-weight: 600;
   color: #666;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.mongo-index-dashboard-collections-table {
+  width: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: auto;
+}
+
+.mongo-index-dashboard-collections-table th {
+  text-align: left;
+  padding: 4px 6px;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+
+.mongo-index-dashboard-collections-table td {
+  padding: 4px 6px;
+  border: 1px solid #e0e0e0;
+  background-color: white;
+  white-space: nowrap;
+}
+
+.mongo-index-dashboard-collections-table tbody tr {
+  cursor: context-menu;
+}
+
+.mongo-index-dashboard-collections-table tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.mongo-index-dashboard-collections-table tbody tr.rebuilding {
+  background-color: #fff3cd;
+}
+
+.mongo-index-dashboard-collections-table .collection-name {
+  display: flex;
+  align-items: center;
+}
+
+.mongo-index-dashboard-collections-table .collection-count {
+  text-align: right;
 }
 
 .mongo-index-dashboard-collections-list {

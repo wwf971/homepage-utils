@@ -257,3 +257,113 @@ export async function deleteCollectionWithIndex(dbName, collName) {
     return { code: -2, message: error.message || 'Network error' };
   }
 }
+
+// ========== Index Stats Cache ==========
+const STATS_CACHE_TTL = 30000; // 30 seconds
+
+/**
+ * Map of indexName -> atom for stats
+ * Each atom stores: { data, timestamp }
+ */
+export const mongoIndexStatsAtoms = new Map();
+
+/**
+ * Get or create stats atom for a specific index
+ */
+export function getIndexStatsAtom(indexName) {
+  if (!mongoIndexStatsAtoms.has(indexName)) {
+    mongoIndexStatsAtoms.set(indexName, atom(null));
+  }
+  return mongoIndexStatsAtoms.get(indexName);
+}
+
+/**
+ * Check if cached data is still valid
+ */
+function isCacheValid(timestamp, ttl) {
+  if (!timestamp) return false;
+  return Date.now() - timestamp < ttl;
+}
+
+/**
+ * Fetch index stats with cache
+ * 
+ * @param {string} indexName - Index name
+ * @param {boolean} forceRefresh - If true, bypass cache
+ * @param {Function} getAtomValue - Jotai getter function
+ * @param {Function} setAtomValue - Jotai setter function
+ * @returns {Promise<{code: number, data?: any, message?: string}>}
+ */
+export async function fetchIndexStats(indexName, forceRefresh = false, getAtomValue = null, setAtomValue = null) {
+  // Check cache first
+  if (!forceRefresh && getAtomValue && setAtomValue) {
+    const statsAtom = getIndexStatsAtom(indexName);
+    const cached = getAtomValue(statsAtom);
+    
+    if (cached && isCacheValid(cached.timestamp, STATS_CACHE_TTL)) {
+      return { code: 0, data: cached.data };
+    }
+  }
+
+  // Fetch from server
+  try {
+    const backendUrl = getBackendServerUrl();
+    const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(indexName)}/stats`);
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      // Update cache
+      if (setAtomValue) {
+        const statsAtom = getIndexStatsAtom(indexName);
+        setAtomValue(statsAtom, {
+          data: result.data,
+          timestamp: Date.now()
+        });
+      }
+      
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch stats' };
+  } catch (error) {
+    console.error('Failed to fetch index stats:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
+ * Rebuild index for a specific collection
+ * 
+ * @param {string} indexName - Index name
+ * @param {string} dbName - Database name
+ * @param {string} collName - Collection name
+ * @param {Integer} maxDocs - Maximum number of documents to rebuild (null for all)
+ * @param {Function} setAtomValue - Jotai setter function (optional)
+ * @returns {Promise<{code: number, data?: any, message?: string}>}
+ */
+export async function rebuildIndexForMongoCollection(indexName, dbName, collName, maxDocs = null, setAtomValue = null) {
+  try {
+    const backendUrl = getBackendServerUrl();
+    const url = maxDocs 
+      ? `${backendUrl}/mongo-index/${encodeURIComponent(indexName)}/rebuild-collection/${encodeURIComponent(dbName)}/${encodeURIComponent(collName)}?maxDocs=${maxDocs}`
+      : `${backendUrl}/mongo-index/${encodeURIComponent(indexName)}/rebuild-collection/${encodeURIComponent(dbName)}/${encodeURIComponent(collName)}`;
+    
+    const response = await fetch(url, {
+      method: 'POST'
+    });
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      // Invalidate stats cache
+      if (setAtomValue) {
+        const statsAtom = getIndexStatsAtom(indexName);
+        setAtomValue(statsAtom, null);
+      }
+      
+      return { code: 0, data: result.data, message: result.message || 'Collection rebuilt successfully' };
+    }
+    return { code: -1, message: result.message || 'Failed to rebuild collection' };
+  } catch (error) {
+    console.error('Failed to rebuild collection:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}

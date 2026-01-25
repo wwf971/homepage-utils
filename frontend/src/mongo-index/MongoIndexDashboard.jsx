@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { SpinningCircle, RefreshIcon, KeyValuesComp } from '@wwf971/react-comp-misc';
-import { getBackendServerUrl } from '../remote/dataStore';
+import { useStore } from 'jotai';
+import { SpinningCircle, RefreshIcon, KeyValues, Menu } from '@wwf971/react-comp-misc';
+import { fetchIndexStats, rebuildIndexForMongoCollection } from './mongoIndexStore';
 import './mongo-index.css';
 
 /**
@@ -8,31 +9,29 @@ import './mongo-index.css';
  * This is a child component of MongoIndexCard
  */
 const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
+  const store = useStore();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildResult, setRebuildResult] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [isRebuildingCollection, setIsRebuildingCollection] = useState(null);
+  const [collectionRebuildResult, setCollectionRebuildResult] = useState(null);
 
-  const fetchStats = async () => {
+  const fetchStatsData = async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
 
-    try {
-      const backendUrl = getBackendServerUrl();
-      const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/stats`);
-      const result = await response.json();
-
-      if (result.code === 0) {
-        setStats(result.data);
-      } else {
-        setError(result.message || 'Failed to fetch stats');
-      }
-    } catch (err) {
-      setError(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
+    const result = await fetchIndexStats(index.name, forceRefresh, store.get, store.set);
+    
+    if (result.code === 0) {
+      setStats(result.data);
+    } else {
+      setError(result.message || 'Failed to fetch stats');
     }
+    
+    setLoading(false);
   };
 
   const handleRebuild = async (maxDocs = null) => {
@@ -44,6 +43,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
     setError(null);
 
     try {
+      const { getBackendServerUrl } = await import('../remote/dataStore');
       const backendUrl = getBackendServerUrl();
       const url = maxDocs 
         ? `${backendUrl}/mongo-index/${encodeURIComponent(index.name)}/rebuild?maxDocs=${maxDocs}`
@@ -56,7 +56,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
       if (result.code === 0) {
         setRebuildResult(result.data);
-        setTimeout(() => fetchStats(), 500);
+        setTimeout(() => fetchStatsData(true), 500);
       } else {
         setError(result.message || 'Failed to rebuild index');
       }
@@ -71,15 +71,53 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
   };
 
   useEffect(() => {
-    fetchStats();
+    fetchStatsData();
   }, [index.name]);
+
+  const handleContextMenu = (e, collection) => {
+    e.preventDefault();
+    setContextMenu({
+      position: { x: e.clientX, y: e.clientY },
+      collection
+    });
+  };
+
+  const handleMenuClose = () => {
+    setContextMenu(null);
+  };
+
+  const handleMenuItemClick = async (item) => {
+    if (item.name === 'Rebuild') {
+      const { database, collection } = contextMenu.collection;
+      const collKey = `${database}/${collection}`;
+      setIsRebuildingCollection(collKey);
+      setCollectionRebuildResult(null);
+      
+      const result = await rebuildIndexForMongoCollection(index.name, database, collection, null, store.set);
+      
+      setIsRebuildingCollection(null);
+      
+      if (result.code === 0) {
+        // Show rebuild result
+        setCollectionRebuildResult({
+          collKey,
+          ...result.data
+        });
+        // Refresh stats to show updated counts
+        await fetchStatsData(true);
+      } else {
+        setError(result.message || 'Failed to rebuild collection');
+      }
+    }
+    handleMenuClose();
+  };
 
   return (
     <div className="mongo-index-dashboard">
       <div className="mongo-index-dashboard-header">
         <h5 className="mongo-index-dashboard-title">Index Statistics</h5>
         <button
-          onClick={fetchStats}
+          onClick={() => fetchStatsData(true)}
           disabled={loading || rebuilding}
           className="mongo-index-dashboard-button"
           title="Refresh stats"
@@ -110,7 +148,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
       {rebuildResult && (
         <div className="mongo-index-dashboard-rebuild-result">
-          <div><strong>Rebuild completed:</strong></div>
+          <div><strong>Full Index Rebuild completed:</strong></div>
           <div>Total docs: {rebuildResult.totalDocs}</div>
           <div>Indexed docs: {rebuildResult.indexedDocs}</div>
           {rebuildResult.errors && rebuildResult.errors.length > 0 && (
@@ -137,7 +175,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
       {stats && (
         <div className="mongo-index-dashboard-stats">
-          <KeyValuesComp
+          <KeyValues
             data={[
               { key: 'ES Index Name', value: stats.esIndexName },
               { key: 'MongoDB Doc Num', value: stats.totalMongoDocsCount },
@@ -149,22 +187,84 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
           {stats.collections && stats.collections.length > 0 && (
             <div className="mongo-index-dashboard-collections">
-              <div className="mongo-index-dashboard-collections-title">Collections:</div>
-              <div className="mongo-index-dashboard-collections-list">
-                {stats.collections.map((coll, idx) => (
-                  <div key={idx} className="mongo-index-dashboard-collection-item">
-                    <span className="mongo-index-dashboard-collection-name">
-                      {coll.database}.{coll.collection}
-                    </span>
-                    <span className="mongo-index-dashboard-collection-count">
-                      {coll.docCount} docs
-                    </span>
+              <div className="mongo-index-dashboard-collections-title">Collections</div>
+              <table className="mongo-index-dashboard-collections-table">
+                <thead>
+                  <tr>
+                    <th>Collection</th>
+                    <th>Doc Num</th>
+                    <th>Indexed Doc Num</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.collections.map((coll, idx) => {
+                    const collKey = `${coll.database}/${coll.collection}`;
+                    const isRebuilding = isRebuildingCollection === collKey;
+                    
+                    return (
+                      <tr
+                        key={idx}
+                        onContextMenu={(e) => handleContextMenu(e, coll)}
+                        className={isRebuilding ? 'rebuilding' : ''}
+                      >
+                        <td className="collection-name">
+                          {coll.database}/{coll.collection}
+                          {isRebuilding && <SpinningCircle width={12} height={12} style={{ marginLeft: '4px' }} />}
+                        </td>
+                        <td className="collection-count">{coll.docCount}</td>
+                        <td className="collection-count">{coll.indexedDocCount || 0}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {collectionRebuildResult && (
+                <div className="mongo-index-dashboard-rebuild-result">
+                  <div className="mongo-index-dashboard-rebuild-result-header">
+                    <strong>Collection Rebuild: {collectionRebuildResult.collKey}</strong>
+                    <button 
+                      onClick={() => setCollectionRebuildResult(null)}
+                      className="mongo-index-dashboard-close-button"
+                    >
+                      ×
+                    </button>
                   </div>
-                ))}
-              </div>
+                  <div>Total docs: {collectionRebuildResult.totalDocs}</div>
+                  <div>Indexed docs: {collectionRebuildResult.indexedDocs}</div>
+                  {collectionRebuildResult.errors && collectionRebuildResult.errors.length > 0 && (
+                    <div className="mongo-index-dashboard-rebuild-errors">
+                      <div><strong>Errors: {collectionRebuildResult.errors.length}</strong></div>
+                      <div className="mongo-index-dashboard-rebuild-errors-list">
+                        {collectionRebuildResult.errors.slice(0, 10).map((err, idx) => (
+                          <div key={idx} className="mongo-index-dashboard-rebuild-error-item">
+                            {err}
+                          </div>
+                        ))}
+                        {collectionRebuildResult.errors.length > 10 && (
+                          <div className="mongo-index-dashboard-rebuild-error-item">
+                            ... and {collectionRebuildResult.errors.length - 10} more errors
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
+      )}
+
+      {contextMenu && (
+        <Menu
+          items={[
+            { type: 'item', name: 'Rebuild' }
+          ]}
+          position={contextMenu.position}
+          onClose={handleMenuClose}
+          onItemClick={handleMenuItemClick}
+        />
       )}
     </div>
   );

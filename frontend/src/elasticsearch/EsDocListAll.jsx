@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAtomValue, useStore } from 'jotai';
+import { useStore } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon, DeleteIcon, JsonComp } from '@wwf971/react-comp-misc';
-import { esSelectedIndexAtom } from '../remote/dataStore';
 import { 
   fetchEsDocs,
   deleteEsDoc,
@@ -23,8 +22,9 @@ import './elasticsearch.css';
 
 /**
  * DocListAll - Component for listing documents in a selected Elasticsearch index with pagination
+ * @param {string} indexName - ES index name to list documents from (required)
  */
-const EsDocListAll = () => {
+const EsDocListAll = ({ indexName }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [docs, setDocs] = useState([]);
@@ -37,14 +37,13 @@ const EsDocListAll = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   
-  const selectedIndexName = useAtomValue(esSelectedIndexAtom);
   const store = useStore();
   
   const getAtomValue = (atom) => store.get(atom);
   const setAtomValue = (atom, value) => store.set(atom, value);
 
   useEffect(() => {
-    if (selectedIndexName) {
+    if (indexName) {
       setDocs([]);
       setPage(1);
       loadDocuments(1);
@@ -54,19 +53,19 @@ const EsDocListAll = () => {
       setPage(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIndexName]);
+  }, [indexName]);
 
   const loadDocuments = async (targetPage) => {
-    if (!selectedIndexName) return;
+    if (!indexName) return;
 
     setLoading(true);
     setError(null);
 
-    const result = await fetchEsDocs(selectedIndexName, targetPage, pageSize, false, getAtomValue, setAtomValue);
+    const result = await fetchEsDocs(indexName, targetPage, pageSize, false, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
       // Read from atoms
-      const docListAtom = getDocListAtom(selectedIndexName);
+      const docListAtom = getDocListAtom(indexName);
       const docListData = getAtomValue(docListAtom);
       
       if (docListData) {
@@ -74,7 +73,7 @@ const EsDocListAll = () => {
         
         // Get actual documents from individual doc atoms
         const loadedDocs = docIds.map(docId => {
-          const docAtom = getDocAtom(selectedIndexName, docId);
+          const docAtom = getDocAtom(indexName, docId);
           return getAtomValue(docAtom);
         }).filter(doc => doc !== null && doc !== undefined);
         
@@ -100,7 +99,7 @@ const EsDocListAll = () => {
   };
 
   const handleRefresh = () => {
-    if (selectedIndexName) {
+    if (indexName) {
       setDocs([]);
       loadDocuments(page);
     }
@@ -122,11 +121,11 @@ const EsDocListAll = () => {
     const { docId } = deleteConfirm;
     setDeleteConfirm({ show: false, docId: null });
     
-    if (!selectedIndexName || !docId) return;
+    if (!indexName || !docId) return;
 
     setError(null);
 
-    const result = await deleteEsDoc(selectedIndexName, docId, getAtomValue, setAtomValue);
+    const result = await deleteEsDoc(indexName, docId, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
       // Remove the document from the current docs array
@@ -211,11 +210,11 @@ const EsDocListAll = () => {
       const updatedDoc = createArrayItem(path, newValue, editingDoc);
       const docToSend = prepareDocForBackend(updatedDoc);
       
-      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
+      const result = await updateEsDoc(indexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
       
       if (result.code === 0) {
         // Read updated doc from atom
-        const docAtom = getDocAtom(selectedIndexName, editingDoc._id);
+        const docAtom = getDocAtom(indexName, editingDoc._id);
         const newDoc = getAtomValue(docAtom);
         
         setDocs(prevDocs => 
@@ -239,11 +238,11 @@ const EsDocListAll = () => {
       const updatedDoc = createDictEntry(path, newValue, _key, editingDoc);
       const docToSend = prepareDocForBackend(updatedDoc);
       
-      const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
+      const result = await updateEsDoc(indexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
       
       if (result.code === 0) {
         // Read updated doc from atom
-        const docAtom = getDocAtom(selectedIndexName, editingDoc._id);
+        const docAtom = getDocAtom(indexName, editingDoc._id);
         const newDoc = getAtomValue(docAtom);
         
         setDocs(prevDocs => 
@@ -265,11 +264,11 @@ const EsDocListAll = () => {
     const updatedDoc = applyValueChange(_action, path, newValue, editingDoc);
     const docToSend = prepareDocForBackend(updatedDoc);
     
-    const result = await updateEsDoc(selectedIndexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
+    const result = await updateEsDoc(indexName, editingDoc._id, docToSend, getAtomValue, setAtomValue);
     
     if (result.code === 0) {
       // Read updated doc from atom
-      const docAtom = getDocAtom(selectedIndexName, editingDoc._id);
+      const docAtom = getDocAtom(indexName, editingDoc._id);
       const newDoc = getAtomValue(docAtom);
       
       setDocs(prevDocs => 
@@ -284,7 +283,7 @@ const EsDocListAll = () => {
     return result;
   };
 
-  if (!selectedIndexName) {
+  if (!indexName) {
     return null;
   }
 
@@ -293,7 +292,7 @@ const EsDocListAll = () => {
   return (
     <div className="es-docs-section">
       <div className="es-section-header">
-        <div className="section-title">Documents in "{selectedIndexName}"</div>
+        <div className="section-title">Documents in "{indexName}"</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
             className="es-refresh-button"
@@ -404,7 +403,7 @@ const EsDocListAll = () => {
 
       {shouldShowCreatePanel && (
         <CreateDoc
-          indexName={selectedIndexName}
+          indexName={indexName}
           onClose={() => setShouldShowCreatePanel(false)}
           onSuccess={handleCreateSuccess}
         />

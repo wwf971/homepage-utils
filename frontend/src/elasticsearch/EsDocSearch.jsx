@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { useAtomValue } from 'jotai';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
-import { esSelectedIndexAtom } from '../remote/dataStore';
 import { searchEsDocs } from './EsStore';
 import EsDocSearchResult from './EsDocSearchResult';
 import './elasticsearch.css';
 
 /**
  * EsDocSearch - Component for searching documents using character-level index
+ * @param {string} indexName - ES index name to search (required)
  */
-const EsDocSearch = () => {
+const EsDocSearch = ({ indexName }) => {
   const pageSize = 20;
   const [query, setQuery] = useState('');
   const [searchInKeys, setSearchInKeys] = useState(false);
@@ -22,11 +21,9 @@ const EsDocSearch = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
   const [mergeMatches, setMergeMatches] = useState(true);
-  
-  const selectedIndexName = useAtomValue(esSelectedIndexAtom);
 
   const handleSearch = async (page = 1) => {
-    if (!selectedIndexName || !query.trim()) return;
+    if (!indexName || !query.trim()) return;
 
     setSearching(true);
     setError(null);
@@ -36,7 +33,7 @@ const EsDocSearch = () => {
       setCurrentPage(1);
     }
 
-    const result = await searchEsDocs(selectedIndexName, {
+    const result = await searchEsDocs(indexName, {
       query: query.trim(),
       search_in_paths: searchInKeys,
       search_in_values: searchInValues,
@@ -62,15 +59,12 @@ const EsDocSearch = () => {
     }
   };
 
-  if (!selectedIndexName) {
+  if (!indexName) {
     return null;
   }
 
   return (
     <div className="es-search-section">
-      <div className="es-section-header">
-        <div className="section-title">Search Documents in "{selectedIndexName}"</div>
-      </div>
 
       <div style={{ marginBottom: '12px' }}>
         <div className="es-search-input-row">
