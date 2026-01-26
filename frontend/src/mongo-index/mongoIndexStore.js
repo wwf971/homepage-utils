@@ -331,6 +331,27 @@ export async function fetchIndexStats(indexName, forceRefresh = false, getAtomVa
 }
 
 /**
+ * Fetch stats for a single collection (no caching - always fresh)
+ */
+export async function fetchCollectionStats(indexName, dbName, collName) {
+  try {
+    const backendUrl = getBackendServerUrl();
+    const response = await fetch(
+      `${backendUrl}/mongo-index/${encodeURIComponent(indexName)}/stats/${encodeURIComponent(dbName)}/${encodeURIComponent(collName)}`
+    );
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      return { code: 0, data: result.data };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch collection stats' };
+  } catch (error) {
+    console.error('Failed to fetch collection stats:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+/**
  * Rebuild index for a specific collection
  * 
  * @param {string} indexName - Index name
@@ -340,7 +361,7 @@ export async function fetchIndexStats(indexName, forceRefresh = false, getAtomVa
  * @param {Function} setAtomValue - Jotai setter function (optional)
  * @returns {Promise<{code: number, data?: any, message?: string}>}
  */
-export async function rebuildIndexForMongoCollection(indexName, dbName, collName, maxDocs = null, setAtomValue = null) {
+export async function rebuildIndexForMongoCollection(indexName, dbName, collName, maxDocs = null) {
   try {
     const backendUrl = getBackendServerUrl();
     const url = maxDocs 
@@ -353,17 +374,11 @@ export async function rebuildIndexForMongoCollection(indexName, dbName, collName
     const result = await response.json();
     
     if (result.code === 0) {
-      // Invalidate stats cache
-      if (setAtomValue) {
-        const statsAtom = getIndexStatsAtom(indexName);
-        setAtomValue(statsAtom, null);
-      }
-      
-      return { code: 0, data: result.data, message: result.message || 'Collection rebuilt successfully' };
+      return { code: 0, data: result.data, message: result.message || 'Rebuild task started' };
     }
-    return { code: -1, message: result.message || 'Failed to rebuild collection' };
+    return { code: -1, message: result.message || 'Failed to start rebuild task' };
   } catch (error) {
-    console.error('Failed to rebuild collection:', error);
+    console.error('Failed to start rebuild task:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }

@@ -6,6 +6,7 @@ import app.service.ElasticSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -394,19 +395,16 @@ public class MongoIndexController {
             @PathVariable String collName,
             @RequestParam(required = false) Integer maxDocs) {
         try {
-            Map<String, Object> result = mongoIndexService.rebuildIndexForMongoCollection(indexName, dbName, collName, maxDocs);
+            // Start async rebuild and return task ID immediately
+            String taskId = mongoIndexService.rebuildIndexForMongoCollectionAsync(indexName, dbName, collName, maxDocs);
             
-            if ((Integer) result.get("code") != 0) {
-                return new ApiResponse<>(-1, null, (String) result.get("message"));
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> data = (Map<String, Object>) result.get("data");
-            return new ApiResponse<>(0, data, (String) result.get("message"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("taskId", taskId);
+            return new ApiResponse<>(0, data, "Rebuild task started");
         } catch (Exception e) {
-            System.err.println("Failed to rebuild collection: " + e.getMessage());
+            System.err.println("Failed to start rebuild task: " + e.getMessage());
             e.printStackTrace();
-            return new ApiResponse<>(-1, null, "Failed to rebuild collection: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to start rebuild task: " + e.getMessage());
         }
     }
 
@@ -428,6 +426,28 @@ public class MongoIndexController {
         } catch (Exception e) {
             System.err.println("Failed to get stats: " + e.getMessage());
             return new ApiResponse<>(-1, null, "Failed to get stats: " + e.getMessage());
+        }
+    }
+    
+    @GetMapping("/{indexName}/stats/{dbName}/{collName}")
+    public ApiResponse<Map<String, Object>> getCollectionStats(
+        @PathVariable String indexName,
+        @PathVariable String dbName,
+        @PathVariable String collName
+    ) {
+        try {
+            Map<String, Object> result = mongoIndexService.getCollectionStats(indexName, dbName, collName);
+            
+            if ((Integer) result.get("code") != 0) {
+                return new ApiResponse<>(-1, null, (String) result.get("message"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return new ApiResponse<>(0, data, "Collection stats retrieved successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to get collection stats: " + e.getMessage());
+            return new ApiResponse<>(-1, null, "Failed to get collection stats: " + e.getMessage());
         }
     }
 

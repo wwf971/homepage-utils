@@ -1,14 +1,27 @@
-import React, { useState, useRef } from 'react';
-import { useAtomValue } from 'jotai';
+import React, { useState, useRef, useEffect } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
-import { jdbcComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
+import { jdbcComputedConfigAtom, getBackendServerUrl, fetchJdbcComputedConfig } from '../remote/dataStore';
 import '../styles/common.css';
 
 const JdbcConnectionTest = () => {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
   const config = useAtomValue(jdbcComputedConfigAtom);
+  const setComputedConfig = useSetAtom(jdbcComputedConfigAtom);
   const abortControllerRef = useRef(null);
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      const result = await fetchJdbcComputedConfig();
+      if (result.code === 0) {
+        setComputedConfig(result.data);
+      }
+    };
+    if (config.length === 0) {
+      loadConfig();
+    }
+  }, []);
 
   const handleTest = async () => {
     setTesting(true);

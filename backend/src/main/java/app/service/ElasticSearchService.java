@@ -228,53 +228,56 @@ public class ElasticSearchService {
      */
     public void indexDoc(String indexName, String docId, String database, String collection,
                              List<Map<String, String>> flattenedPairs, long updateVersion, 
-                             long updateAt, Integer updateAtTimeZone) throws Exception {
+                             long updateAt, Integer updateAtTimeZone, boolean forceReindex) throws Exception {
         String baseUri = getBaseUri();
         
         // First, try to get existing document to check version and get seq_no/primary_term
         Long seqNo = null;
         Long primaryTerm = null;
         
-        try {
-            String getUri = baseUri + indexName + "/_doc/" + docId;
-            HttpURLConnection getConn = setupConnection(getUri, "GET");
-            int getResponseCode = getConn.getResponseCode();
-            
-            if (getResponseCode == 200) {
-                // Document exists, check its version
-                String response = readResponse(getConn);
-                @SuppressWarnings("unchecked")
-                Map<String, Object> result = objectMapper.readValue(response, Map.class);
+        if (!forceReindex) {
+            // Only do version checking if not forcing reindex
+            try {
+                String getUri = baseUri + indexName + "/_doc/" + docId;
+                HttpURLConnection getConn = setupConnection(getUri, "GET");
+                int getResponseCode = getConn.getResponseCode();
                 
-                // Get seq_no and primary_term for optimistic concurrency control
-                seqNo = ((Number) result.get("_seq_no")).longValue();
-                primaryTerm = ((Number) result.get("_primary_term")).longValue();
-                
-                // Get the existing updateVersion
-                @SuppressWarnings("unchecked")
-                Map<String, Object> source = (Map<String, Object>) result.get("_source");
-                if (source != null && source.containsKey("updateVersion")) {
-                    Long existingVersion = ((Number) source.get("updateVersion")).longValue();
+                if (getResponseCode == 200) {
+                    // Document exists, check its version
+                    String response = readResponse(getConn);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> result = objectMapper.readValue(response, Map.class);
                     
-                    // Only update if our version is greater than or equal to existing
-                    if (updateVersion < existingVersion) {
-                        System.err.println("WARNING: Aborting ES index update for doc " + docId + 
-                            ". Existing ES version " + existingVersion + " is higher than attempted version " + updateVersion + 
-                            ". This prevents overwriting newer data with older data.");
-                        return;
-                    }
+                    // Get seq_no and primary_term for optimistic concurrency control
+                    seqNo = ((Number) result.get("_seq_no")).longValue();
+                    primaryTerm = ((Number) result.get("_primary_term")).longValue();
                     
-                    if (updateVersion == existingVersion) {
-                        System.out.println("Info: Skipping ES index update for doc " + docId + 
-                            ". Version " + updateVersion + " is already indexed (no change needed).");
-                        return;
+                    // Get the existing updateVersion
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> source = (Map<String, Object>) result.get("_source");
+                    if (source != null && source.containsKey("updateVersion")) {
+                        Long existingVersion = ((Number) source.get("updateVersion")).longValue();
+                        
+                        // Only update if our version is greater than or equal to existing
+                        if (updateVersion < existingVersion) {
+                            System.err.println("WARNING: Aborting ES index update for doc " + docId + 
+                                ". Existing ES version " + existingVersion + " is higher than attempted version " + updateVersion + 
+                                ". This prevents overwriting newer data with older data.");
+                            return;
+                        }
+                        
+                        if (updateVersion == existingVersion) {
+                            System.out.println("Info: Skipping ES index update for doc " + docId + 
+                                ". Version " + updateVersion + " is already indexed (no change needed).");
+                            return;
+                        }
                     }
                 }
+                // If 404, document doesn't exist - proceed with creation
+            } catch (Exception e) {
+                // If we can't read, proceed anyway (might be first creation)
+                System.err.println("Warning: Could not read existing document for version check: " + e.getMessage());
             }
-            // If 404, document doesn't exist - proceed with creation
-        } catch (Exception e) {
-            // If we can't read, proceed anyway (might be first creation)
-            System.err.println("Warning: Could not read existing document for version check: " + e.getMessage());
         }
         
         // Create document with nested flat field and metadata

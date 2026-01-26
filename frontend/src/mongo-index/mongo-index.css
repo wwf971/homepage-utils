@@ -571,6 +571,28 @@
   text-align: right;
 }
 
+.mongo-index-dashboard-refresh-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  vertical-align: middle;
+}
+
+.mongo-index-dashboard-refresh-btn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.mongo-index-dashboard-refresh-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
 .mongo-index-dashboard-collections-list {
   display: flex;
   flex-direction: column;

@@ -33,9 +33,11 @@ public class JdbcConnectionService {
         System.out.println("Old config: " + event.getOldConfig());
         System.out.println("New config: " + event.getNewConfig());
         
+        // Only close existing connection, don't automatically restart
+        // User must manually start connection or test it
         closeDataSource();
         this.configCurrent = event.getNewConfig();
-        initializeDataSource(event.getNewConfig());
+        System.out.println("Connection closed due to config change. Use 'Start Connection' or 'Test' to connect with new config.");
     }
 
     private void initializeDataSource(JdbcConfig config) {

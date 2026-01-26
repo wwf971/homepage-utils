@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from 'jotai';
-import { SpinningCircle, RefreshIcon, KeyValues, Menu } from '@wwf971/react-comp-misc';
-import { fetchIndexStats, rebuildIndexForMongoCollection } from './mongoIndexStore';
+import { SpinningCircle, RefreshIcon, KeyValues, Menu} from '@wwf971/react-comp-misc';
+import { fetchIndexStats, fetchCollectionStats, rebuildIndexForMongoCollection } from './mongoIndexStore';
+import { useTaskProgress } from '../hooks/useTaskProgress';
 import './mongo-index.css';
 
 /**
@@ -18,6 +19,21 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
   const [contextMenu, setContextMenu] = useState(null);
   const [isRebuildingCollection, setIsRebuildingCollection] = useState(null);
   const [collectionRebuildResult, setCollectionRebuildResult] = useState(null);
+  const [currentTaskId, setCurrentTaskId] = useState(null);
+  const handledTaskRef = useRef(null);
+  const [refreshingCollection, setRefreshingCollection] = useState(null);
+  
+  // Subscribe to task progress
+  const { progress, isComplete, error: taskError } = useTaskProgress(currentTaskId);
+  
+  // Debug logging
+  useEffect(() => {
+    if (progress) {
+      console.log('[MongoIndexDashboard] Progress update:', progress);
+      console.log('[MongoIndexDashboard] isRebuildingCollection:', isRebuildingCollection);
+      console.log('[MongoIndexDashboard] isComplete:', isComplete);
+    }
+  }, [progress, isRebuildingCollection, isComplete]);
 
   const fetchStatsData = async (forceRefresh = false) => {
     setLoading(true);
@@ -76,9 +92,16 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
   const handleContextMenu = (e, collection) => {
     e.preventDefault();
-    setContextMenu({
-      position: { x: e.clientX, y: e.clientY },
-      collection
+    
+    // Close any existing menu first
+    setContextMenu(null);
+    
+    // Use requestAnimationFrame to ensure React completes unmount before remounting
+    requestAnimationFrame(() => {
+      setContextMenu({
+        position: { x: e.clientX, y: e.clientY },
+        collection
+      });
     });
   };
 
@@ -93,24 +116,91 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
       setIsRebuildingCollection(collKey);
       setCollectionRebuildResult(null);
       
-      const result = await rebuildIndexForMongoCollection(index.name, database, collection, null, store.set);
+      // Start async rebuild task
+      const result = await rebuildIndexForMongoCollection(index.name, database, collection, null);
       
-      setIsRebuildingCollection(null);
-      
-      if (result.code === 0) {
-        // Show rebuild result
-        setCollectionRebuildResult({
-          collKey,
-          ...result.data
-        });
-        // Refresh stats to show updated counts
-        await fetchStatsData(true);
+      if (result.code === 0 && result.data.taskId) {
+        // Set task ID to start subscribing to progress
+        setCurrentTaskId(result.data.taskId);
       } else {
-        setError(result.message || 'Failed to rebuild collection');
+        setIsRebuildingCollection(null);
+        setError(result.message || 'Failed to start rebuild task');
       }
     }
     handleMenuClose();
   };
+  
+  const handleRefreshCollection = async (e, database, collection) => {
+    e.stopPropagation(); // Prevent context menu from opening
+    const collKey = `${database}/${collection}`;
+    setRefreshingCollection(collKey);
+    
+    try {
+      // Fetch stats for only this collection
+      const result = await fetchCollectionStats(index.name, database, collection);
+      
+      if (result.code === 0) {
+        // Update only the specific collection in stats
+        setStats(prevStats => {
+          if (!prevStats) return prevStats;
+          
+          const updatedCollections = prevStats.collections.map(coll => {
+            if (coll.database === database && coll.collection === collection) {
+              return {
+                ...coll,
+                docCount: result.data.docCount,
+                indexedDocCount: result.data.indexedDocCount
+              };
+            }
+            return coll;
+          });
+          
+          return {
+            ...prevStats,
+            collections: updatedCollections
+          };
+        });
+      } else {
+        setError(result.message || 'Failed to refresh collection stats');
+      }
+    } catch (err) {
+      setError('Failed to refresh collection stats: ' + err.message);
+    } finally {
+      setRefreshingCollection(null);
+    }
+  };
+  
+  // Handle task completion
+  useEffect(() => {
+    if (isComplete && progress && isRebuildingCollection && currentTaskId) {
+      // Prevent handling the same task completion multiple times
+      if (handledTaskRef.current === currentTaskId) {
+        return;
+      }
+      
+      console.log('[MongoIndexDashboard] Task completed, cleaning up');
+      handledTaskRef.current = currentTaskId;
+      const collKey = isRebuildingCollection;
+      
+      if (progress.status === 'completed') {
+        // Show rebuild result
+        setCollectionRebuildResult({
+          collKey,
+          totalDocs: progress.totalDocs,
+          indexedDocs: progress.processedDocs,
+          errors: progress.errors || []
+        });
+        // Refresh stats to show updated counts
+        fetchStatsData(true);
+      } else if (progress.status === 'failed') {
+        setError(taskError || 'Rebuild task failed');
+      }
+      
+      // Clean up after handling completion
+      setIsRebuildingCollection(null);
+      setCurrentTaskId(null);
+    }
+  }, [isComplete, progress, isRebuildingCollection, currentTaskId, taskError]);
 
   return (
     <div className="mongo-index-dashboard">
@@ -200,6 +290,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
                   {stats.collections.map((coll, idx) => {
                     const collKey = `${coll.database}/${coll.collection}`;
                     const isRebuilding = isRebuildingCollection === collKey;
+                    const isRefreshing = refreshingCollection === collKey;
                     
                     return (
                       <tr
@@ -209,10 +300,39 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
                       >
                         <td className="collection-name">
                           {coll.database}/{coll.collection}
-                          {isRebuilding && <SpinningCircle width={12} height={12} style={{ marginLeft: '4px' }} />}
+                          {isRebuilding && progress && (
+                            <span style={{ marginLeft: '8px', fontSize: '11px', color: '#666' }}>
+                              ({progress.processedDocs}/{progress.totalDocs})
+                            </span>
+                          )}
+                          {isRebuilding && !progress && <SpinningCircle width={12} height={12} style={{ marginLeft: '4px' }} />}
                         </td>
-                        <td className="collection-count">{coll.docCount}</td>
-                        <td className="collection-count">{coll.indexedDocCount || 0}</td>
+                        <td className="collection-count">
+                          {coll.docCount}
+                          {!isRebuilding && (
+                            <button
+                              onClick={(e) => handleRefreshCollection(e, coll.database, coll.collection)}
+                              disabled={isRefreshing}
+                              className="mongo-index-dashboard-refresh-btn"
+                              title="Refresh count"
+                            >
+                              {isRefreshing ? <SpinningCircle width={10} height={10} /> : <RefreshIcon width={10} height={10} />}
+                            </button>
+                          )}
+                        </td>
+                        <td className="collection-count">
+                          {isRebuilding ? '(rebuilding index)' : (coll.indexedDocCount || 0)}
+                          {!isRebuilding && (
+                            <button
+                              onClick={(e) => handleRefreshCollection(e, coll.database, coll.collection)}
+                              disabled={isRefreshing}
+                              className="mongo-index-dashboard-refresh-btn"
+                              title="Refresh count"
+                            >
+                              {isRefreshing ? <SpinningCircle width={10} height={10} /> : <RefreshIcon width={10} height={10} />}
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}

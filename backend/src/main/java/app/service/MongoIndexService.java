@@ -22,6 +22,7 @@ import org.bson.types.ObjectId;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -54,6 +55,14 @@ public class MongoIndexService {
     @Autowired(required = false)
     @org.springframework.context.annotation.Lazy
     private RedissonClient redissonClient;
+
+    @Autowired
+    private TaskService taskService;
+    
+    // Self-injection to enable @Async proxy to work
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private MongoIndexService self;
 
     private static final String METADATA_COLLECTION = "mongo-index";
     
@@ -744,7 +753,7 @@ public class MongoIndexService {
                                            String esIndexName) {
         CompletableFuture.runAsync(() -> {
             try {
-                createIndexForDoc(indexName, database, collection, mongoIdObj, updateTime);
+                createIndexForDoc(indexName, database, collection, mongoIdObj, updateTime, false);
                 
                 // Acquire lock before marking as indexed to prevent race condition
                 // Use same lock key format as createIndexForDoc
@@ -848,7 +857,7 @@ public class MongoIndexService {
      * @param docId Document ID (can be ObjectId, String, etc.)
      * @param updateAtTimestamp The updateAt timestamp this index represents (unused, kept for compatibility)
      */
-    private void createIndexForDoc(String indexName, String dbName, String collName, Object docId, long updateAtTimestamp) {
+    private void createIndexForDoc(String indexName, String dbName, String collName, Object docId, long updateAtTimestamp, boolean forceReindex) {
         // Get index metadata
         Map<String, Object> indexMeta = getIndex(indexName);
         if (indexMeta == null) {
@@ -941,10 +950,11 @@ public class MongoIndexService {
 
             // Index to Elasticsearch with custom id, version, and metadata
             elasticSearchService.indexDoc(esIndexName, customId, dbName, collName, flattened, 
-                                         docUpdateVersion, docUpdateAt, docUpdateAtTimeZone);
+                                         docUpdateVersion, docUpdateAt, docUpdateAtTimeZone, forceReindex);
 
-            if(CHECK_BEFORE_SETTING_INDEX_VERSION) {
+            if(CHECK_BEFORE_SETTING_INDEX_VERSION && !forceReindex) {
                 // After successful ES indexing, verify queue entry hasn't been updated in the meantime
+                // Skip these checks if forceReindex=true (during rebuild)
                 MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(dbName);
                 Document currentQueueEntry = indexQueue.find(Filters.eq("docId", customId)).first();
                 if (currentQueueEntry == null) {
@@ -1083,12 +1093,35 @@ public class MongoIndexService {
      * @return Result map with statistics
      */
     public Map<String, Object> rebuildIndex(String indexName, Integer maxDocs) {
-        Map<String, Object> indexMeta = getIndex(indexName);
-        if (indexMeta == null) {
-            return createErrorResult("Index not found: " + indexName);
+        // Acquire distributed lock for rebuild to prevent concurrent rebuilds on same index
+        String lockKey = "mongo-index-rebuild:" + indexName;
+        RLock lock = null;
+        boolean lockAcquired = false;
+        
+        try {
+            if (redissonClient != null) {
+                lock = redissonClient.getLock(lockKey);
+                // Try to acquire lock immediately (0 wait), 600 seconds lease time (10 minutes max)
+                lockAcquired = lock.tryLock(0, 600, TimeUnit.SECONDS);
+                
+                if (!lockAcquired) {
+                    return createErrorResult("Another rebuild task is already running for index: " + indexName + ". Please try again later.");
+                }
+            } else {
+                System.err.println("Warning: RedissonClient not available, proceeding without lock");
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to acquire rebuild lock: " + e.getMessage());
+            return createErrorResult("Failed to acquire rebuild lock: " + e.getMessage());
         }
+        
+        try {
+            Map<String, Object> indexMeta = getIndex(indexName);
+            if (indexMeta == null) {
+                return createErrorResult("Index not found: " + indexName);
+            }
 
-        String esIndexName = (String) indexMeta.get("esIndex");
+            String esIndexName = (String) indexMeta.get("esIndex");
         
         @SuppressWarnings("unchecked")
         List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
@@ -1147,7 +1180,10 @@ public class MongoIndexService {
                             updateAt = TimeUtils.getCurrentTimestamp();
                         }
                         
-                        createIndexForDoc(indexName, dbName, collName, mongoIdObj, updateAt);
+                        createIndexForDoc(
+                            indexName, dbName, collName, mongoIdObj, updateAt,
+                            true // forceReindex
+                        );
                         indexedDocs++;
                     }
                 } catch (Exception e) {
@@ -1175,6 +1211,18 @@ public class MongoIndexService {
         data.put("errors", errors);
         result.put("data", data);
         return result;
+        
+        } finally {
+            // Release lock
+            if (lockAcquired && lock != null) {
+                try {
+                    lock.unlock();
+                    System.out.println("Released rebuild lock for index: " + indexName);
+                } catch (Exception e) {
+                    System.err.println("Warning: Failed to release rebuild lock: " + e.getMessage());
+                }
+            }
+        }
     }
 
     /**
@@ -1244,7 +1292,7 @@ public class MongoIndexService {
                             updateAt = TimeUtils.getCurrentTimestamp();
                         }
                         
-                        createIndexForDoc(indexName, dbName, collName, mongoIdObj, updateAt);
+                        createIndexForDoc(indexName, dbName, collName, mongoIdObj, updateAt, true);
                         indexedDocs++;
                     }
                 } catch (Exception e) {
@@ -1272,6 +1320,160 @@ public class MongoIndexService {
             return result;
         } catch (Exception e) {
             return createErrorResult("Failed to rebuild collection: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Start async rebuild for a specific collection
+     * Returns task ID immediately, actual rebuild happens in background
+     */
+    public String rebuildIndexForMongoCollectionAsync(String indexName, String dbName, String collName, Integer maxDocs) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("indexName", indexName);
+        params.put("dbName", dbName);
+        params.put("collName", collName);
+        params.put("maxDocs", maxDocs);
+        
+        app.pojo.Task task = taskService.createTask("rebuild-collection", params);
+        
+        // Start async execution using self-injection to ensure @Async proxy works
+        self.executeRebuildAsync(task.getTaskId(), indexName, dbName, collName, maxDocs);
+        
+        return task.getTaskId();
+    }
+    
+    /**
+     * Async method that performs the actual rebuild and publishes progress
+     */
+    @Async("taskExecutor")
+    public void executeRebuildAsync(String taskId, String indexName, String dbName, String collName, Integer maxDocs) {
+        // Acquire distributed lock for rebuild to prevent concurrent rebuilds on same index
+        String lockKey = "mongo-index-rebuild:" + indexName;
+        RLock lock = null;
+        boolean lockAcquired = false;
+        
+        try {
+            if (redissonClient != null) {
+                lock = redissonClient.getLock(lockKey);
+                // Try to acquire lock immediately (0 wait), 600 seconds lease time (10 minutes max)
+                lockAcquired = lock.tryLock(0, 600, TimeUnit.SECONDS);
+                
+                if (!lockAcquired) {
+                    taskService.failTask(taskId, "Another rebuild task is already running for index: " + indexName + ". Please try again later.");
+                    return;
+                }
+            } else {
+                System.err.println("Warning: RedissonClient not available, proceeding without lock");
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to acquire rebuild lock: " + e.getMessage());
+            taskService.failTask(taskId, "Failed to acquire rebuild lock: " + e.getMessage());
+            return;
+        }
+        
+        try {
+            Map<String, Object> indexMeta = getIndex(indexName);
+            if (indexMeta == null) {
+                taskService.failTask(taskId, "Index not found: " + indexName);
+                return;
+            }
+
+            String esIndexName = (String) indexMeta.get("esIndex");
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
+
+            // Verify collection is part of this index
+            boolean found = false;
+            for (Map<String, String> collInfo : collections) {
+                if (dbName.equals(collInfo.get("database")) && collName.equals(collInfo.get("collection"))) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                taskService.failTask(taskId, "Collection " + dbName + "." + collName + " is not part of index: " + indexName);
+                return;
+            }
+
+            int indexedDocs = 0;
+
+            MongoClient client = mongoService.getMongoClient();
+            MongoDatabase database = client.getDatabase(dbName);
+            MongoCollection<Document> collection = database.getCollection(collName);
+
+            // Count total docs
+            long totalDocs = collection.countDocuments();
+            if (maxDocs != null && maxDocs < totalDocs) {
+                totalDocs = maxDocs;
+            }
+            
+            // Initialize task progress
+            taskService.updateProgress(taskId, (int) totalDocs, 0);
+            
+            // Index each document (with limit if specified)
+            FindIterable<Document> cursor = maxDocs != null 
+                ? collection.find().limit(maxDocs)
+                : collection.find();
+                
+            for (Document doc : cursor) {
+                try {
+                    Object mongoIdObj = doc.get("_id");
+                    if (mongoIdObj != null) {
+                        String docId = mongoIdObj.toString();
+                        
+                        // Get or create IndexQueue entry for this document
+                        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, docId, mongoIdObj);
+                        if (queueEntry == null) {
+                            String errorMsg = "Failed to get/create IndexQueue entry for doc: " + docId;
+                            taskService.addError(taskId, errorMsg);
+                            System.err.println(errorMsg);
+                            continue;
+                        }
+                        
+                        Long updateAt = queueEntry.getLong("updateAt");
+                        if (updateAt == null) {
+                            updateAt = TimeUtils.getCurrentTimestamp();
+                        }
+                        
+                        createIndexForDoc(indexName, dbName, collName, mongoIdObj, updateAt, true);
+                        indexedDocs++;
+                        
+                        // Update progress after each doc for real-time feedback
+                        taskService.updateProgress(taskId, (int) totalDocs, indexedDocs);
+                    }
+                } catch (Exception e) {
+                    String errorMsg = "Failed to index doc " + doc.get("_id") + ": " + e.getMessage();
+                    taskService.addError(taskId, errorMsg);
+                    System.err.println(errorMsg);
+                    e.printStackTrace();
+                }
+                
+                if (maxDocs != null && indexedDocs >= maxDocs) {
+                    break;
+                }
+            }
+
+            // Complete task
+            Map<String, Object> result = new HashMap<>();
+            result.put("totalDocs", totalDocs);
+            result.put("indexedDocs", indexedDocs);
+            taskService.completeTask(taskId, result);
+            
+        } catch (Exception e) {
+            taskService.failTask(taskId, "Failed to rebuild collection: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            // Release lock
+            if (lockAcquired && lock != null) {
+                try {
+                    lock.unlock();
+                    System.out.println("Released rebuild lock for index: " + indexName);
+                } catch (Exception e) {
+                    System.err.println("Warning: Failed to release rebuild lock: " + e.getMessage());
+                }
+            }
         }
     }
 
@@ -1336,7 +1538,7 @@ public class MongoIndexService {
                             updateAt = TimeUtils.getCurrentTimestamp();
                         }
                         
-                        createIndexForDoc(indexName, dbName, collName, mongoId, updateAt);
+                        createIndexForDoc(indexName, dbName, collName, mongoId, updateAt, true);
                         indexedDocs++;
                     }
                 } catch (Exception e) {
@@ -1371,6 +1573,44 @@ public class MongoIndexService {
      * @param indexName The mongo-index name
      * @return Result map with statistics
      */
+    /**
+     * Get stats for a single collection within an index
+     */
+    public Map<String, Object> getCollectionStats(String indexName, String dbName, String collName) {
+        Map<String, Object> indexMeta = getIndex(indexName);
+        if (indexMeta == null) {
+            return createErrorResult("Index not found: " + indexName);
+        }
+
+        String esIndexName = (String) indexMeta.get("esIndex");
+
+        MongoClient client = mongoService.getMongoClient();
+        MongoDatabase database = client.getDatabase(dbName);
+        MongoCollection<Document> collection = database.getCollection(collName);
+
+        long count = collection.countDocuments();
+
+        // Count indexed documents in ES for this collection
+        long indexedCount = 0;
+        try {
+            indexedCount = elasticSearchService.countDocNumBySource(esIndexName, dbName, collName);
+        } catch (Exception e) {
+            System.err.println("Failed to count indexed docs for " + dbName + "." + collName + ": " + e.getMessage());
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", "Success");
+        Map<String, Object> data = new HashMap<>();
+        data.put("database", dbName);
+        data.put("collection", collName);
+        data.put("docCount", count);
+        data.put("indexedDocCount", indexedCount);
+        result.put("data", data);
+        
+        return result;
+    }
+
     public Map<String, Object> getIndexStats(String indexName) {
         Map<String, Object> indexMeta = getIndex(indexName);
         if (indexMeta == null) {
