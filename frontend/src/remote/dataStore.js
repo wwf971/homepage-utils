@@ -75,6 +75,12 @@ export const rabbitMQLocalConfigAtom = atom([]);
 export const rabbitMQComputedConfigAtom = atom([]);
 export const rabbitMQConfigErrorAtom = atom(null);
 
+// ========== ID Service Atoms ==========
+export const idAppConfigAtom = atom([]);
+export const idLocalConfigAtom = atom([]);
+export const idComputedConfigAtom = atom([]);
+export const idConfigErrorAtom = atom(null);
+
 
 // ========== Cross-Subsystem Config Reloader ==========
 
@@ -665,6 +671,166 @@ export async function updateRabbitMQConfig(path, value) {
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
     console.error('Failed to update RabbitMQ config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+// ========== ID Service Config API ==========
+
+export async function fetchIdAppConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/config/app/`);
+    const result = await response.json();
+    
+    if (result.code === 0 && result.data) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key,
+        value: value === null ? '' : String(value)
+      }));
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch ID service application config' };
+  } catch (error) {
+    console.error('Failed to fetch ID service application.properties config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function fetchIdLocalConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/local_config/category/id/`);
+    const result = await response.json();
+    
+    if (result.code === 0 && result.data) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key: key.replace('id.', ''),
+        value: value === null ? '' : String(value)
+      }));
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch ID service local config' };
+  } catch (error) {
+    console.error('Failed to fetch ID service local config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function fetchIdComputedConfig() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/config/`);
+    const result = await response.json();
+    
+    if (result.code === 0 && result.data) {
+      const configArray = Object.entries(result.data).map(([key, value]) => ({
+        key,
+        value: value === null ? '' : String(value)
+      }));
+      
+      if (!window.__computedConfigKeys) {
+        window.__computedConfigKeys = {};
+      }
+      window.__computedConfigKeys.id = configArray.map(item => item.key);
+      
+      return { code: 0, data: configArray };
+    }
+    return { code: -1, message: result.message || 'Failed to fetch ID service computed config' };
+  } catch (error) {
+    console.error('Failed to fetch ID service computed config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function updateIdConfig(key, value) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/config/set/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        path: key,
+        value: value
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.code === 0) {
+      return { code: 0, message: 'Success' };
+    }
+    return { code: -1, message: result.message || 'Update failed' };
+  } catch (error) {
+    console.error('Failed to update ID service config:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function checkIdTable() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/table/check/`);
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to check ID table:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function checkIdTableStructure() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/table/structure/`);
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to check ID table structure:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function createIdTable() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/table/create/`, {
+      method: 'POST'
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to create ID table:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function deleteIdTable() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/table/delete/`, {
+      method: 'POST'
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to delete ID table:', error);
+    return { code: -2, message: error.message || 'Network error' };
+  }
+}
+
+export async function recreateIdTable() {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/table/recreate/`, {
+      method: 'POST'
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to recreate ID table:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }

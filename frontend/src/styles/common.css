@@ -13,6 +13,17 @@
   overflow: auto;
 }
 
+.config-hint {
+  margin-bottom: 6px;
+  padding: 8px 12px;
+  background: #e7f3ff;
+  border-left: 3px solid #2196F3;
+  color: #0d47a1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
 .panel-title {
   margin-bottom: 2px;
   font-size: 18px;

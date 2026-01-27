@@ -17,6 +17,7 @@ import {RedisConfigPanel} from './redis/RedisConfigPanel';
 import {TestConnectionRedis} from './redis/TestConnectionRedis';
 import {TestConnectionRedisson} from './redis/TestConnectionRedisson';
 import RabbitMQPanel from './rabbitmq/RabbitMQPanel';
+import IdConfigPanel from './id/IdConfigPanel';
 import BackendServerPanel from './remote/BackendServerPanel';
 import FilePanel from './file/FilePanel';
 import './App.css';
@@ -122,6 +123,14 @@ function App() {
                 </Panel>
               </SubTab>
 
+            </SubTab>
+          </Tab>
+          
+          <Tab label="ID Service">
+            <SubTab label="Configuration" isDefault={true}>
+              <Panel>
+                <IdConfigPanel />
+              </Panel>
             </SubTab>
           </Tab>
           
