@@ -464,7 +464,7 @@ public class MongoIndexService {
         // Get IndexQueue entry (or create if missing)
         Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(database, collection, docId, mongoIdObj);
         if (queueEntry == null) {
-            return createErrorResult("Document not found in " + database + "." + collection);
+            return createErrorResult("Doc with docId: " + docId + " not found in " + database + "." + collection);
         }
 
         String esIndexName = (String) indexMeta.get("esIndex");
@@ -491,7 +491,11 @@ public class MongoIndexService {
                     docUpdates.add(Updates.set(entry.getKey(), entry.getValue()));
                 }
                 
-                coll.updateOne(session, Filters.eq("_id", mongoIdObj), Updates.combine(docUpdates));
+                // Update by custom 'id' field (used by MongoAppService)
+                long matchedCount = coll.updateOne(session, Filters.eq("id", docId), Updates.combine(docUpdates)).getMatchedCount();
+                if (matchedCount == 0) {
+                    throw new RuntimeException("Doc with id '" + docId + "' not found in " + database + "." + collection);
+                }
 
                 // 2. Upsert IndexQueue with new version and status=-1
                 Bson queueFilter = Filters.and(
@@ -563,9 +567,10 @@ public class MongoIndexService {
         MongoDatabase db = client.getDatabase(database);
         MongoCollection<Document> coll = db.getCollection(collection);
 
-        Document doc = coll.find(Filters.eq("_id", mongoIdObj)).first();
+        // Try custom 'id' field first (used by MongoAppService)
+        Document doc = coll.find(Filters.eq("id", docId)).first();
         if (doc == null) {
-            return createErrorResult("Document not found in " + database + "." + collection);
+            return createErrorResult("Doc with docId: " + docId + " not found in " + database + "." + collection);
         }
         
         // Return entire document
@@ -613,7 +618,7 @@ public class MongoIndexService {
         // Get IndexQueue entry
         Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(database, collection, docId, mongoIdObj);
         if (queueEntry == null) {
-            return createErrorResult("Document not found in " + database + "." + collection);
+            return createErrorResult("Document not found in " + database + "." + collection + " with docId: " + docId);
         }
 
         long currentTime = TimeUtils.getCurrentTimestamp();
@@ -632,7 +637,11 @@ public class MongoIndexService {
             MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(database);
 
             // 1. Delete main document
-            coll.deleteOne(session, Filters.eq("_id", mongoIdObj));
+            // Delete by custom 'id' field (used by MongoAppService)
+            long deletedCount = coll.deleteOne(session, Filters.eq("id", docId)).getDeletedCount();
+            if (deletedCount == 0) {
+                throw new RuntimeException("Doc with id '" + docId + "' not found in " + database + "." + collection);
+            }
 
             // 2. Update IndexQueue: mark as deleted, increment version, status=-1
             Bson queueFilter = Filters.and(
@@ -871,22 +880,18 @@ public class MongoIndexService {
         MongoDatabase database = client.getDatabase(dbName);
         MongoCollection<Document> collection = database.getCollection(collName);
 
-        Document doc = collection.find(Filters.eq("_id", docId)).first();
+        // Try to find by custom 'id' field first (used by MongoAppService)
+        Document doc = collection.find(Filters.eq("id", docId)).first();
         if (doc == null) {
-            throw new RuntimeException("Document not found: " + docId);
+            throw new RuntimeException("Doc with docId: " + docId + " not found");
         }
 
         // Extract custom id from document (data is at top level now)
-        // Fall back to MongoDB _id if no custom "id" field exists
         Object idObj = doc.get("id");
-        String customId;
         if (idObj == null || idObj.toString().trim().isEmpty()) {
-            // Use MongoDB _id as the document id
-            customId = docId.toString();
-            System.out.println("Document " + docId + " has no 'id' field, using MongoDB _id as document id");
-        } else {
-            customId = idObj.toString().trim();
+            throw new RuntimeException("Doc with docId: " + docId + " found but has no 'id' field");
         }
+        String customId = idObj.toString().trim();
 
         // Get IndexQueue entry for metadata
         Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, customId, docId);
@@ -923,7 +928,8 @@ public class MongoIndexService {
         
         try {
             // Re-read document and queue entry after acquiring lock
-            doc = collection.find(Filters.eq("_id", docId)).first();
+            // Try custom 'id' field first (used by MongoAppService)
+            doc = collection.find(Filters.eq("id", docId)).first();
             if (doc == null) {
                 throw new RuntimeException("Document not found: " + docId);
             }

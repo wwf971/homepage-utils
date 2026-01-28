@@ -66,6 +66,7 @@ public class ElasticSearchService {
      * Count documents by source (database and collection)
      */
     public long countDocNumBySource(String indexName, String dbName, String collName) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String countUri = baseUri + indexName + "/_count";
         
@@ -104,10 +105,10 @@ public class ElasticSearchService {
             os.write(input, 0, input.length);
         }
         
-        int responseCode = connection.getResponseCode();
-        if (responseCode != 200) {
+        int respCode = connection.getResponseCode();
+        if (respCode != 200) {
             String errorResponse = readResponse(connection);
-            throw new Exception("Failed to count documents: HTTP " + responseCode + " - " + errorResponse);
+            throw new Exception("Failed to count documents: HTTP " + respCode + " - " + errorResponse);
         }
         
         String response = readResponse(connection);
@@ -140,6 +141,7 @@ public class ElasticSearchService {
      * Create or clear an index
      */
     public void createOrClearIndex(String indexName, boolean clearIfExists) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String indexUri = baseUri + indexName;
 
@@ -150,11 +152,11 @@ public class ElasticSearchService {
             if (clearIfExists) {
                 // Delete the index
                 HttpURLConnection deleteConn = setupConnection(indexUri, "DELETE");
-                int responseCode = deleteConn.getResponseCode();
-                if (responseCode == 200) {
+                int respCode = deleteConn.getResponseCode();
+                if (respCode == 200) {
                     System.out.println("Deleted existing ES index: " + indexName);
                 } else {
-                    throw new Exception("Failed to delete index: HTTP " + responseCode);
+                    throw new Exception("Failed to delete index: HTTP " + respCode);
                 }
             } else {
                 System.out.println("ES index already exists: " + indexName);
@@ -212,12 +214,12 @@ public class ElasticSearchService {
             os.write(input, 0, input.length);
         }
 
-        int responseCode = createConn.getResponseCode();
-        if (responseCode == 200 || responseCode == 201) {
+        int respCode = createConn.getResponseCode();
+        if (respCode == 200 || respCode == 201) {
             System.out.println("Created ES index: " + indexName);
         } else {
             String errorResponse = readResponse(createConn);
-            throw new Exception("Failed to create index: HTTP " + responseCode + " - " + errorResponse);
+            throw new Exception("Failed to create index: HTTP " + respCode + " - " + errorResponse);
         }
     }
 
@@ -229,6 +231,7 @@ public class ElasticSearchService {
     public void indexDoc(String indexName, String docId, String database, String collection,
                              List<Map<String, String>> flattenedPairs, long updateVersion, 
                              long updateAt, Integer updateAtTimeZone, boolean forceReindex) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         
         // First, try to get existing document to check version and get seq_no/primary_term
@@ -308,13 +311,13 @@ public class ElasticSearchService {
             os.write(input, 0, input.length);
         }
 
-        int responseCode = connection.getResponseCode();
-        if (responseCode == 409) {
+        int respCode = connection.getResponseCode();
+        if (respCode == 409) {
             // Version conflict - document was modified by someone else
             throw new Exception("Version conflict: document " + docId + " was modified concurrently. Retry may be needed.");
-        } else if (responseCode != 200 && responseCode != 201) {
+        } else if (respCode != 200 && respCode != 201) {
             String errorResponse = readResponse(connection);
-            throw new Exception("Failed to index document: HTTP " + responseCode + " - " + errorResponse);
+            throw new Exception("Failed to index document: HTTP " + respCode + " - " + errorResponse);
         }
 
         System.out.println("Indexed " + flattenedPairs.size() + " path/value pairs for doc " + docId + " (version " + updateVersion + ") to ES index " + indexName);
@@ -325,18 +328,19 @@ public class ElasticSearchService {
      * WITHOUT version control - use deleteDocumentWithVersion for version-controlled deletes
      */
     public void deleteDocument(String indexName, String docId) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String deleteUri = baseUri + indexName + "/_doc/" + docId;
 
         HttpURLConnection connection = setupConnection(deleteUri, "DELETE");
-        int responseCode = connection.getResponseCode();
+        int respCode = connection.getResponseCode();
         
-        if (responseCode == 200 || responseCode == 404) {
+        if (respCode == 200 || respCode == 404) {
             // 404 is OK - document may not exist
             System.out.println("Deleted doc " + docId + " from ES index " + indexName);
         } else {
             String errorResponse = readResponse(connection);
-            throw new Exception("Failed to delete document: HTTP " + responseCode + " - " + errorResponse);
+            throw new Exception("Failed to delete document: HTTP " + respCode + " - " + errorResponse);
         }
     }
 
@@ -348,6 +352,7 @@ public class ElasticSearchService {
      * @param deleteVersion The MongoDB updateVersion at time of deletion
      */
     public void deleteDocumentWithVersion(String indexName, String docId, long deleteVersion) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         
         // First, try to get existing document to check version and get seq_no/primary_term
@@ -406,18 +411,18 @@ public class ElasticSearchService {
         }
 
         HttpURLConnection connection = setupConnection(deleteUri, "DELETE");
-        int responseCode = connection.getResponseCode();
+        int respCode = connection.getResponseCode();
         
-        if (responseCode == 409) {
+        if (respCode == 409) {
             // Version conflict - document was modified by someone else
             System.err.println("Version conflict during delete: document " + docId + " was modified concurrently. Delete aborted.");
             // Don't throw - this is expected behavior with concurrent operations
-        } else if (responseCode == 200 || responseCode == 404) {
+        } else if (respCode == 200 || respCode == 404) {
             // 200 = deleted, 404 = already gone
             System.out.println("Deleted doc " + docId + " from ES index " + indexName + " (version " + deleteVersion + ")");
         } else {
             String errorResponse = readResponse(connection);
-            throw new Exception("Failed to delete document: HTTP " + responseCode + " - " + errorResponse);
+            throw new Exception("Failed to delete document: HTTP " + respCode + " - " + errorResponse);
         }
     }
 
@@ -425,22 +430,23 @@ public class ElasticSearchService {
      * Get document count for an index
      */
     public long getDocumentCount(String indexName) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String countUri = baseUri + indexName + "/_count";
 
         HttpURLConnection connection = setupConnection(countUri, "GET");
-        int responseCode = connection.getResponseCode();
+        int respCode = connection.getResponseCode();
 
-        if (responseCode == 200) {
+        if (respCode == 200) {
             String response = readResponse(connection);
             @SuppressWarnings("unchecked")
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
             return ((Number) result.get("count")).longValue();
-        } else if (responseCode == 404) {
+        } else if (respCode == 404) {
             // Index doesn't exist
             return 0;
         } else {
-            throw new Exception("Failed to get document count: HTTP " + responseCode);
+            throw new Exception("Failed to get document count: HTTP " + respCode);
         }
     }
 
@@ -448,12 +454,13 @@ public class ElasticSearchService {
      * Check if index exists
      */
     public boolean indexExists(String indexName) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String indexUri = baseUri + indexName;
 
         HttpURLConnection connection = setupConnection(indexUri, "HEAD");
-        int responseCode = connection.getResponseCode();
-        return responseCode == 200;
+        int respCode = connection.getResponseCode();
+        return respCode == 200;
     }
 
     /**
@@ -462,6 +469,7 @@ public class ElasticSearchService {
      */
     public List<Map<String, Object>> searchCharIndex(String indexName, String query, 
                                                       boolean searchInPaths, boolean searchInValues) throws Exception {
+        indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String searchUri = baseUri + indexName + "/_search";
 
@@ -520,10 +528,10 @@ public class ElasticSearchService {
             os.write(jsonQuery.getBytes("utf-8"));
         }
 
-        int responseCode = connection.getResponseCode();
-        if (responseCode != 200) {
+        int respCode = connection.getResponseCode();
+        if (respCode != 200) {
             String errorResponse = readResponse(connection);
-            throw new Exception("Search failed: HTTP " + responseCode + " - " + errorResponse);
+            throw new Exception("Search failed: HTTP " + respCode + " - " + errorResponse);
         }
 
         String response = readResponse(connection);

@@ -64,7 +64,8 @@ public class MongoIndexQueueService {
         MongoDatabase db = client.getDatabase(database);
         MongoCollection<Document> coll = db.getCollection(collection);
         
-        Document mainDoc = coll.find(Filters.eq("_id", mongoIdObj)).first();
+        // First try to find by custom 'id' field (used by MongoAppService)
+        Document mainDoc = coll.find(Filters.eq("id", docId)).first();
         if (mainDoc == null) {
             return null; // Document doesn't exist
         }
