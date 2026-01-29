@@ -56,7 +56,7 @@ public class IdService {
     /**
      * Issue a new random ID
      */
-    public IdEntity issueRandomId(IdIssueRequest request) throws Exception {
+    public ApiResponse<IdEntity> issueRandomId(IdIssueRequest request) {
         try {
             long idValue = IdGenerator.generateRandomId();
             long createAt = System.currentTimeMillis();
@@ -68,18 +68,18 @@ public class IdService {
                 IdFormatConverter.longToBase36(idValue) + ")");
             
             saveId(entity);
-            return entity;
+            return ApiResponse.success(entity, "Random ID issued successfully");
         } catch (Exception e) {
             System.err.println("Failed to issue random ID: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            return ApiResponse.error("Failed to issue random ID: " + e.getMessage());
         }
     }
 
     /**
      * Issue a new ms_48 timestamp-based ID
      */
-    public IdEntity issueMs48Id(IdIssueRequest request) throws Exception {
+    public ApiResponse<IdEntity> issueMs48Id(IdIssueRequest request) {
         try {
             long idValue = IdGenerator.generateMs48Id();
             long createAt = System.currentTimeMillis();
@@ -91,11 +91,11 @@ public class IdService {
                 IdFormatConverter.longToBase36(idValue) + ")");
             
             saveId(entity);
-            return entity;
+            return ApiResponse.success(entity, "ms_48 ID issued successfully");
         } catch (Exception e) {
             System.err.println("Failed to issue ms_48 ID: " + e.getMessage());
             e.printStackTrace();
-            throw e;
+            return ApiResponse.error("Failed to issue ms_48 ID: " + e.getMessage());
         }
     }
 
@@ -135,207 +135,239 @@ public class IdService {
     /**
      * Get ID by value (supports integer or string format)
      */
-    public IdEntity getById(String valueStr) throws Exception {
-        long value;
+    public ApiResponse<IdEntity> getById(String valueStr) {
         try {
-            value = IdFormatConverter.parseIdString(valueStr);
-        } catch (IllegalArgumentException e) {
-            throw new Exception("Invalid ID format: " + e.getMessage());
+            long value;
+            try {
+                value = IdFormatConverter.parseIdString(valueStr);
+            } catch (IllegalArgumentException e) {
+                return ApiResponse.error("Invalid ID format: " + e.getMessage());
+            }
+
+            JdbcTemplate jdbcTemplate = getJdbcTemplate();
+            String tableName = getFullTableName();
+
+            String sql = "SELECT * FROM " + tableName + " WHERE value = ?";
+            List<IdEntity> results = jdbcTemplate.query(sql, new IdRowMapper(), value);
+
+            if (results.isEmpty()) {
+                return ApiResponse.error("ID not found: " + valueStr);
+            }
+
+            return ApiResponse.success(results.get(0));
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to get ID: " + e.getMessage());
         }
-
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-        String tableName = getFullTableName();
-
-        String sql = "SELECT * FROM " + tableName + " WHERE value = ?";
-        List<IdEntity> results = jdbcTemplate.query(sql, new IdRowMapper(), value);
-
-        if (results.isEmpty()) {
-            throw new Exception("ID not found: " + valueStr);
-        }
-
-        return results.get(0);
     }
 
     /**
      * List all IDs with pagination
      */
-    public IdListResult listIds(int page, int pageSize) throws Exception {
-        if (page < 0) page = 0;
-        if (pageSize <= 0) pageSize = 20;
-        if (pageSize > 1000) pageSize = 1000; // Max limit
+    public ApiResponse<IdListResult> listIds(int page, int pageSize) {
+        try {
+            if (page < 0) page = 0;
+            if (pageSize <= 0) pageSize = 20;
+            if (pageSize > 1000) pageSize = 1000; // Max limit
 
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-        String tableName = getFullTableName();
+            JdbcTemplate jdbcTemplate = getJdbcTemplate();
+            String tableName = getFullTableName();
 
-        // Get total count
-        String countSql = "SELECT COUNT(*) FROM " + tableName;
-        Long totalCount = jdbcTemplate.queryForObject(countSql, Long.class);
+            // Get total count
+            String countSql = "SELECT COUNT(*) FROM " + tableName;
+            Long totalCount = jdbcTemplate.queryForObject(countSql, Long.class);
 
-        // Get paginated results
-        int offset = page * pageSize;
-        String sql = "SELECT * FROM " + tableName + " ORDER BY createAt DESC LIMIT ? OFFSET ?";
-        List<IdEntity> ids = jdbcTemplate.query(sql, new IdRowMapper(), pageSize, offset);
+            // Get paginated results
+            int offset = page * pageSize;
+            String sql = "SELECT * FROM " + tableName + " ORDER BY createAt DESC LIMIT ? OFFSET ?";
+            List<IdEntity> ids = jdbcTemplate.query(sql, new IdRowMapper(), pageSize, offset);
 
-        return new IdListResult(ids, page, pageSize, totalCount != null ? totalCount : 0);
+            return ApiResponse.success(new IdListResult(ids, page, pageSize, totalCount != null ? totalCount : 0));
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to list IDs: " + e.getMessage());
+        }
     }
 
     /**
      * Search IDs by filters
      */
-    public IdListResult searchIds(IdSearchRequest request) throws Exception {
-        int page = request.getPage() != null ? request.getPage() : 0;
-        int pageSize = request.getPageSize() != null ? request.getPageSize() : 20;
-        if (page < 0) page = 0;
-        if (pageSize <= 0) pageSize = 20;
-        if (pageSize > 1000) pageSize = 1000;
+    public ApiResponse<IdListResult> searchIds(IdSearchRequest request) {
+        try {
+            int page = request.getPage() != null ? request.getPage() : 0;
+            int pageSize = request.getPageSize() != null ? request.getPageSize() : 20;
+            if (page < 0) page = 0;
+            if (pageSize <= 0) pageSize = 20;
+            if (pageSize > 1000) pageSize = 1000;
 
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-        String tableName = getFullTableName();
+            JdbcTemplate jdbcTemplate = getJdbcTemplate();
+            String tableName = getFullTableName();
 
-        // Build WHERE clause
-        List<String> conditions = new ArrayList<>();
-        List<Object> params = new ArrayList<>();
+            // Build WHERE clause
+            List<String> conditions = new ArrayList<>();
+            List<Object> params = new ArrayList<>();
 
-        if (request.getSelfType() != null) {
-            conditions.add("selfType = ?");
-            params.add(request.getSelfType());
+            if (request.getSelfType() != null) {
+                conditions.add("selfType = ?");
+                params.add(request.getSelfType());
+            }
+
+            if (request.getType() != null && !request.getType().isEmpty()) {
+                conditions.add("type = ?");
+                params.add(request.getType());
+            }
+
+            if (request.getCreateAtStart() != null) {
+                conditions.add("createAt >= ?");
+                params.add(request.getCreateAtStart());
+            }
+
+            if (request.getCreateAtEnd() != null) {
+                conditions.add("createAt <= ?");
+                params.add(request.getCreateAtEnd());
+            }
+
+            String whereClause = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
+
+            // Get total count
+            String countSql = "SELECT COUNT(*) FROM " + tableName + whereClause;
+            Long totalCount = jdbcTemplate.queryForObject(countSql, Long.class, params.toArray());
+
+            // Get paginated results
+            int offset = page * pageSize;
+            List<Object> queryParams = new ArrayList<>(params);
+            queryParams.add(pageSize);
+            queryParams.add(offset);
+
+            String sql = "SELECT * FROM " + tableName + whereClause + " ORDER BY createAt DESC LIMIT ? OFFSET ?";
+            List<IdEntity> ids = jdbcTemplate.query(sql, new IdRowMapper(), queryParams.toArray());
+
+            return ApiResponse.success(new IdListResult(ids, page, pageSize, totalCount != null ? totalCount : 0));
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to search IDs: " + e.getMessage());
         }
-
-        if (request.getType() != null && !request.getType().isEmpty()) {
-            conditions.add("type = ?");
-            params.add(request.getType());
-        }
-
-        if (request.getCreateAtStart() != null) {
-            conditions.add("createAt >= ?");
-            params.add(request.getCreateAtStart());
-        }
-
-        if (request.getCreateAtEnd() != null) {
-            conditions.add("createAt <= ?");
-            params.add(request.getCreateAtEnd());
-        }
-
-        String whereClause = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
-
-        // Get total count
-        String countSql = "SELECT COUNT(*) FROM " + tableName + whereClause;
-        Long totalCount = jdbcTemplate.queryForObject(countSql, Long.class, params.toArray());
-
-        // Get paginated results
-        int offset = page * pageSize;
-        List<Object> queryParams = new ArrayList<>(params);
-        queryParams.add(pageSize);
-        queryParams.add(offset);
-
-        String sql = "SELECT * FROM " + tableName + whereClause + " ORDER BY createAt DESC LIMIT ? OFFSET ?";
-        List<IdEntity> ids = jdbcTemplate.query(sql, new IdRowMapper(), queryParams.toArray());
-
-        return new IdListResult(ids, page, pageSize, totalCount != null ? totalCount : 0);
     }
 
     /**
      * Update ID metadata
      */
-    public void updateMetadata(String valueStr, String metadata) throws Exception {
-        long value;
+    public ApiResponse<Void> updateMetadata(String valueStr, String metadata) {
         try {
-            value = IdFormatConverter.parseIdString(valueStr);
-        } catch (IllegalArgumentException e) {
-            throw new Exception("Invalid ID format: " + e.getMessage());
-        }
+            long value;
+            try {
+                value = IdFormatConverter.parseIdString(valueStr);
+            } catch (IllegalArgumentException e) {
+                return ApiResponse.error("Invalid ID format: " + e.getMessage());
+            }
 
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-        String tableName = getFullTableName();
+            JdbcTemplate jdbcTemplate = getJdbcTemplate();
+            String tableName = getFullTableName();
 
-        String sql = "UPDATE " + tableName + " SET metadata = ? WHERE value = ?";
-        int rowsAffected = jdbcTemplate.update(sql, metadata, value);
+            String sql = "UPDATE " + tableName + " SET metadata = ? WHERE value = ?";
+            int rowsAffected = jdbcTemplate.update(sql, metadata, value);
 
-        if (rowsAffected == 0) {
-            throw new Exception("ID not found: " + valueStr);
+            if (rowsAffected == 0) {
+                return ApiResponse.error("ID not found: " + valueStr);
+            }
+
+            return ApiResponse.success(null, "Metadata updated successfully");
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to update metadata: " + e.getMessage());
         }
     }
 
     /**
      * Delete ID
      */
-    public void deleteId(String valueStr) throws Exception {
-        long value;
+    public ApiResponse<Void> deleteId(String valueStr) {
         try {
-            value = IdFormatConverter.parseIdString(valueStr);
-        } catch (IllegalArgumentException e) {
-            throw new Exception("Invalid ID format: " + e.getMessage());
-        }
+            long value;
+            try {
+                value = IdFormatConverter.parseIdString(valueStr);
+            } catch (IllegalArgumentException e) {
+                return ApiResponse.error("Invalid ID format: " + e.getMessage());
+            }
 
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-        String tableName = getFullTableName();
+            JdbcTemplate jdbcTemplate = getJdbcTemplate();
+            String tableName = getFullTableName();
 
-        String sql = "DELETE FROM " + tableName + " WHERE value = ?";
-        int rowsAffected = jdbcTemplate.update(sql, value);
+            String sql = "DELETE FROM " + tableName + " WHERE value = ?";
+            int rowsAffected = jdbcTemplate.update(sql, value);
 
-        if (rowsAffected == 0) {
-            throw new Exception("ID not found: " + valueStr);
+            if (rowsAffected == 0) {
+                return ApiResponse.error("ID not found: " + valueStr);
+            }
+
+            return ApiResponse.success(null, "ID deleted successfully");
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to delete ID: " + e.getMessage());
         }
     }
 
     /**
      * Convert ID to all formats
      */
-    public IdConvertResult convertId(String valueStr, String targetFormat) throws Exception {
-        long value;
+    public ApiResponse<IdConvertResult> convertId(String valueStr, String targetFormat) {
         try {
-            value = IdFormatConverter.parseIdString(valueStr);
-        } catch (IllegalArgumentException e) {
-            throw new Exception("Invalid ID format: " + e.getMessage());
-        }
+            long value;
+            try {
+                value = IdFormatConverter.parseIdString(valueStr);
+            } catch (IllegalArgumentException e) {
+                return ApiResponse.error("Invalid ID format: " + e.getMessage());
+            }
 
-        return IdFormatConverter.convertAll(value);
+            return ApiResponse.success(IdFormatConverter.convertAll(value));
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to convert ID: " + e.getMessage());
+        }
     }
 
     /**
      * Search IDs by base36 substring
      */
-    public IdListResult searchBySubstring(IdSubstringSearchRequest request) throws Exception {
-        int page = request.getPage() != null ? request.getPage() : 0;
-        int pageSize = request.getPageSize() != null ? request.getPageSize() : 20;
-        if (page < 0) page = 0;
-        if (pageSize <= 0) pageSize = 20;
-        if (pageSize > 1000) pageSize = 1000;
+    public ApiResponse<IdListResult> searchBySubstring(IdSubstringSearchRequest request) {
+        try {
+            int page = request.getPage() != null ? request.getPage() : 0;
+            int pageSize = request.getPageSize() != null ? request.getPageSize() : 20;
+            if (page < 0) page = 0;
+            if (pageSize <= 0) pageSize = 20;
+            if (pageSize > 1000) pageSize = 1000;
 
-        String substring = request.getSubstring();
-        if (substring == null || substring.isEmpty()) {
-            throw new Exception("Substring cannot be empty");
-        }
-
-        substring = substring.toLowerCase().trim();
-
-        JdbcTemplate jdbcTemplate = getJdbcTemplate();
-        String tableName = getFullTableName();
-
-        // Get all IDs and filter by base36 substring
-        String sql = "SELECT * FROM " + tableName + " ORDER BY createAt DESC";
-        List<IdEntity> allIds = jdbcTemplate.query(sql, new IdRowMapper());
-
-        // Filter by base36 substring
-        List<IdEntity> matchedIds = new ArrayList<>();
-        for (IdEntity id : allIds) {
-            String base36 = IdFormatConverter.longToBase36(id.getValue());
-            if (base36.contains(substring)) {
-                matchedIds.add(id);
+            String substring = request.getSubstring();
+            if (substring == null || substring.isEmpty()) {
+                return ApiResponse.error("Substring cannot be empty");
             }
+
+            substring = substring.toLowerCase().trim();
+
+            JdbcTemplate jdbcTemplate = getJdbcTemplate();
+            String tableName = getFullTableName();
+
+            // Get all IDs and filter by base36 substring
+            String sql = "SELECT * FROM " + tableName + " ORDER BY createAt DESC";
+            List<IdEntity> allIds = jdbcTemplate.query(sql, new IdRowMapper());
+
+            // Filter by base36 substring
+            List<IdEntity> matchedIds = new ArrayList<>();
+            for (IdEntity id : allIds) {
+                String base36 = IdFormatConverter.longToBase36(id.getValue());
+                if (base36.contains(substring)) {
+                    matchedIds.add(id);
+                }
+            }
+
+            // Apply pagination
+            int totalCount = matchedIds.size();
+            int offset = page * pageSize;
+            int endIndex = Math.min(offset + pageSize, totalCount);
+
+            List<IdEntity> paginatedIds = new ArrayList<>();
+            if (offset < totalCount) {
+                paginatedIds = matchedIds.subList(offset, endIndex);
+            }
+
+            return ApiResponse.success(new IdListResult(paginatedIds, page, pageSize, totalCount));
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to search by substring: " + e.getMessage());
         }
-
-        // Apply pagination
-        int totalCount = matchedIds.size();
-        int offset = page * pageSize;
-        int endIndex = Math.min(offset + pageSize, totalCount);
-
-        List<IdEntity> paginatedIds = new ArrayList<>();
-        if (offset < totalCount) {
-            paginatedIds = matchedIds.subList(offset, endIndex);
-        }
-
-        return new IdListResult(paginatedIds, page, pageSize, totalCount);
     }
 
     /**

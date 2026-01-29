@@ -848,7 +848,7 @@ export async function issueRandomId(request) {
     return result;
   } catch (error) {
     console.error('Failed to issue random ID:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -864,7 +864,7 @@ export async function issueMs48Id(request) {
     return result;
   } catch (error) {
     console.error('Failed to issue ms48 ID:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -876,7 +876,7 @@ export async function getIdByValue(value) {
     return result;
   } catch (error) {
     console.error('Failed to get ID:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -888,7 +888,7 @@ export async function listIds(page = 0, pageSize = 20) {
     return result;
   } catch (error) {
     console.error('Failed to list IDs:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -904,7 +904,7 @@ export async function searchIds(request) {
     return result;
   } catch (error) {
     console.error('Failed to search IDs:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -920,7 +920,7 @@ export async function updateIdMetadata(value, metadata) {
     return result;
   } catch (error) {
     console.error('Failed to update ID metadata:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -934,7 +934,7 @@ export async function deleteId(value) {
     return result;
   } catch (error) {
     console.error('Failed to delete ID:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -946,7 +946,7 @@ export async function convertId(value, format) {
     return result;
   } catch (error) {
     console.error('Failed to convert ID:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
 
@@ -962,6 +962,6 @@ export async function searchIdsBySubstring(request) {
     return result;
   } catch (error) {
     console.error('Failed to search IDs by substring:', error);
-    return { success: false, message: error.message || 'Network error' };
+    return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }

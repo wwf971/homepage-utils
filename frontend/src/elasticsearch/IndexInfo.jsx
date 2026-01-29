@@ -5,7 +5,8 @@ import { esSelectedIndexAtom } from '../remote/dataStore';
 import { 
   fetchEsIndexInfo,
   deleteElasticsearchIndex,
-  renameEsIndex
+  renameEsIndex,
+  getIndexAtom
 } from './EsStore';
 import ConfirmDialog from '../components/ConfirmDialog';
 import './elasticsearch.css';
@@ -29,6 +30,12 @@ const IndexInfo = () => {
   const store = useStore();
   const getAtomValue = (atom) => store.get(atom);
   const setAtomValue = (atom, value) => store.set(atom, value);
+  
+  // Check if this is a mongo-es-index
+  const indexAtom = selectedIndexName ? getIndexAtom(selectedIndexName) : null;
+  const indexData = indexAtom ? useAtomValue(indexAtom) : null;
+  const isMongoIndex = indexData?.isMongoIndex || false;
+  const mongoIndexName = indexData?.mongoData?.name;
 
   useEffect(() => {
     if (selectedIndexName) {
@@ -183,6 +190,21 @@ const IndexInfo = () => {
           >
             {selectedIndexName}
           </span>
+          {isMongoIndex && (
+            <span style={{
+              display: 'inline-block',
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontWeight: '600',
+              backgroundColor: '#e3f2fd',
+              color: '#1976d2',
+              border: '1px solid #90caf9',
+              borderRadius: '2px',
+              marginLeft: '4px'
+            }} title={mongoIndexName ? `Mongo-Index: ${mongoIndexName}` : 'Mongo-ES Index'}>
+              MONGO-INDEX
+            </span>
+          )}
           {!isRenaming && (
             <button
               onClick={handleRenameStart}
@@ -237,6 +259,31 @@ const IndexInfo = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <SpinningCircle width={16} height={16} color="#666" />
           <span>Loading index information...</span>
+        </div>
+      )}
+
+      {isMongoIndex && (
+        <div style={{
+          padding: '6px 8px',
+          marginBottom: '6px',
+          backgroundColor: '#e3f2fd',
+          border: '1px solid #90caf9',
+          borderRadius: '2px',
+          fontSize: '13px',
+          color: '#1565c0'
+        }}>
+          <div style={{ fontWeight: '600', marginBottom: '4px' }}>Mongo-ES Index</div>
+          <div>This Elasticsearch index is managed by the mongo-index system. It automatically indexes MongoDB collections for search.</div>
+          {mongoIndexName && (
+            <div style={{ marginTop: '4px', fontSize: '12px' }}>
+              Mongo-Index Name: <strong>{mongoIndexName}</strong>
+            </div>
+          )}
+          {indexData?.mongoData?.collections && indexData.mongoData.collections.length > 0 && (
+            <div style={{ marginTop: '4px', fontSize: '12px' }}>
+              Monitors {indexData.mongoData.collections.length} MongoDB collection(s)
+            </div>
+          )}
         </div>
       )}
 

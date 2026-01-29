@@ -227,7 +227,8 @@ public class ElasticSearchController {
             if (!baseUri.endsWith("/")) {
                 baseUri += "/";
             }
-            String listUri = baseUri + "_cat/indices?format=json";
+            // Include expand_wildcards=all to show hidden indices as well
+            String listUri = baseUri + "_cat/indices?format=json&expand_wildcards=all";
             
             java.net.URL url = new java.net.URL(listUri);
             java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection(java.net.Proxy.NO_PROXY);
@@ -269,7 +270,10 @@ public class ElasticSearchController {
                     
                     for (java.util.Map<String, Object> index : indices) {
                         String indexName = (String) index.get("index");
-                        if (indexName != null) {
+                        
+                        // Filter out system indices (starting with .)
+                        // Include all indices regardless of status (open/close)
+                        if (indexName != null && !indexName.startsWith(".")) {
                             indexNames.add(indexName);
                         }
                     }

@@ -11,7 +11,7 @@
  */
 
 import { atom } from 'jotai';
-import { convertPathToMongoDotNotation } from '../../../../2025/react-comp-misc/src/layout/json/pathUtils';
+import { convertPathToMongoDotNotation } from '@wwf971/react-comp-misc/src/layout/json/pathUtils';
 import { getBackendServerUrl } from '../remote/backendServerStore';
 
 // Re-export useMongoDocEditor from mongoEdit.js for backwards compatibility

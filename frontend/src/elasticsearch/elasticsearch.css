@@ -6,13 +6,6 @@
   background-color: #f9f9f9;
 }
 
-.es-section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
 .es-refresh-button {
   padding: 4px 0px;
   border: none;
@@ -59,7 +52,7 @@
 
 .es-index-info {
   margin-bottom: 12px;
-  padding: 12px;
+  padding: 6px 8px 8px 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background-color: #f9f9f9;

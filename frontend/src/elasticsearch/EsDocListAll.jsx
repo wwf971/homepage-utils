@@ -291,7 +291,7 @@ const EsDocListAll = ({ indexName }) => {
 
   return (
     <div className="es-docs-section">
-      <div className="es-section-header">
+      <div className="section-header">
         <div className="section-title">Documents in "{indexName}"</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button

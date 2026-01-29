@@ -234,18 +234,28 @@ export async function fetchAllEsIndices(forceRefresh = false, getAtomValue = nul
     // Handle mongo-index entries
     const mongoIndices = mongoResult.code === 0 ? mongoResult.data : [];
     
-    // Create a map of ES index name -> mongo-index data
+    // Create a map of ES index name (lowercase) -> mongo-index data
+    // Use lowercase for case-insensitive matching since ES index names are case-insensitive
     const mongoIndexMap = new Map();
     mongoIndices.forEach(mi => {
       if (mi.esIndex) {
-        mongoIndexMap.set(mi.esIndex, mi);
+        const lowerCaseEsIndex = mi.esIndex.toLowerCase();
+        mongoIndexMap.set(lowerCaseEsIndex, mi);
       }
     });
+
+    // Create a Set of ES index names (lowercase) for quick lookup
+    const esIndexNamesSet = new Set(
+      esIndices.map(esIndex => {
+        const name = typeof esIndex === 'string' ? esIndex : esIndex.name;
+        return name.toLowerCase();
+      })
+    );
 
     // Merge: mark ES indices that are mongo-indices
     const mergedIndices = esIndices.map(esIndex => {
       const indexName = typeof esIndex === 'string' ? esIndex : esIndex.name;
-      const mongoData = mongoIndexMap.get(indexName);
+      const mongoData = mongoIndexMap.get(indexName.toLowerCase());
       
       const indexData = {
         name: indexName,
@@ -262,6 +272,28 @@ export async function fetchAllEsIndices(forceRefresh = false, getAtomValue = nul
       }
       
       return indexData;
+    });
+
+    // Add mongo-index entries whose ES indices don't exist yet
+    // Use case-insensitive comparison
+    mongoIndices.forEach(mi => {
+      if (mi.esIndex && !esIndexNamesSet.has(mi.esIndex.toLowerCase())) {
+        const indexData = {
+          name: mi.esIndex,
+          isMongoIndex: true,
+          mongoData: mi,
+          timestamp: Date.now(),
+          esIndexMissing: true  // Flag to indicate ES index doesn't exist
+        };
+        
+        // Store in individual atom
+        if (setAtomValue) {
+          const indexAtom = getIndexAtom(mi.esIndex);
+          setAtomValue(indexAtom, indexData);
+        }
+        
+        mergedIndices.push(indexData);
+      }
     });
 
     // Update names list cache

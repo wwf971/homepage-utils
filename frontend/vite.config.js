@@ -8,6 +8,9 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis'
+  },
+  optimizeDeps: {
+    include: ['@stomp/stompjs', 'sockjs-client']
   }
 });
 

@@ -18,7 +18,7 @@ import {
   navigateToPath,
   navigateToParentArray,
   isPathToArrayItem
-} from '../../../../2025/react-comp-misc/src/layout/json/pathUtils';
+} from '@wwf971/react-comp-misc/src/layout/json/pathUtils';
 import {
   updateDocField,
   replaceDocFields,

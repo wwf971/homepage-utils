@@ -33,12 +33,12 @@ const IdSearch = () => {
         }
 
         response = await getIdByValue(searchValue.trim());
-        if (response.success) {
+        if (response.code === 0) {
           // Get conversions
-          const conversionResult = await convertId(response.id.value, 'all');
+          const conversionResult = await convertId(response.data.value, 'all');
           const idWithConversions = {
-            ...response.id,
-            conversions: conversionResult.success ? conversionResult.conversions : null
+            ...response.data,
+            conversions: conversionResult.code === 0 ? conversionResult.data : null
           };
           setResults({
             ids: [idWithConversions],
@@ -63,14 +63,14 @@ const IdSearch = () => {
         };
 
         response = await searchIdsBySubstring(request);
-        if (response.success) {
+        if (response.code === 0) {
           // Get conversions for all IDs
           const idsWithConversions = await Promise.all(
             response.data.ids.map(async (id) => {
               const conversionResult = await convertId(id.value, 'all');
               return {
                 ...id,
-                conversions: conversionResult.success ? conversionResult.conversions : null
+                conversions: conversionResult.code === 0 ? conversionResult.data : null
               };
             })
           );
@@ -83,14 +83,14 @@ const IdSearch = () => {
         }
       } else if (searchType === 'list') {
         response = await listIds(page, pageSize);
-        if (response.success) {
+        if (response.code === 0) {
           // Get conversions for all IDs
           const idsWithConversions = await Promise.all(
             response.data.ids.map(async (id) => {
               const conversionResult = await convertId(id.value, 'all');
               return {
                 ...id,
-                conversions: conversionResult.success ? conversionResult.conversions : null
+                conversions: conversionResult.code === 0 ? conversionResult.data : null
               };
             })
           );
@@ -112,14 +112,14 @@ const IdSearch = () => {
         };
 
         response = await searchIds(request);
-        if (response.success) {
+        if (response.code === 0) {
           // Get conversions for all IDs
           const idsWithConversions = await Promise.all(
             response.data.ids.map(async (id) => {
               const conversionResult = await convertId(id.value, 'all');
               return {
                 ...id,
-                conversions: conversionResult.success ? conversionResult.conversions : null
+                conversions: conversionResult.code === 0 ? conversionResult.data : null
               };
             })
           );
@@ -146,7 +146,7 @@ const IdSearch = () => {
     setDeletingId(idValue);
     try {
       const response = await deleteId(idValue);
-      if (response.success) {
+      if (response.code === 0) {
         // Remove the deleted ID from results
         setResults(prev => ({
           ...prev,

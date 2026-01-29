@@ -26,9 +26,15 @@ const MongoIndexCardWrapper = ({ indexName, onUpdate, onDelete, onJsonEdit }) =>
     return null;
   }
   
+  // Merge mongoData with esIndexMissing flag
+  const indexWithFlags = {
+    ...indexData.mongoData,
+    esIndexMissing: indexData.esIndexMissing || false
+  };
+  
   return (
     <MongoIndexCard
-      index={indexData.mongoData}
+      index={indexWithFlags}
       onUpdate={onUpdate}
       onDelete={onDelete}
       onJsonEdit={onJsonEdit}

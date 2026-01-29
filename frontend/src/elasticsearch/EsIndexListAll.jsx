@@ -83,7 +83,7 @@ const EsIndexListAll = ({ onTestConnection, hasSuccessfulTest, isTestingConnecti
 
   return (
     <div className="es-indices-section">
-      <div className="es-section-header">
+      <div className="section-header">
         <div className="section-title">Elasticsearch Indices</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button 

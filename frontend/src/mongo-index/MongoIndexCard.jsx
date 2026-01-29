@@ -258,6 +258,20 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
         </div>
       </div>
       
+      {index.esIndexMissing && (
+        <div style={{
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '2px',
+          padding: '6px 8px',
+          marginBottom: '8px',
+          fontSize: '12px',
+          color: '#856404'
+        }}>
+          <strong>Warning:</strong> Elasticsearch index "{index.esIndex}" does not exist. The index metadata exists in MongoDB but the actual ES index needs to be created.
+        </div>
+      )}
+      
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
         <div className="mongo-index-card-section-title" style={{ marginBottom: 0 }}>
           MongoDB Collections Monitored:

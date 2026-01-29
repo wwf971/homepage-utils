@@ -45,13 +45,13 @@ const IdIssue = () => {
         response = await issueMs48Id(request);
       }
 
-      if (response.success) {
+      if (response.code === 0) {
         // Get conversion formats
-        // Note: response.id.value is now a string to preserve precision
-        const conversionResult = await convertId(response.id.value, 'all');
+        // Note: response.data.value is now a string to preserve precision
+        const conversionResult = await convertId(response.data.value, 'all');
         setResult({
-          ...response.id,
-          conversions: conversionResult.success ? conversionResult.conversions : null
+          ...response.data,
+          conversions: conversionResult.code === 0 ? conversionResult.data : null
         });
       } else {
         setError(response.message || 'Failed to issue ID');
