@@ -834,3 +834,134 @@ export async function recreateIdTable() {
     return { code: -2, message: error.message || 'Network error' };
   }
 }
+
+// ID operations
+export async function issueRandomId(request) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/issue/random`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to issue random ID:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function issueMs48Id(request) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/issue/ms48`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to issue ms48 ID:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function getIdByValue(value) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/get/${encodeURIComponent(value)}`);
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to get ID:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function listIds(page = 0, pageSize = 20) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/list?page=${page}&pageSize=${pageSize}`);
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to list IDs:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function searchIds(request) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to search IDs:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function updateIdMetadata(value, metadata) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/${encodeURIComponent(value)}/metadata`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metadata })
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to update ID metadata:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function deleteId(value) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/${encodeURIComponent(value)}`, {
+      method: 'DELETE'
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to delete ID:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function convertId(value, format) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/convert/${encodeURIComponent(value)}/${format}`);
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to convert ID:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}
+
+export async function searchIdsBySubstring(request) {
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/id/search/substring`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Failed to search IDs by substring:', error);
+    return { success: false, message: error.message || 'Network error' };
+  }
+}

@@ -7,6 +7,118 @@
   padding: 10px;
 }
 
+/* Button styles */
+.button-primary {
+  padding: 6px 16px;
+  font-size: 13px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.button-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.button-primary:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.button-secondary {
+  padding: 6px 16px;
+  font-size: 13px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.button-secondary:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.button-danger {
+  padding: 6px 16px;
+  font-size: 13px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.button-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.button-danger:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Input styles */
+.input-text {
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-family: inherit;
+}
+
+.input-text:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+/* Message styles */
+.error-message {
+  padding: 8px;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 3px;
+  color: #c33;
+  font-size: 13px;
+}
+
+.success-message {
+  padding: 8px;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 3px;
+  color: #155724;
+  font-size: 13px;
+}
+
+.info-message {
+  padding: 8px;
+  background-color: #d1ecf1;
+  border: 1px solid #bee5eb;
+  border-radius: 3px;
+  color: #0c5460;
+  font-size: 13px;
+}
+
+.warning-message {
+  padding: 8px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 3px;
+  color: #856404;
+  font-size: 13px;
+}
+
 
 .config-section {
   height: 100%;
