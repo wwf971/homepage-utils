@@ -12,7 +12,7 @@ import {
   fetchAllEsIndices, 
   esIndexAtoms,
   getIndexAtom,
-  deleteIndexAtom,
+  deleteEsIndexAtom,
   esIndexNamesAtom,
   esIndexNamesTimestampAtom,
   esIndicesLoadingAtom,
@@ -186,7 +186,7 @@ export async function deleteMongoIndex(indexName, setAtomValue = null, getAtomVa
           if (indexData?.mongoData?.name === indexName) {
             esIndexNameToDelete = name;
             // Garbage collect the ES index atom
-            deleteIndexAtom(name);
+            deleteEsIndexAtom(name);
             break;
           }
         }

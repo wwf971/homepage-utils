@@ -331,7 +331,7 @@ export async function deleteCollection(databaseName, collectionName) {
 /**
  * Fetch documents in a specific MongoDB collection with pagination
  */
-export async function fetchMongoDocuments(databaseName, collectionName, page = 1, pageSize = 20) {
+export async function fetchMongoDocs(databaseName, collectionName, page = 1, pageSize = 20) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
@@ -358,7 +358,7 @@ export async function fetchMongoDocuments(databaseName, collectionName, page = 1
 /**
  * Create an empty document in a MongoDB collection
  */
-export async function createMongoDocument(databaseName, collectionName) {
+export async function createMongoDoc(databaseName, collectionName) {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(

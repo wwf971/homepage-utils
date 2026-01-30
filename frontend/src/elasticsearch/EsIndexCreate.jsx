@@ -5,12 +5,12 @@ import { createEsIndex } from './EsStore';
 import './elasticsearch.css';
 
 /**
- * CreateIndex - Panel component for creating a new Elasticsearch index
+ * EsIndexCreate - Panel component for creating a new Elasticsearch index
  * 
  * @param {function} onClose - Callback when panel is closed
  * @param {function} onSuccess - Callback when index is successfully created
  */
-const CreateIndex = ({ onClose, onSuccess }) => {
+const EsIndexCreate = ({ onClose, onSuccess }) => {
   const [indexName, setIndexName] = useState('');
   const [indexMapping, setIndexMapping] = useState('');
   const [creating, setIsCreating] = useState(false);
@@ -236,5 +236,5 @@ const CreateIndex = ({ onClose, onSuccess }) => {
   );
 };
 
-export default CreateIndex;
+export default EsIndexCreate;
 

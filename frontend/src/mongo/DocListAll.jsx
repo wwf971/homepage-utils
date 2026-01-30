@@ -8,8 +8,8 @@ import {
   mongoDocsPageAtom,
   mongoDocsTotalAtom,
   mongoDocsPageSizeAtom,
-  fetchMongoDocuments,
-  createMongoDocument
+  fetchMongoDocs,
+  createMongoDoc
 } from '../remote/dataStore';
 import DocList from './DocList';
 import './mongo.css';
@@ -20,9 +20,9 @@ import './mongo.css';
  * @param {boolean} shouldLoad - Whether to load documents (controlled by parent)
  */
 const DocListAll = ({ shouldLoad = true }) => {
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [creating, setCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   
   const selectedDatabase = useAtomValue(mongoSelectedDatabaseAtom);
   const selectedCollection = useAtomValue(mongoSelectedCollectionAtom);
@@ -51,10 +51,10 @@ const DocListAll = ({ shouldLoad = true }) => {
   const loadDocuments = async (targetPage) => {
     if (!selectedDatabase || !selectedCollection) return;
 
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
 
-    const result = await fetchMongoDocuments(selectedDatabase, selectedCollection, targetPage, pageSize);
+    const result = await fetchMongoDocs(selectedDatabase, selectedCollection, targetPage, pageSize);
     
     if (result.code === 0) {
       setDocs(result.data);
@@ -64,7 +64,7 @@ const DocListAll = ({ shouldLoad = true }) => {
       setError(result.message);
     }
     
-    setLoading(false);
+    setIsLoading(false);
   };
 
   const handleRefresh = () => {
@@ -81,13 +81,13 @@ const DocListAll = ({ shouldLoad = true }) => {
     }
   };
 
-  const handleCreateDocument = async () => {
+  const handleDocCreate = async () => {
     if (!selectedDatabase || !selectedCollection) return;
 
-    setCreating(true);
+    setIsCreating(true);
     setError(null);
 
-    const result = await createMongoDocument(selectedDatabase, selectedCollection);
+    const result = await createMongoDoc(selectedDatabase, selectedCollection);
     
     if (result.code === 0) {
       // Insert the new document at the beginning of the current docs array
@@ -106,10 +106,10 @@ const DocListAll = ({ shouldLoad = true }) => {
       setError(result.message);
     }
     
-    setCreating(false);
+    setIsCreating(false);
   };
 
-  const handleDeleteDocument = (docId) => {
+  const handleDocDelete = (docId) => {
     // Remove the document from the current docs array
     const updatedDocs = docs.filter(doc => doc._id !== docId);
     setDocs(updatedDocs);
@@ -137,23 +137,23 @@ const DocListAll = ({ shouldLoad = true }) => {
           <button
             className="mongo-refresh-button"
             onClick={handleRefresh}
-            disabled={loading || creating}
+            disabled={isLoading || isCreating}
             title="Refresh documents"
           >
             <RefreshIcon width={16} height={16} />
           </button>
           <button
             className="mongo-refresh-button"
-            onClick={handleCreateDocument}
-            disabled={loading || creating}
+            onClick={handleDocCreate}
+            disabled={isLoading || isCreating}
             title="Create new empty document"
           >
-            {creating ? <SpinningCircle width={16} height={16} /> : <PlusIcon width={16} height={16} />}
+            {isCreating ? <SpinningCircle width={16} height={16} /> : <PlusIcon width={16} height={16} />}
           </button>
         </div>
       </div>
       
-      {loading && (
+      {isLoading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
           <SpinningCircle width={16} height={16} color="#666" />
           <span>Loading documents...</span>
@@ -167,7 +167,7 @@ const DocListAll = ({ shouldLoad = true }) => {
         </div>
       )}
 
-      {Array.isArray(docs) && !loading && (
+      {Array.isArray(docs) && !isLoading && (
         <div style={{ marginTop: '6px' }}>
           <DocList
             docs={docs}
@@ -176,7 +176,7 @@ const DocListAll = ({ shouldLoad = true }) => {
             total={total}
             pageSize={pageSize}
             onPageChange={handlePageChange}
-            onDelete={handleDeleteDocument}
+            onDelete={handleDocDelete}
             emptyMessage="No documents in this collection"
           />
         </div>

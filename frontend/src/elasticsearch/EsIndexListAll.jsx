@@ -5,7 +5,7 @@ import {
   esSelectedIndexAtom
 } from '../remote/dataStore';
 import { fetchAllEsIndices, esIndexNamesAtom } from './EsStore';
-import CreateIndex from './CreateIndex';
+import EsIndexCreate from './EsIndexCreate';
 import './elasticsearch.css';
 
 /**
@@ -162,7 +162,7 @@ const EsIndexListAll = ({ onTestConnection, hasSuccessfulTest, isTestingConnecti
       )}
 
       {showCreatePanel && (
-        <CreateIndex 
+        <EsIndexCreate 
           onClose={() => setShowCreatePanel(false)}
           onSuccess={handleCreateSuccess}
         />

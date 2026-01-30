@@ -1,0 +1,1 @@
+export { default as MongoAppConfig } from './mongo-app/MongoAppConfig'

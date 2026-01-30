@@ -43,8 +43,8 @@ export {
   fetchMongoDatabases,
   fetchMongoCollections,
   createMongoCollection,
-  fetchMongoDocuments,
-  createMongoDocument,
+  fetchMongoDocs,
+  createMongoDoc,
   deleteMongoDocument
 } from '../mongo/mongoStore';
 

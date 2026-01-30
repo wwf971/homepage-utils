@@ -5,13 +5,13 @@ import { createEsDoc, getDocAtom } from './EsStore';
 import './elasticsearch.css';
 
 /**
- * CreateDoc - Panel component for creating a new Elasticsearch document
+ * EsDocCreate - Panel component for creating a new Elasticsearch document
  * 
  * @param {string} indexName - Name of the index to create document in
  * @param {function} onClose - Callback when panel is closed
  * @param {function} onSuccess - Callback when document is successfully created
  */
-const CreateDoc = ({ indexName, onClose, onSuccess }) => {
+const EsDocCreate = ({ indexName, onClose, onSuccess }) => {
   const [docJson, setDocJson] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
@@ -150,5 +150,5 @@ const CreateDoc = ({ indexName, onClose, onSuccess }) => {
   );
 };
 
-export default CreateDoc;
+export default EsDocCreate;
 

@@ -17,7 +17,7 @@ import {
   isFieldBlocked
 } from './EditUtils';
 import ConfirmDialog from '../components/ConfirmDialog';
-import CreateDoc from './CreateDoc';
+import EsDocCreate from './EsDocCreate';
 import './elasticsearch.css';
 
 /**
@@ -402,7 +402,7 @@ const EsDocListAll = ({ indexName }) => {
       />
 
       {shouldShowCreatePanel && (
-        <CreateDoc
+        <EsDocCreate
           indexName={indexName}
           onClose={() => setShouldShowCreatePanel(false)}
           onSuccess={handleCreateSuccess}

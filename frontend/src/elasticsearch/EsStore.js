@@ -40,7 +40,7 @@ export function getIndexAtom(indexName) {
 /**
  * Delete atom for a specific index (for garbage collection)
  */
-export function deleteIndexAtom(indexName) {
+export function deleteEsIndexAtom(indexName) {
   esIndexAtoms.delete(indexName);
 }
 
@@ -76,7 +76,7 @@ export function getIndexInfoAtom(indexName) {
 /**
  * Delete info atom for a specific index (for garbage collection)
  */
-export function deleteIndexInfoAtom(indexName) {
+export function deleteEsIndexAtom(indexName) {
   esIndexInfoAtoms.delete(indexName);
 }
 
@@ -377,8 +377,8 @@ export async function deleteElasticsearchIndex(indexName, setAtomValue = null, g
     
     if (result.code === 0) {
       // Garbage collect all atoms related to this index
-      deleteIndexAtom(indexName);
-      deleteIndexInfoAtom(indexName);
+      deleteEsIndexAtom(indexName);
+      deleteEsIndexAtom(indexName);
       deleteAllDocAtomsForIndex(indexName);
       deleteDocListAtom(indexName);
       
@@ -419,14 +419,14 @@ export async function renameEsIndex(oldName, newName, setAtomValue = null, getAt
     
     if (result.code === 0) {
       // Garbage collect all atoms related to old index
-      deleteIndexAtom(oldName);
-      deleteIndexInfoAtom(oldName);
+      deleteEsIndexAtom(oldName);
+      deleteEsIndexAtom(oldName);
       deleteAllDocAtomsForIndex(oldName);
       deleteDocListAtom(oldName);
       
       // Also delete atoms for new name in case they exist
-      deleteIndexAtom(newName);
-      deleteIndexInfoAtom(newName);
+      deleteEsIndexAtom(newName);
+      deleteEsIndexAtom(newName);
       deleteAllDocAtomsForIndex(newName);
       deleteDocListAtom(newName);
       
@@ -528,9 +528,9 @@ export function invalidateIndicesCache(setAtomValue, getAtomValue = null) {
  * Invalidate index info cache for a specific index
  * @param {string} indexName - Name of the index
  */
-export function invalidateIndexInfoCache(indexName) {
+export function invalidateIndexCache(indexName) {
   // Individual atom approach: just delete the atom for garbage collection
-  deleteIndexInfoAtom(indexName);
+  deleteEsIndexAtom(indexName);
 }
 
 /**
