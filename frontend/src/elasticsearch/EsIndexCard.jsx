@@ -14,7 +14,7 @@ import './elasticsearch.css';
 /**
  * IndexInfo - Component for displaying information about a selected Elasticsearch index
  */
-const IndexInfo = () => {
+const EsIndexCard = () => {
   const selectedIndexName = useAtomValue(esSelectedIndexAtom);
   const setSelectedIndexName = useSetAtom(esSelectedIndexAtom);
   const [loading, setLoading] = useState(false);
@@ -329,5 +329,5 @@ const IndexInfo = () => {
   );
 };
 
-export default IndexInfo;
+export default EsIndexCard;
 

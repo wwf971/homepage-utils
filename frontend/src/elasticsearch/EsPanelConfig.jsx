@@ -227,8 +227,6 @@ export const ConfigPanel = () => {
         </TabsOnTop.Tab>
       </TabsOnTop>
 
-      <div style={{ marginTop: '12px' }}></div>
-      
       <EsTestConnection 
         onTestSuccess={() => {}}
         onTestResult={handleTestResult}

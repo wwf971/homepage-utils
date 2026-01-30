@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
-import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
+import { PanelWithToggle, KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
 import { esComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
 import '../styles/common.css';
 
@@ -89,9 +89,8 @@ export const EsTestConnection = ({ onTestSuccess, onTestResult, isTestingConnect
   };
 
   return (
-    <>
-      <div className="panel-title">Test Elasticsearch Connection</div>
-      
+    <PanelWithToggle title="Test Elasticsearch Connection" defaultExpanded={true}>
+
       <div className="test-config-section">
         <div className="section-title">Current Config(Computed)</div>
         {config.length === 0 ? (
@@ -137,7 +136,7 @@ export const EsTestConnection = ({ onTestSuccess, onTestResult, isTestingConnect
           </div>
         )}
       </div>
-    </>
+    </PanelWithToggle>
   );
 };
 

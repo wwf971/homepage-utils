@@ -162,7 +162,7 @@ function isCacheValid(timestamp, ttl) {
 async function fetchPureEsIndices() {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/elasticsearch/indices/`);
+    const response = await fetch(`${backendUrl}/elasticsearch/indices/list`);
     const result = await response.json();
     
     if (result.code === 0) {
@@ -370,7 +370,7 @@ export async function fetchEsIndexInfo(indexName, forceRefresh = false, getAtomV
 export async function deleteElasticsearchIndex(indexName, setAtomValue = null, getAtomValue = null) {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}`, {
+    const response = await fetch(`${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/delete`, {
       method: 'DELETE'
     });
     const result = await response.json();
@@ -466,7 +466,7 @@ export async function renameEsIndex(oldName, newName, setAtomValue = null, getAt
 export async function createEsIndex(indexName, body = {}, setAtomValue = null, getAtomValue = null) {
   try {
     const backendUrl = getBackendServerUrl();
-    const response = await fetch(`${backendUrl}/elasticsearch/indices/`, {
+    const response = await fetch(`${backendUrl}/elasticsearch/indices/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -634,7 +634,7 @@ export async function deleteEsDoc(indexName, docId, setAtomValue = null, getAtom
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/docs/${encodeURIComponent(docId)}/delete`,
       {
         method: 'DELETE'
       }
@@ -679,7 +679,7 @@ export async function createEsDoc(indexName, body = {}, setAtomValue = null, get
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/docs/`,
+      `${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/docs/create`,
       {
         method: 'POST',
         headers: {
@@ -766,7 +766,7 @@ export async function updateEsDoc(indexName, docId, newDoc, setAtomValue = null)
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(
-      `${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/docs/${encodeURIComponent(docId)}`,
+      `${backendUrl}/elasticsearch/indices/${encodeURIComponent(indexName)}/docs/${encodeURIComponent(docId)}/update`,
       {
         method: 'PUT',
         headers: {

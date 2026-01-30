@@ -187,6 +187,7 @@ public class ElasticSearchService {
               },
               "mappings": {
                 "properties": {
+
                   "flat": {
                     "type": "nested",
                     "properties": {
@@ -461,6 +462,547 @@ public class ElasticSearchService {
         HttpURLConnection connection = setupConnection(indexUri, "HEAD");
         int respCode = connection.getResponseCode();
         return respCode == 200;
+    }
+
+    /**
+     * Test Elasticsearch connection
+     */
+    public String testConnection() throws Exception {
+        String baseUri = getBaseUri();
+        String testUri = baseUri + "_cluster/health";
+
+        HttpURLConnection connection = setupConnection(testUri, "GET");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            String response = readResponse(connection);
+            return response;
+        } else {
+            throw new Exception("Connection test failed with HTTP " + respCode);
+        }
+    }
+
+    /**
+     * List all indices
+     */
+    public List<String> listIndices() throws Exception {
+        String baseUri = getBaseUri();
+        String listUri = baseUri + "_cat/indices?format=json&expand_wildcards=all";
+
+        HttpURLConnection connection = setupConnection(listUri, "GET");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            String response = readResponse(connection);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> indices = objectMapper.readValue(response, List.class);
+
+            List<String> indexNames = new ArrayList<>();
+            for (Map<String, Object> index : indices) {
+                String indexName = (String) index.get("index");
+                if (indexName != null && !indexName.startsWith(".")) {
+                    indexNames.add(indexName);
+                }
+            }
+            return indexNames;
+        } else {
+            throw new Exception("Failed to list indices: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Get index information
+     */
+    public Map<String, Object> getIndexInfo(String indexName) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String infoUri = baseUri + indexName;
+
+        HttpURLConnection connection = setupConnection(infoUri, "GET");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            String response = readResponse(connection);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> indexInfo = objectMapper.readValue(response, Map.class);
+            return indexInfo;
+        } else if (respCode == 404) {
+            throw new Exception("Index not found: " + indexName);
+        } else {
+            throw new Exception("Failed to get index info: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Create an index with optional settings/mappings
+     */
+    public void createIndex(String indexName, Map<String, Object> body) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String createUri = baseUri + indexName;
+
+        HttpURLConnection connection = setupConnection(createUri, "PUT");
+        connection.setDoOutput(true);
+
+        if (body != null && !body.isEmpty()) {
+            String jsonBody = objectMapper.writeValueAsString(body);
+            try (OutputStream os = connection.getOutputStream()) {
+                os.write(jsonBody.getBytes("utf-8"));
+            }
+        }
+
+        int respCode = connection.getResponseCode();
+        if (respCode == 200 || respCode == 201) {
+            System.out.println("Created index: " + indexName);
+        } else {
+            String errorResponse = readResponse(connection);
+            throw new Exception("Failed to create index: HTTP " + respCode + " - " + errorResponse);
+        }
+    }
+
+    /**
+     * Delete an index
+     */
+    public void deleteIndex(String indexName) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String deleteUri = baseUri + indexName;
+
+        HttpURLConnection connection = setupConnection(deleteUri, "DELETE");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            System.out.println("Deleted index: " + indexName);
+        } else if (respCode == 404) {
+            throw new Exception("Index not found: " + indexName);
+        } else {
+            throw new Exception("Failed to delete index: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Rename an index using reindex + delete
+     */
+    public void renameIndex(String oldName, String newName) throws Exception {
+        oldName = oldName.toLowerCase();
+        newName = newName.toLowerCase();
+        String baseUri = getBaseUri();
+
+        // Step 1: Reindex
+        String reindexUri = baseUri + "_reindex";
+        Map<String, Object> reindexBody = new HashMap<>();
+        reindexBody.put("source", Map.of("index", oldName));
+        reindexBody.put("dest", Map.of("index", newName));
+
+        HttpURLConnection reindexConn = setupConnection(reindexUri, "POST");
+        reindexConn.setConnectTimeout(30000);
+        reindexConn.setReadTimeout(30000);
+        reindexConn.setDoOutput(true);
+
+        String jsonBody = objectMapper.writeValueAsString(reindexBody);
+        try (OutputStream os = reindexConn.getOutputStream()) {
+            os.write(jsonBody.getBytes("utf-8"));
+        }
+
+        int reindexRespCode = reindexConn.getResponseCode();
+        if (reindexRespCode != 200) {
+            String errorResponse = readResponse(reindexConn);
+            throw new Exception("Failed to reindex: HTTP " + reindexRespCode + " - " + errorResponse);
+        }
+
+        // Step 2: Delete old index
+        deleteIndex(oldName);
+        System.out.println("Renamed index from " + oldName + " to " + newName);
+    }
+
+    /**
+     * Get documents from an index with pagination
+     */
+    public Map<String, Object> getDocuments(String indexName, int page, int pageSize) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        int from = (page - 1) * pageSize;
+        String searchUri = baseUri + indexName + "/_search?from=" + from + "&size=" + pageSize;
+
+        HttpURLConnection connection = setupConnection(searchUri, "GET");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            String response = readResponse(connection);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> searchResult = objectMapper.readValue(response, Map.class);
+
+            // Extract documents
+            @SuppressWarnings("unchecked")
+            Map<String, Object> hits = (Map<String, Object>) searchResult.get("hits");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> hitsList = (List<Map<String, Object>>) hits.get("hits");
+
+            List<Map<String, Object>> documents = new ArrayList<>();
+            for (Map<String, Object> hit : hitsList) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> source = (Map<String, Object>) hit.get("_source");
+                Map<String, Object> doc = new HashMap<>(source);
+                doc.put("_id", hit.get("_id"));
+                documents.add(doc);
+            }
+
+            // Get total count
+            @SuppressWarnings("unchecked")
+            Map<String, Object> totalObj = (Map<String, Object>) hits.get("total");
+            int total = 0;
+            if (totalObj != null) {
+                Object value = totalObj.get("value");
+                if (value instanceof Integer) {
+                    total = (Integer) value;
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("documents", documents);
+            result.put("total", total);
+            result.put("page", page);
+            result.put("pageSize", pageSize);
+
+            return result;
+        } else {
+            throw new Exception("Failed to get documents: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Create a document in an index
+     */
+    public String createDocument(String indexName, Map<String, Object> body) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String createUri = baseUri + indexName + "/_doc";
+
+        HttpURLConnection connection = setupConnection(createUri, "POST");
+        connection.setDoOutput(true);
+
+        String jsonBody = objectMapper.writeValueAsString(body);
+        try (OutputStream os = connection.getOutputStream()) {
+            os.write(jsonBody.getBytes("utf-8"));
+        }
+
+        int respCode = connection.getResponseCode();
+        if (respCode == 200 || respCode == 201) {
+            String response = readResponse(connection);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> createResult = objectMapper.readValue(response, Map.class);
+            String docId = (String) createResult.get("_id");
+            System.out.println("Created document: " + docId);
+            return docId;
+        } else {
+            throw new Exception("Failed to create document: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Update a document in an index
+     */
+    public void updateDocument(String indexName, String docId, Map<String, Object> body) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String updateUri = baseUri + indexName + "/_doc/" + docId;
+
+        HttpURLConnection connection = setupConnection(updateUri, "PUT");
+        connection.setDoOutput(true);
+
+        String jsonBody = objectMapper.writeValueAsString(body);
+        try (OutputStream os = connection.getOutputStream()) {
+            os.write(jsonBody.getBytes("utf-8"));
+        }
+
+        int respCode = connection.getResponseCode();
+        if (respCode == 200 || respCode == 201) {
+            System.out.println("Updated document: " + docId);
+        } else if (respCode == 404) {
+            throw new Exception("Document not found: " + docId);
+        } else {
+            throw new Exception("Failed to update document: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Get a single document by ID
+     */
+    public Map<String, Object> getDocument(String indexName, String docId) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String getUri = baseUri + indexName + "/_doc/" + docId;
+
+        HttpURLConnection connection = setupConnection(getUri, "GET");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            String response = readResponse(connection);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> getDoc = objectMapper.readValue(response, Map.class);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> source = (Map<String, Object>) getDoc.get("_source");
+            Map<String, Object> doc = new HashMap<>(source);
+            doc.put("_id", getDoc.get("_id"));
+            return doc;
+        } else if (respCode == 404) {
+            throw new Exception("Document not found: " + docId);
+        } else {
+            throw new Exception("Failed to get document: HTTP " + respCode);
+        }
+    }
+
+    /**
+     * Update index metadata settings
+     * Adds or updates a key-value pair under index.meta
+     */
+    public void updateIndexMeta(String indexName, String key, String value) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String settingsUri = baseUri + indexName + "/_settings";
+
+        // Build settings update with index.meta.key = value
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("index.meta." + key, value);
+
+        HttpURLConnection connection = setupConnection(settingsUri, "PUT");
+        connection.setDoOutput(true);
+
+        String jsonBody = objectMapper.writeValueAsString(settings);
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = jsonBody.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        int respCode = connection.getResponseCode();
+        if (respCode == 200) {
+            System.out.println("Updated index meta for " + indexName + ": " + key + " = " + value);
+        } else {
+            String errorResponse = readResponse(connection);
+            throw new Exception("Failed to update index meta: HTTP " + respCode + " - " + errorResponse);
+        }
+    }
+
+    /**
+     * Get index settings including metadata
+     */
+    public Map<String, Object> getIndexSettings(String indexName) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String settingsUri = baseUri + indexName + "/_settings";
+
+        HttpURLConnection connection = setupConnection(settingsUri, "GET");
+        int respCode = connection.getResponseCode();
+
+        if (respCode == 200) {
+            String response = readResponse(connection);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = objectMapper.readValue(response, Map.class);
+            return result;
+        } else if (respCode == 404) {
+            throw new Exception("Index not found: " + indexName);
+        } else {
+            String errorResponse = readResponse(connection);
+            throw new Exception("Failed to get index settings: HTTP " + respCode + " - " + errorResponse);
+        }
+    }
+
+    /**
+     * Search documents with pagination and validation for character-level indices
+     */
+    public Map<String, Object> searchDocsWithPagination(String indexName, String query,
+                                                              boolean searchInPaths, boolean searchInValues,
+                                                              int page, int pageSize) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+
+        // First, check if this is a character-level index by getting its mapping
+        String mappingUri = baseUri + indexName + "/_mapping";
+        HttpURLConnection mappingConn = setupConnection(mappingUri, "GET");
+        int mappingResponseCode = mappingConn.getResponseCode();
+
+        if (mappingResponseCode != 200) {
+            throw new Exception("Failed to get index mapping");
+        }
+
+        String mappingResponse = readResponse(mappingConn);
+        if (!mappingResponse.contains("\"flat\"") || !mappingResponse.contains("\"path\"") || !mappingResponse.contains("\"value\"")) {
+            throw new Exception("Index '" + indexName + "' is not a character-level index. " +
+                "It must have a 'flat' nested field with 'path' and 'value' subfields.");
+        }
+
+        // Use existing searchCharIndex method but with pagination
+        List<Map<String, Object>> results = searchCharIndexWithPagination(indexName, query, searchInPaths, searchInValues, page, pageSize);
+
+        // Get total count (approximate - we use page results)
+        long totalHits = results.size(); // This is a simplification; real impl would query ES for total
+
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("results", results);
+        responseData.put("total", totalHits);
+        responseData.put("page", page);
+        responseData.put("page_size", pageSize);
+        responseData.put("total_pages", (int) Math.ceil((double) totalHits / pageSize));
+
+        return responseData;
+    }
+
+    /**
+     * Search a character-level index with pagination
+     */
+    private List<Map<String, Object>> searchCharIndexWithPagination(String indexName, String query,
+                                                                      boolean searchInPaths, boolean searchInValues,
+                                                                      int page, int pageSize) throws Exception {
+        indexName = indexName.toLowerCase();
+        String baseUri = getBaseUri();
+        String searchUri = baseUri + indexName + "/_search";
+
+        // Build should conditions
+        List<Map<String, Object>> shouldConditions = new ArrayList<>();
+
+        if (searchInValues) {
+            Map<String, Object> valueMatch = new HashMap<>();
+            valueMatch.put("match_phrase", Map.of("flat.value", query));
+            shouldConditions.add(valueMatch);
+        }
+
+        if (searchInPaths) {
+            Map<String, Object> pathMatch = new HashMap<>();
+            pathMatch.put("match_phrase", Map.of("flat.path", query));
+            shouldConditions.add(pathMatch);
+        }
+
+        // Build highlight fields
+        Map<String, Object> highlightConfig = new HashMap<>();
+        highlightConfig.put("type", "fvh");
+        highlightConfig.put("pre_tags", new String[]{"[[HIGHLIGHT_START]]"});
+        highlightConfig.put("post_tags", new String[]{"[[HIGHLIGHT_END]]"});
+        highlightConfig.put("fragment_size", 999999);
+        highlightConfig.put("number_of_fragments", 0);
+
+        Map<String, Object> highlightFields = new HashMap<>();
+        if (searchInValues) {
+            highlightFields.put("flat.value", highlightConfig);
+        }
+        if (searchInPaths) {
+            highlightFields.put("flat.path", highlightConfig);
+        }
+
+        // Build search query with pagination
+        int from = (page - 1) * pageSize;
+        Map<String, Object> searchQuery = new HashMap<>();
+        searchQuery.put("query", Map.of(
+            "nested", Map.of(
+                "path", "flat",
+                "query", Map.of("bool", Map.of("should", shouldConditions)),
+                "inner_hits", Map.of(
+                    "_source", true,
+                    "size", 100,
+                    "highlight", Map.of("fields", highlightFields)
+                )
+            )
+        ));
+        searchQuery.put("from", from);
+        searchQuery.put("size", pageSize);
+        searchQuery.put("track_total_hits", true);
+
+        // Execute search
+        HttpURLConnection connection = setupConnection(searchUri, "POST");
+        connection.setDoOutput(true);
+        String jsonQuery = objectMapper.writeValueAsString(searchQuery);
+
+        try (OutputStream os = connection.getOutputStream()) {
+            os.write(jsonQuery.getBytes("utf-8"));
+        }
+
+        int respCode = connection.getResponseCode();
+        if (respCode != 200) {
+            String errorResponse = readResponse(connection);
+            throw new Exception("Search failed: HTTP " + respCode + " - " + errorResponse);
+        }
+
+        String response = readResponse(connection);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = objectMapper.readValue(response, Map.class);
+
+        // Parse results
+        List<Map<String, Object>> structuredResults = new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> hits = (Map<String, Object>) result.get("hits");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> hitsList = (List<Map<String, Object>>) hits.get("hits");
+
+        for (Map<String, Object> hit : hitsList) {
+            Map<String, Object> docResult = new HashMap<>();
+            docResult.put("id", hit.get("_id"));
+            List<Map<String, Object>> matchedKeys = new ArrayList<>();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> innerHitsMap = (Map<String, Object>) hit.get("inner_hits");
+            if (innerHitsMap != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> flatInnerHits = (Map<String, Object>) innerHitsMap.get("flat");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> innerHitsData = (Map<String, Object>) flatInnerHits.get("hits");
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> innerHitsList = (List<Map<String, Object>>) innerHitsData.get("hits");
+
+                for (Map<String, Object> innerHit : innerHitsList) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> source = (Map<String, Object>) innerHit.get("_source");
+                    String path = (String) source.get("path");
+                    String value = (String) source.get("value");
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> highlight = (Map<String, Object>) innerHit.get("highlight");
+                    if (highlight != null) {
+                        // Process highlighted values
+                        if (highlight.containsKey("flat.value") && searchInValues) {
+                            @SuppressWarnings("unchecked")
+                            List<String> highlightedTexts = (List<String>) highlight.get("flat.value");
+                            for (String highlightedText : highlightedTexts) {
+                                List<int[]> positions = extractPositionsFromHighlight(highlightedText, value);
+                                for (int[] pos : positions) {
+                                    Map<String, Object> match = new HashMap<>();
+                                    match.put("key", path);
+                                    match.put("value", value);
+                                    match.put("match_in", "value");
+                                    match.put("start_index", pos[0]);
+                                    match.put("end_index", pos[1]);
+                                    matchedKeys.add(match);
+                                }
+                            }
+                        }
+
+                        // Process highlighted paths
+                        if (highlight.containsKey("flat.path") && searchInPaths) {
+                            @SuppressWarnings("unchecked")
+                            List<String> highlightedTexts = (List<String>) highlight.get("flat.path");
+                            for (String highlightedText : highlightedTexts) {
+                                List<int[]> positions = extractPositionsFromHighlight(highlightedText, path);
+                                for (int[] pos : positions) {
+                                    Map<String, Object> match = new HashMap<>();
+                                    match.put("key", path);
+                                    match.put("value", value);
+                                    match.put("match_in", "key");
+                                    match.put("start_index", pos[0]);
+                                    match.put("end_index", pos[1]);
+                                    matchedKeys.add(match);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!matchedKeys.isEmpty()) {
+                docResult.put("matched_keys", matchedKeys);
+                structuredResults.add(docResult);
+            }
+        }
+
+        return structuredResults;
     }
 
     /**

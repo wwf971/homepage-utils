@@ -3,7 +3,7 @@ import { useAtomValue } from 'jotai';
 import { TabsOnTop } from '@wwf971/react-comp-misc';
 import { esSelectedIndexAtom } from '../remote/dataStore';
 import EsIndexListAll from './EsIndexListAll';
-import IndexInfo from './IndexInfo';
+import EsIndexCard from './EsIndexCard';
 import EsDocSearch from './EsDocSearch';
 import EsDocListAll from './EsDocListAll';
 
@@ -21,7 +21,7 @@ export const EsPanelData = () => {
         <div style={{ marginTop: '8px' }}>
           <TabsOnTop defaultTab="Info" autoSwitchToNewTab={false}>
             <TabsOnTop.Tab label="Info">
-              <IndexInfo />
+              <EsIndexCard />
             </TabsOnTop.Tab>
             
             <TabsOnTop.Tab label="Search">
