@@ -61,23 +61,23 @@ export const esIndicesErrorAtom = atom(null);
  * Map of index name -> atom for that index's detailed info
  * Each atom stores: { data, timestamp }
  */
-export const esIndexInfoAtoms = new Map();
+export const esIndexCardAtoms = new Map();
 
 /**
  * Get or create info atom for a specific index
  */
-export function getIndexInfoAtom(indexName) {
-  if (!esIndexInfoAtoms.has(indexName)) {
-    esIndexInfoAtoms.set(indexName, atom(null));
+export function getIndexCardAtom(indexName) {
+  if (!esIndexCardAtoms.has(indexName)) {
+    esIndexCardAtoms.set(indexName, atom(null));
   }
-  return esIndexInfoAtoms.get(indexName);
+  return esIndexCardAtoms.get(indexName);
 }
 
 /**
  * Delete info atom for a specific index (for garbage collection)
  */
-export function deleteEsIndexAtom(indexName) {
-  esIndexInfoAtoms.delete(indexName);
+export function deleteEsIndexCardAtom(indexName) {
+  esIndexCardAtoms.delete(indexName);
 }
 
 // ========== Document Atoms - Individual atom per document ==========
@@ -328,7 +328,7 @@ export async function fetchEsIndices(forceRefresh = false) {
 export async function fetchEsIndexInfo(indexName, forceRefresh = false, getAtomValue = null, setAtomValue = null) {
   // Check cache first - read from individual atom
   if (!forceRefresh && getAtomValue && setAtomValue) {
-    const infoAtom = getIndexInfoAtom(indexName);
+    const infoAtom = getIndexCardAtom(indexName);
     const cached = getAtomValue(infoAtom);
     
     if (cached && isCacheValid(cached.timestamp, INDEX_INFO_CACHE_TTL)) {
@@ -345,7 +345,7 @@ export async function fetchEsIndexInfo(indexName, forceRefresh = false, getAtomV
     if (result.code === 0) {
       // Update cache in individual atom
       if (setAtomValue) {
-        const infoAtom = getIndexInfoAtom(indexName);
+        const infoAtom = getIndexCardAtom(indexName);
         setAtomValue(infoAtom, {
           data: result.data,
           timestamp: Date.now()
@@ -545,7 +545,7 @@ export function clearAllCaches(setAtomValue) {
   
   // Garbage collect all individual atoms
   esIndexAtoms.clear();
-  esIndexInfoAtoms.clear();
+  esIndexCardAtoms.clear();
   esDocAtoms.clear();
   esDocListAtoms.clear();
 }

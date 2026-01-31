@@ -6,6 +6,9 @@ export default defineConfig({
   server: {
     port: 3000
   },
+  resolve: {
+    conditions: ['development', 'module', 'import']
+  },
   define: {
     global: 'globalThis'
   },

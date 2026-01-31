@@ -217,13 +217,13 @@ public class ElasticSearchController {
      * Get documents from an index with pagination
      */
     @GetMapping("indices/{indexName}/docs/")
-    public ApiResponse<java.util.Map<String, Object>> getDocuments(
+    public ApiResponse<java.util.Map<String, Object>> getEsDocs(
         @PathVariable String indexName,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "20") int pageSize
     ) {
         try {
-            java.util.Map<String, Object> result = esService.getDocuments(indexName, page, pageSize);
+            java.util.Map<String, Object> result = esService.getEsDocs(indexName, page, pageSize);
             @SuppressWarnings("unchecked")
             java.util.List<java.util.Map<String, Object>> documents = 
                 (java.util.List<java.util.Map<String, Object>>) result.get("documents");
@@ -239,7 +239,7 @@ public class ElasticSearchController {
      * Create a document in an index
      */
     @PostMapping("indices/{indexName}/docs/create")
-    public ApiResponse<java.util.Map<String, Object>> createDocument(
+    public ApiResponse<java.util.Map<String, Object>> createEsDoc(
         @PathVariable String indexName,
         @RequestBody java.util.Map<String, Object> request
     ) {
@@ -250,8 +250,8 @@ public class ElasticSearchController {
                 body = new java.util.HashMap<>();
             }
             
-            String docId = esService.createDocument(indexName, body);
-            java.util.Map<String, Object> doc = esService.getDocument(indexName, docId);
+            String docId = esService.createEsDoc(indexName, body);
+            java.util.Map<String, Object> doc = esService.getEsDoc(indexName, docId);
             return ApiResponse.success(doc, "Document created successfully");
         } catch (Exception e) {
             System.err.println("Failed to create document: " + e.getMessage());
@@ -264,7 +264,7 @@ public class ElasticSearchController {
      * Update a document in an index (full rewrite)
      */
     @PutMapping("indices/{indexName}/docs/{docId}/update")
-    public ApiResponse<java.util.Map<String, Object>> updateDocument(
+    public ApiResponse<java.util.Map<String, Object>> updateEsDoc(
         @PathVariable String indexName,
         @PathVariable String docId,
         @RequestBody java.util.Map<String, Object> request
@@ -276,8 +276,8 @@ public class ElasticSearchController {
                 return ApiResponse.error(-1, "Document body is required");
             }
             
-            esService.updateDocument(indexName, docId, body);
-            java.util.Map<String, Object> doc = esService.getDocument(indexName, docId);
+            esService.updateEsDoc(indexName, docId, body);
+            java.util.Map<String, Object> doc = esService.getEsDoc(indexName, docId);
             return ApiResponse.success(doc, "Document updated successfully");
         } catch (Exception e) {
             System.err.println("Failed to update document: " + e.getMessage());

@@ -1,19 +1,23 @@
 package app.service;
 
-import app.pojo.ApiResponse;
-import app.util.TimeUtils;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.bson.Document;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
-import org.bson.Document;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import app.pojo.ApiResponse;
+import app.util.TimeUtils;
 
 /**
  * Service for managing MongoDB collections for different apps
@@ -154,9 +158,13 @@ public class MongoAppService {
             return createErrorResult("Failed to create ES index metadata: " + e.getMessage());
         }
         
-        // Create the actual Elasticsearch index
+        // Create the actual Elasticsearch index with metadata
         try {
-            esService.createOrClearIndex(esIndexName, false);
+            Map<String, String> metadata = new HashMap<>();
+
+            // add information about owner app in settings.index.meta
+            metadata.put("owner", "mongoapp_" + appId);
+            esService.createCharLevelIndex(esIndexName, false, metadata);
         } catch (Exception e) {
             // Rollback: delete app metadata and index metadata
             metadataCollection.deleteOne(Filters.eq("appId", appId));
@@ -645,8 +653,10 @@ public class MongoAppService {
         }
         
         try {
-            // Create the Elasticsearch index
-            esService.createOrClearIndex(esIndexName, false);
+            // Create the Elasticsearch index with metadata
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("owner", "mongoapp_" + appId);
+            esService.createCharLevelIndex(esIndexName, false, metadata);
             
             // Reindex all existing collections
             MongoClient client = mongoService.getMongoClient();
@@ -780,6 +790,33 @@ public class MongoAppService {
                 "skip", skip
             )
         );
+    }
+    
+    /**
+     * List all mongo apps
+     * 
+     * @return List of all apps with basic info
+     */
+    public ApiResponse<List<Map<String, Object>>> listAllApps() {
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        
+        try {
+            List<Map<String, Object>> apps = new ArrayList<>();
+            
+            for (Document doc : metadataCollection.find()) {
+                Map<String, Object> app = new HashMap<>();
+                app.put("appId", doc.getString("appId"));
+                app.put("appName", doc.getString("appName"));
+                app.put("esIndex", doc.getString("esIndex"));
+                app.put("createdAt", doc.getLong("createdAt"));
+                app.put("collections", doc.get("collections", new ArrayList<>()));
+                apps.add(app);
+            }
+            
+            return ApiResponse.success(apps);
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to list apps: " + e.getMessage());
+        }
     }
     
     /**

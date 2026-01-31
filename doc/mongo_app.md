@@ -29,6 +29,7 @@ mongo-app (database)
 ## API Endpoints
 
 POST   /mongo-app/create                                            - Initialize app
+GET    /mongo-app/list                                              - List all mongo apps
 GET    /mongo-app/get-id/{appName}                                  - Get app IDs by name
 GET    /mongo-app/{appId}/config                                    - Get app info
 POST   /mongo-app/{appId}/coll/create                               - Create collection

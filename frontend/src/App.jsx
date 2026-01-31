@@ -21,6 +21,7 @@ import IdConfigPanel from './id/IdConfigPanel';
 import IdDataPanel from './id/IdDataPanel';
 import BackendServerPanel from './remote/BackendServerPanel';
 import FilePanel from './file/FilePanel';
+import PanelMongoApp from './mongo-app/PanelMongApp';
 import './App.css';
 
 function App() {
@@ -141,6 +142,14 @@ function App() {
             </SubTab>
           </Tab>
           
+          <Tab label="Mongo App">
+            <SubTab label="Apps">
+              <Panel>
+                <PanelMongoApp />
+              </Panel>
+            </SubTab>
+          </Tab>
+
           <Tab label="File">
             <SubTab label="Access Points">
               <Panel>

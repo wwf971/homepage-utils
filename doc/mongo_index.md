@@ -79,7 +79,7 @@ updateDoc()
     → MongoDB Transaction (fast)
       → Update doc
       → Update auxiliary doc in __IndexQueue__ that stores metadata
-    → createIndexAfterUpdateDoc() [async, returns immediately]
+    → updateEsIndexAfterUpdateMongoDoc() [async, returns immediately]
         → ES indexing (slow, no lock)
         [ACQUIRE INNER LOCK]
         → Check version

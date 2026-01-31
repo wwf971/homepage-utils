@@ -1,9 +1,5 @@
 package app.service;
 
-import app.pojo.ElasticSearchConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Service;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -14,6 +10,13 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import app.pojo.ElasticSearchConfig;
 
 @Service
 public class ElasticSearchService {
@@ -138,9 +141,9 @@ public class ElasticSearchService {
     }
 
     /**
-     * Create or clear an index
+     * Create char-level index with metadata. if index already exists, it will be deleted and created again.
      */
-    public void createOrClearIndex(String indexName, boolean clearIfExists) throws Exception {
+    public void createCharLevelIndex(String indexName, boolean clearIfExists, Map<String, String> metadata) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String indexUri = baseUri + indexName;
@@ -164,49 +167,118 @@ public class ElasticSearchService {
             }
         }
 
-        // Create the index with char-level indexing using raw JSON
-        String jsonBody = """
-            {
-              "settings": {
-                "number_of_shards": 1,
-                "analysis": {
-                  "analyzer": {
-                    "char_analyzer": {
-                      "type": "custom",
-                      "tokenizer": "char_tokenizer",
-                      "filter": []
-                    }
-                  },
-                  "tokenizer": {
-                    "char_tokenizer": {
-                      "type": "pattern",
-                      "pattern": ""
-                    }
-                  }
-                }
-              },
-              "mappings": {
-                "properties": {
-
-                  "flat": {
-                    "type": "nested",
-                    "properties": {
-                      "path": {
-                        "type": "text",
-                        "analyzer": "char_analyzer",
-                        "term_vector": "with_positions_offsets"
-                      },
-                      "value": {
-                        "type": "text",
-                        "analyzer": "char_analyzer",
-                        "term_vector": "with_positions_offsets"
-                      }
-                    }
-                  }
-                }
-              }
+        // Create the index with char-level indexing using Jackson
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        ObjectNode root = mapper.createObjectNode();
+        
+        // Build settings
+        ObjectNode settings = root.putObject("settings");
+        
+        // Add metadata if provided
+        if (metadata != null && !metadata.isEmpty()) {
+            ObjectNode indexSettings = settings.putObject("index");
+            ObjectNode meta = indexSettings.putObject("meta");
+            for (Map.Entry<String, String> entry : metadata.entrySet()) {
+                meta.put(entry.getKey(), entry.getValue());
             }
-            """;
+        }
+
+
+        /*
+        "settings": {
+            "number_of_shards": 1,
+            "analysis": {
+                "analyzer": {
+                "char_analyzer": {
+                    "type": "custom",
+                    "tokenizer": "char_tokenizer",
+                    "filter": []
+                }
+                },
+                "tokenizer": {
+                "char_tokenizer": {
+                    "type": "pattern",
+                    "pattern": ""
+                }
+                }
+            }
+            },
+            "mappings": {
+                "properties": {
+                    "id": {
+                        "type": "keyword"
+                    },
+                    "type": {
+                        "type": "keyword"
+                    },
+                    "appId": {
+                        "type": "keyword"
+                    },
+                    "flat": {
+                        "type": "nested",
+                        "properties": {
+                            "path": {
+                                "type": "text",
+                                "analyzer": "char_analyzer",
+                                "term_vector": "with_positions_offsets"
+                            },
+                            "value": {
+                                "type": "text",
+                                "analyzer": "char_analyzer",
+                                "term_vector": "with_positions_offsets"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        */
+
+        settings.put("number_of_shards", 1);
+        
+        // Build analysis settings
+        ObjectNode analysis = settings.putObject("analysis");
+        ObjectNode analyzer = analysis.putObject("analyzer");
+        ObjectNode charAnalyzer = analyzer.putObject("char_analyzer");
+        charAnalyzer.put("type", "custom");
+        charAnalyzer.put("tokenizer", "char_tokenizer");
+        charAnalyzer.putArray("filter");
+        
+        ObjectNode tokenizer = analysis.putObject("tokenizer");
+        ObjectNode charTokenizer = tokenizer.putObject("char_tokenizer");
+        charTokenizer.put("type", "pattern");
+        charTokenizer.put("pattern", "");
+        
+        // Build mappings
+        ObjectNode mappings = root.putObject("mappings");
+        ObjectNode properties = mappings.putObject("properties");
+        
+        // Add keyword fields at top level
+        ObjectNode id = properties.putObject("id");
+        id.put("type", "keyword");
+        ObjectNode type = properties.putObject("type");
+        type.put("type", "keyword");
+        ObjectNode appId = properties.putObject("appId");
+        appId.put("type", "keyword");
+        ObjectNode createAt = properties.putObject("createAt");
+        createAt.put("type", "keyword");
+
+        // Add nested flat field
+        ObjectNode flat = properties.putObject("flat");
+        flat.put("type", "nested");
+        ObjectNode flatProperties = flat.putObject("properties");
+        
+        ObjectNode path = flatProperties.putObject("path");
+        path.put("type", "text");
+        path.put("analyzer", "char_analyzer");
+        path.put("term_vector", "with_positions_offsets");
+        
+        ObjectNode value = flatProperties.putObject("value");
+        value.put("type", "text");
+        value.put("analyzer", "char_analyzer");
+        value.put("term_vector", "with_positions_offsets");
+        
+        String jsonBody = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
 
         HttpURLConnection createConn = setupConnection(indexUri, "PUT");
         createConn.setDoOutput(true);
@@ -225,13 +297,22 @@ public class ElasticSearchService {
     }
 
     /**
+     * Create or clear an index without metadata (backward compatibility)
+     */
+    public void createCharLevelIndex(String indexName, boolean clearIfExists) throws Exception {
+        createCharLevelIndex(indexName, clearIfExists, null);
+    }
+
+    /**
      * Index a flattened document (list of path/value pairs)
      * Uses nested structure with "flat" field containing all path/value pairs
      * Uses optimistic concurrency control with if_seq_no and if_primary_term
+     * 
+     * @param topLevelEntries Map of field names to values that should be stored at document root level (can be null)
      */
     public void indexDoc(String indexName, String docId, String database, String collection,
-                             List<Map<String, String>> flattenedPairs, long updateVersion, 
-                             long updateAt, Integer updateAtTimeZone, boolean forceReindex) throws Exception {
+                             List<Map<String, String>> flattenedPairs, Map<String, String> topLevelEntries,
+                             long updateVersion, long updateAt, Integer updateAtTimeZone, boolean forceReindex) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         
@@ -286,6 +367,12 @@ public class ElasticSearchService {
         
         // Create document with nested flat field and metadata
         Map<String, Object> doc = new HashMap<>();
+        
+        // Add top-level entries if provided
+        if (topLevelEntries != null && !topLevelEntries.isEmpty()) {
+            doc.putAll(topLevelEntries);
+        }
+        
         doc.put("flat", flattenedPairs);
         doc.put("updateVersion", updateVersion);
         doc.put("updateAt", updateAt);
@@ -430,7 +517,7 @@ public class ElasticSearchService {
     /**
      * Get document count for an index
      */
-    public long getDocumentCount(String indexName) throws Exception {
+    public long getEsDocCount(String indexName) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String countUri = baseUri + indexName + "/_count";
@@ -618,7 +705,7 @@ public class ElasticSearchService {
     /**
      * Get documents from an index with pagination
      */
-    public Map<String, Object> getDocuments(String indexName, int page, int pageSize) throws Exception {
+    public Map<String, Object> getEsDocs(String indexName, int page, int pageSize) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         int from = (page - 1) * pageSize;
@@ -673,7 +760,7 @@ public class ElasticSearchService {
     /**
      * Create a document in an index
      */
-    public String createDocument(String indexName, Map<String, Object> body) throws Exception {
+    public String createEsDoc(String indexName, Map<String, Object> body) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String createUri = baseUri + indexName + "/_doc";
@@ -702,7 +789,7 @@ public class ElasticSearchService {
     /**
      * Update a document in an index
      */
-    public void updateDocument(String indexName, String docId, Map<String, Object> body) throws Exception {
+    public void updateEsDoc(String indexName, String docId, Map<String, Object> body) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String updateUri = baseUri + indexName + "/_doc/" + docId;
@@ -728,7 +815,7 @@ public class ElasticSearchService {
     /**
      * Get a single document by ID
      */
-    public Map<String, Object> getDocument(String indexName, String docId) throws Exception {
+    public Map<String, Object> getEsDoc(String indexName, String docId) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String getUri = baseUri + indexName + "/_doc/" + docId;

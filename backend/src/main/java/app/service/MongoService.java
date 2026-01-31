@@ -553,7 +553,7 @@ public class MongoService {
      * @param position Position for addArrayItem (-1 for end, or specific index)
      * @return Updated document
      */
-    public org.bson.Document updateDocument(
+    public org.bson.Document updateMongoDoc(
             String databaseName, 
             String collectionName, 
             String docId,

@@ -1,52 +1,36 @@
 import { makeAutoObservable, runInAction } from 'mobx'
-import { createContext, useContext, useMemo } from 'react'
+import { getBackendServerUrl } from '../remote/backendServerStore'
 
 class MongoAppStore {
-  // App configuration
+  // All mongo apps cache
+  allApps = []
+  isLoadingAllApps = false
+  allAppsError = null
+  
+  // Selected app
+  selectedAppId = null
+  selectedApp = null
+  
+  // Per-app state (for selected app)
   serverUrl = ''
   appId = ''
   appName = ''
-  
-  // UI state
   isLoadingAppId = false
   isCreatingApp = false
   isCheckingCollections = false
-  isTestingConnection = false
-  connectionSuccess = false
-  
-  // Errors
-  connectionError = null
   appError = null
   collectionError = null
   indexError = null
-  
-  // App search results
+  indexSuccess = null
   foundApps = []
-  
-  // Collection status
   collectionStatus = {}
-  
-  // App metadata
   appMetadata = null
-  
-  // Index status
   indexExists = false
   indexName = ''
-  indexSuccess = null
 
-  // Config
-  localStorageKey = 'mongo-app-config'
-
-  constructor(config = {}) {
+  constructor() {
     makeAutoObservable(this)
-    
-    // Set defaults from config
-    this.appName = config.appName || ''
-    this.serverUrl = config.defaultServerUrl || ''
-    this.localStorageKey = config.localStorageKey || 'mongo-app-config'
-    
-    // Load from localStorage
-    this.loadFromLocalStorage()
+    this.serverUrl = getBackendServerUrl()
   }
 
   // ============ Getters ============
@@ -59,25 +43,74 @@ class MongoAppStore {
     return `${this.serverUrl}/mongo-app`
   }
 
+  // ============ All Apps Management ============
+
+  async fetchAllApps() {
+    this.isLoadingAllApps = true
+    this.allAppsError = null
+
+    try {
+      const response = await fetch(`${this.apiBase}/list`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch apps: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      
+      runInAction(() => {
+        if (result.code === 0 && result.data) {
+          this.allApps = result.data
+        } else {
+          this.allAppsError = result.message || 'Failed to fetch apps'
+        }
+        this.isLoadingAllApps = false
+      })
+    } catch (error) {
+      runInAction(() => {
+        this.allAppsError = error instanceof Error ? error.message : 'Unknown error'
+        this.isLoadingAllApps = false
+      })
+    }
+  }
+
+  selectApp(appId) {
+    const app = this.allApps.find(a => a.appId === appId)
+    if (app) {
+      runInAction(() => {
+        this.selectedAppId = appId
+        this.selectedApp = app
+        this.appId = app.appId
+        this.appName = app.appName
+        this.indexName = app.esIndex
+        
+        // Reset state
+        this.appError = null
+        this.collectionError = null
+        this.indexError = null
+        this.indexSuccess = null
+        this.collectionStatus = {}
+        this.appMetadata = null
+      })
+      
+      // Fetch fresh metadata
+      this.fetchAppMetadata()
+      this.checkIndexExists()
+    }
+  }
+
   // ============ Actions ============
 
   setServerUrl(url) {
     this.serverUrl = url.trim()
-    this.saveToLocalStorage()
   }
 
   setAppName(name) {
     this.appName = name.trim()
-    this.saveToLocalStorage()
   }
 
   setAppId(id) {
     this.appId = id.trim()
-    this.saveToLocalStorage()
-  }
-
-  clearConnectionError() {
-    this.connectionError = null
   }
 
   clearAppError() {
@@ -97,64 +130,6 @@ class MongoAppStore {
   }
 
   // ============ Backend API ============
-
-  async testConnection() {
-    if (!this.serverUrl) {
-      this.connectionError = 'Server URL is required'
-      return false
-    }
-
-    this.isTestingConnection = true
-    this.connectionError = null
-    this.connectionSuccess = false
-
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
-      
-      const response = await fetch(`${this.serverUrl}/actuator/health`, {
-        method: 'GET',
-        signal: controller.signal,
-      })
-      
-      clearTimeout(timeoutId)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} ${response.statusText}`)
-      }
-      
-      const result = await response.json()
-      const success = result.status === 'UP'
-      
-      runInAction(() => {
-        if (success) {
-          this.connectionSuccess = true
-        } else {
-          this.connectionError = 'Server is not healthy'
-        }
-        this.isTestingConnection = false
-      })
-      
-      return success
-    } catch (error) {
-      runInAction(() => {
-        let errorMsg = 'Unknown error'
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            errorMsg = 'Connection timeout'
-          } else if (error.message === 'Failed to fetch') {
-            errorMsg = 'Cannot reach server. Check URL and network.'
-          } else {
-            errorMsg = error.message
-          }
-        }
-        this.connectionError = errorMsg
-        this.connectionSuccess = false
-        this.isTestingConnection = false
-      })
-      return false
-    }
-  }
 
   async searchAppId() {
     if (!this.serverUrl || !this.appName) {
@@ -181,7 +156,6 @@ class MongoAppStore {
           // Auto-select if exactly one app found
           if (this.foundApps.length === 1) {
             this.appId = this.foundApps[0].appId
-            this.saveToLocalStorage()
           }
         } else {
           this.appError = result.message || 'Failed to search app'
@@ -221,7 +195,8 @@ class MongoAppStore {
       runInAction(() => {
         if (result.code === 0 && result.data) {
           this.appId = result.data.appId
-          this.saveToLocalStorage()
+          // Refresh the list
+          this.fetchAllApps()
         } else {
           this.appError = result.message || 'Failed to create app'
         }
@@ -394,94 +369,34 @@ class MongoAppStore {
 
   // ============ Utility ============
 
-  loadFromLocalStorage() {
-    try {
-      const stored = localStorage.getItem(this.localStorageKey)
-      if (stored) {
-        const config = JSON.parse(stored)
-        // Only override if values exist in storage
-        if (config.serverUrl && config.serverUrl.includes('://')) {
-          this.serverUrl = config.serverUrl
-        }
-        if (config.appId) {
-          this.appId = config.appId
-        }
-        if (config.appName) {
-          this.appName = config.appName
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load config from localStorage:', error)
-    }
+  saveToLocalStorage() {
+    // No-op in this store since we don't need localStorage for the app list view
   }
 
-  saveToLocalStorage() {
-    try {
-      const config = {
-        serverUrl: this.serverUrl,
-        appId: this.appId,
-        appName: this.appName,
-      }
-      localStorage.setItem(this.localStorageKey, JSON.stringify(config))
-    } catch (error) {
-      console.error('Failed to save config to localStorage:', error)
-    }
+  loadFromLocalStorage() {
+    // No-op in this store since we don't need localStorage for the app list view
   }
 
   reset() {
-    this.serverUrl = ''
+    this.selectedAppId = null
+    this.selectedApp = null
+    this.serverUrl = getBackendServerUrl()
     this.appId = ''
     this.appName = ''
     this.isLoadingAppId = false
     this.isCreatingApp = false
     this.isCheckingCollections = false
-    this.isTestingConnection = false
-    this.connectionSuccess = false
-    this.connectionError = null
     this.appError = null
     this.collectionError = null
     this.indexError = null
+    this.indexSuccess = null
     this.foundApps = []
     this.collectionStatus = {}
     this.appMetadata = null
     this.indexExists = false
     this.indexName = ''
-    localStorage.removeItem(this.localStorageKey)
   }
 }
 
-// Create context
-export const StoreContext = createContext(null)
+export const mongoAppStore = new MongoAppStore()
 
-// Create provider component
-export const StoreProvider = ({ children, appName, defaultServerUrl, localStorageKey }) => {
-  // Create store instance only once using useMemo
-  const store = useMemo(
-    () => new MongoAppStore({ appName, defaultServerUrl, localStorageKey }),
-    [appName, defaultServerUrl, localStorageKey]
-  )
-  
-  return (
-    <StoreContext.Provider value={store}>
-      {children}
-    </StoreContext.Provider>
-  )
-}
-
-// Custom hook to use the store
-export const useMongoAppStore = () => {
-  const store = useContext(StoreContext)
-  if (!store) {
-    throw new Error('useMongoAppStore must be used within StoreProvider or ExternalStoreProvider')
-  }
-  return store
-}
-
-// Provider for external store (when store is managed by parent)
-export const ExternalStoreProvider = ({ children, store }) => {
-  return (
-    <StoreContext.Provider value={store}>
-      {children}
-    </StoreContext.Provider>
-  )
-}

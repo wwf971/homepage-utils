@@ -5,6 +5,7 @@ import app.service.MongoAppService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,6 +19,17 @@ public class MongoAppController {
 
     @Autowired
     private MongoAppService mongoAppService;
+
+    /**
+     * List all mongo apps
+     * GET /mongo-app/list
+     * 
+     * @return { "code": 0, "data": [{ "appId": "...", "appName": "...", "esIndex": "...", ... }, ...] }
+     */
+    @GetMapping("/list")
+    public ApiResponse<List<Map<String, Object>>> listAllApps() {
+        return mongoAppService.listAllApps();
+    }
 
     /**
      * Initialize an app

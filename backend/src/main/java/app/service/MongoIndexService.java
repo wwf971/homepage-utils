@@ -1,30 +1,5 @@
 package app.service;
 
-import app.util.TimeUtils;
-import com.mongodb.ClientSessionOptions;
-import com.mongodb.TransactionOptions;
-import com.mongodb.ReadConcern;
-import com.mongodb.ReadPreference;
-import com.mongodb.WriteConcern;
-import com.mongodb.client.ClientSession;
-import com.mongodb.client.FindIterable;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.IndexOptions;
-import com.mongodb.client.model.Indexes;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import org.bson.Document;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,6 +11,26 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import com.mongodb.client.ClientSession;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
+
+import app.util.TimeUtils;
+
 /**
  * Service for managing MongoDB-Elasticsearch index metadata
  * Stores metadata in mongo-index collection in the metadata database
@@ -43,11 +38,14 @@ import java.util.stream.Collectors;
 @Service
 public class MongoIndexService {
 
+    // Fields that should be stored at top level in ES documents, not in "flat" nested field
+    private static final Set<String> TOP_LEVEL_FIELDS = Set.of("id", "type", "appId", "createAt");
+
     @Autowired
     private MongoService mongoService;
     
     @Autowired
-    private ElasticSearchService elasticSearchService;
+    private ElasticSearchService esService;
 
     @Autowired
     private MongoIndexQueueService indexQueueService;
@@ -527,7 +525,7 @@ public class MongoIndexService {
                 
                 // Trigger async indexing if requested
                 if (updateIndex) {
-                    createIndexAfterUpdateDoc(indexName, database, collection, mongoIdObj, docId, 
+                    updateEsIndexAfterUpdateMongoDoc(indexName, database, collection, mongoIdObj, docId, 
                                             newVersion, currentTime, esIndexName);
                 }
                 
@@ -757,7 +755,7 @@ public class MongoIndexService {
      * Indexes the document to ES and marks it as indexed in IndexQueue
      * Uses locking to prevent race conditions with concurrent updates
      */
-    private void createIndexAfterUpdateDoc(String indexName, String database, String collection, 
+    private void updateEsIndexAfterUpdateMongoDoc(String indexName, String database, String collection, 
                                            Object mongoIdObj, String docId, long newVersion, long updateTime,
                                            String esIndexName) {
         CompletableFuture.runAsync(() -> {
@@ -952,11 +950,13 @@ public class MongoIndexService {
             }
 
             // Flatten the document for indexing (data is at top level now)
-            List<Map<String, String>> flattened = flattenJson(doc, null);
+            // This separates top-level fields from regular flattened pairs
+            FlattenResult flattenResult = flattenJsonDoc(doc, null);
 
             // Index to Elasticsearch with custom id, version, and metadata
-            elasticSearchService.indexDoc(esIndexName, customId, dbName, collName, flattened, 
-                                         docUpdateVersion, docUpdateAt, docUpdateAtTimeZone, forceReindex);
+            esService.indexDoc(esIndexName, customId, dbName, collName, 
+                             flattenResult.flattenedPairs, flattenResult.topLevelEntries,
+                             docUpdateVersion, docUpdateAt, docUpdateAtTimeZone, forceReindex);
 
             if(CHECK_BEFORE_SETTING_INDEX_VERSION && !forceReindex) {
                 // After successful ES indexing, verify queue entry hasn't been updated in the meantime
@@ -1019,21 +1019,36 @@ public class MongoIndexService {
     }
 
     /**
+     * Result class for flattening operation
+     */
+    private static class FlattenResult {
+        List<Map<String, String>> flattenedPairs = new ArrayList<>();
+        Map<String, String> topLevelEntries = new HashMap<>();
+    }
+
+    /**
      * Flatten JSON content for indexing (similar to Python flatten_json)
+     * Separates top-level fields during flattening
      * 
      * @param obj The object to flatten
      * @param prefix Current path prefix
-     * @return List of {path, value} maps
+     * @return FlattenResult containing both flattened pairs and top-level entries
      */
-    private List<Map<String, String>> flattenJson(Object obj, String prefix) {
-        List<Map<String, String>> result = new ArrayList<>();
+    private FlattenResult flattenJsonDoc(Object obj, String prefix) {
+        FlattenResult result = new FlattenResult();
 
         if (obj == null) {
             if (prefix != null) {
                 Map<String, String> entry = new HashMap<>();
                 entry.put("path", prefix);
                 entry.put("value", "null");
-                result.add(entry);
+                
+                // Check if this is a top-level field
+                if (TOP_LEVEL_FIELDS.contains(prefix)) {
+                    result.topLevelEntries.put(prefix, "null");
+                } else {
+                    result.flattenedPairs.add(entry);
+                }
             }
             return result;
         }
@@ -1042,27 +1057,40 @@ public class MongoIndexService {
             Document doc = (Document) obj;
             for (Map.Entry<String, Object> entry : doc.entrySet()) {
                 String newPrefix = prefix == null ? entry.getKey() : prefix + "." + entry.getKey();
-                result.addAll(flattenJson(entry.getValue(), newPrefix));
+                FlattenResult subResult = flattenJsonDoc(entry.getValue(), newPrefix);
+                result.flattenedPairs.addAll(subResult.flattenedPairs);
+                result.topLevelEntries.putAll(subResult.topLevelEntries);
             }
         } else if (obj instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> map = (Map<String, Object>) obj;
             for (Map.Entry<String, Object> entry : map.entrySet()) {
                 String newPrefix = prefix == null ? entry.getKey() : prefix + "." + entry.getKey();
-                result.addAll(flattenJson(entry.getValue(), newPrefix));
+                FlattenResult subResult = flattenJsonDoc(entry.getValue(), newPrefix);
+                result.flattenedPairs.addAll(subResult.flattenedPairs);
+                result.topLevelEntries.putAll(subResult.topLevelEntries);
             }
         } else if (obj instanceof List) {
             List<?> list = (List<?>) obj;
             for (int i = 0; i < list.size(); i++) {
                 String newPrefix = prefix + "@" + i;
-                result.addAll(flattenJson(list.get(i), newPrefix));
+                FlattenResult subResult = flattenJsonDoc(list.get(i), newPrefix);
+                result.flattenedPairs.addAll(subResult.flattenedPairs);
+                result.topLevelEntries.putAll(subResult.topLevelEntries);
             }
         } else {
             // Primitive value
-            Map<String, String> entry = new HashMap<>();
-            entry.put("path", prefix);
-            entry.put("value", obj.toString());
-            result.add(entry);
+            String valueStr = obj.toString();
+            
+            // Check if this is a top-level field
+            if (TOP_LEVEL_FIELDS.contains(prefix)) {
+                result.topLevelEntries.put(prefix, valueStr);
+            } else {
+                Map<String, String> entry = new HashMap<>();
+                entry.put("path", prefix);
+                entry.put("value", valueStr);
+                result.flattenedPairs.add(entry);
+            }
         }
 
         return result;
@@ -1085,7 +1113,7 @@ public class MongoIndexService {
 
         // Delete from Elasticsearch with version control
         try {
-            elasticSearchService.deleteDocumentWithVersion(esIndexName, docId, deleteVersion);
+            esService.deleteDocumentWithVersion(esIndexName, docId, deleteVersion);
         } catch (Exception e) {
             throw new RuntimeException("Failed to delete document from Elasticsearch: " + e.getMessage(), e);
         }
@@ -1134,7 +1162,7 @@ public class MongoIndexService {
 
         // Create or clear ES index
         try {
-            elasticSearchService.createOrClearIndex(esIndexName, true);
+            esService.createCharLevelIndex(esIndexName, true);
         } catch (Exception e) {
             return createErrorResult("Failed to clear ES index: " + e.getMessage());
         }
@@ -1599,7 +1627,7 @@ public class MongoIndexService {
         // Count indexed documents in ES for this collection
         long indexedCount = 0;
         try {
-            indexedCount = elasticSearchService.countDocNumBySource(esIndexName, dbName, collName);
+            indexedCount = esService.countDocNumBySource(esIndexName, dbName, collName);
         } catch (Exception e) {
             System.err.println("Failed to count indexed docs for " + dbName + "." + collName + ": " + e.getMessage());
         }
@@ -1645,7 +1673,7 @@ public class MongoIndexService {
             // Count indexed documents in ES for this collection
             long indexedCount = 0;
             try {
-                indexedCount = elasticSearchService.countDocNumBySource(esIndexName, dbName, collName);
+                indexedCount = esService.countDocNumBySource(esIndexName, dbName, collName);
             } catch (Exception e) {
                 System.err.println("Failed to count indexed docs for " + dbName + "." + collName + ": " + e.getMessage());
             }
@@ -1661,7 +1689,7 @@ public class MongoIndexService {
         // Get ES index doc count
         long esDocCount = 0;
         try {
-            esDocCount = elasticSearchService.getDocumentCount(esIndexName);
+            esDocCount = esService.getEsDocCount(esIndexName);
         } catch (Exception e) {
             System.err.println("Failed to get ES doc count: " + e.getMessage());
             // Continue with esDocCount = 0

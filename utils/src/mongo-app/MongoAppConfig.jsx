@@ -1,115 +1,10 @@
 import { observer } from 'mobx-react-lite'
-import { useEffect, useState } from 'react'
-import { PanelWithToggle, SpinningCircle } from '@wwf971/react-comp-misc'
-import { StoreProvider, useMongoAppStore } from './mongoAppStore.jsx'
+import { reaction } from 'mobx'
+import { useEffect, useRef } from 'react'
+import { PanelWithToggle, SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc'
+import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoAppStore.jsx'
+import TestConnection from './TestConnection.jsx'
 import './MongoAppConfig.css'
-
-// Separate component for Server URL panel to prevent unnecessary re-renders
-const ServerUrlPanel = observer(() => {
-  const store = useMongoAppStore()
-  const [isEditingUrl, setIsEditingUrl] = useState(false)
-  const [editUrlValue, setEditUrlValue] = useState(store.serverUrl)
-
-  const handleEditUrl = () => {
-    setEditUrlValue(store.serverUrl)
-    setIsEditingUrl(true)
-  }
-
-  const handleSaveUrl = () => {
-    if (editUrlValue.trim()) {
-      store.setServerUrl(editUrlValue.trim())
-      setIsEditingUrl(false)
-    }
-  }
-
-  const handleCancelUrl = () => {
-    setEditUrlValue(store.serverUrl)
-    setIsEditingUrl(false)
-  }
-
-  const handleUrlKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSaveUrl()
-    } else if (e.key === 'Escape') {
-      handleCancelUrl()
-    }
-  }
-
-  return (
-    <PanelWithToggle title="Server URL" defaultExpanded={!store.serverUrl}>
-      <div className="config-panel-content">
-        {isEditingUrl ? (
-          <div className="config-row">
-            <label className="config-label">Server URL:</label>
-            <input
-              type="text"
-              className="config-input config-input-editing"
-              value={editUrlValue}
-              onChange={(e) => setEditUrlValue(e.target.value)}
-              onKeyDown={handleUrlKeyDown}
-              placeholder="http://localhost:8080"
-              autoFocus
-            />
-            <button
-              className="config-button config-button-primary"
-              onClick={handleSaveUrl}
-            >
-              Save
-            </button>
-            <button
-              className="config-button config-button-secondary"
-              onClick={handleCancelUrl}
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className="config-row">
-            <label className="config-label">Server URL:</label>
-            <div className="config-value">{store.serverUrl || '(not set)'}</div>
-            <button
-              className="config-button config-button-edit"
-              onClick={handleEditUrl}
-            >
-              Edit
-            </button>
-          </div>
-        )}
-
-        <div className="config-button-row">
-          <button
-            className="config-button config-button-primary"
-            onClick={() => store.testConnection()}
-            disabled={!store.serverUrl || store.isTestingConnection}
-          >
-            {store.isTestingConnection ? (
-              <>
-                <SpinningCircle width={14} height={14} color="white" />
-                <span>Testing...</span>
-              </>
-            ) : (
-              'Test Connection'
-            )}
-          </button>
-        </div>
-
-        {store.connectionSuccess && (
-          <div className="config-message-box config-message-success-box">
-            <strong>Success</strong>
-            <div className="config-message-success-text">Connected to backend server successfully</div>
-          </div>
-        )}
-
-        {store.connectionError && (
-          <div className="config-message-box config-message-error-box">
-            <strong>Failed</strong>
-            <div className="config-message-error-text">{store.connectionError}</div>
-          </div>
-        )}
-      </div>
-    </PanelWithToggle>
-  )
-})
 
 // App ID Management Panel
 const AppIdPanel = observer(() => {
@@ -260,7 +155,16 @@ const EsIndexPanel = observer(() => {
           <div className="config-metadata-item">
             <span className="config-metadata-label">Status:</span>
             {store.indexExists ? (
-              <span className="config-status-ok">Exists</span>
+              <>
+                <span className="config-status-ok">Exists</span>
+                <button
+                  className="config-button-icon"
+                  onClick={() => store.checkIndexExists()}
+                  title="Refresh index status"
+                >
+                  <RefreshIcon width={16} height={16} />
+                </button>
+              </>
             ) : (
               <>
                 <span className="config-status-error">Not Found</span>
@@ -339,19 +243,33 @@ const CollectionsPanel = observer(({ collections }) => {
   )
 })
 
-const MongoAppConfigInner = observer(({ collections, onConfigChange }) => {
+const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_existence }) => {
   const store = useMongoAppStore()
+  const hasInitialized = useRef(false)
+  const collectionsRef = useRef(collections)
+  
+  // Keep collections ref up to date
+  collectionsRef.current = collections
   
   // Auto-test connection and search on mount
   useEffect(() => {
+    if (!store || hasInitialized.current) return
+    
+    hasInitialized.current = true
+    
     const initConfig = async () => {
-      if (store.serverUrl) {
-        // Test connection first
-        const connected = await store.testConnection()
+      // Only test connection if panels_existence is enabled and method exists
+      if (panels_existence.showTestConnection && typeof store.testConnection === 'function' && store.serverUrl) {
+        try {
+          // Test connection first
+          const connected = await store.testConnection()
 
-        // If connected and appName set but no appId, search for it
-        if (connected && store.appName && !store.appId) {
-          await store.searchAppId()
+          // If connected and appName set but no appId, search for it
+          if (connected && store.appName && !store.appId && typeof store.searchAppId === 'function') {
+            await store.searchAppId()
+          }
+        } catch (error) {
+          console.error('Error during initialization:', error)
         }
       }
     }
@@ -361,24 +279,53 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange }) => {
 
   // Auto-check collections, metadata, and index when appId changes
   useEffect(() => {
-    if (store.isConfigured) {
+    const dispose = reaction(
+      () => ({ 
+        appId: store.appId, 
+        serverUrl: store.serverUrl
+      }),
+      ({ appId, serverUrl }) => {
+        if (appId && serverUrl) {
+          const currentCollections = collectionsRef.current
+          if (currentCollections && currentCollections.length > 0) {
+            store.checkCollections(currentCollections)
+          }
+          store.fetchAppMetadata()
+          store.checkIndexExists()
+        }
+      },
+      { fireImmediately: true }
+    )
+    
+    return () => dispose()
+  }, [store])
+
+  // Check collections when they become available
+  useEffect(() => {
+    if (store.isConfigured && collections && collections.length > 0) {
       store.checkCollections(collections)
-      store.fetchAppMetadata()
-      store.checkIndexExists()
     }
-  }, [store.appId, store.isConfigured, collections])
+  }, [store, store.isConfigured, collections.length])
 
   // Notify parent when configuration changes
   useEffect(() => {
-    if (onConfigChange) {
-      onConfigChange({
+    if (!onConfigChange) return
+    
+    const dispose = reaction(
+      () => ({
         serverUrl: store.serverUrl,
         appId: store.appId,
         appName: store.appName,
         isConfigured: store.isConfigured,
-      })
-    }
-  }, [store.serverUrl, store.appId, store.appName, store.isConfigured, onConfigChange])
+      }),
+      (config) => {
+        onConfigChange(config)
+      },
+      { fireImmediately: true }
+    )
+    
+    return () => dispose()
+  }, [store, onConfigChange])
 
   // Trigger word pairs load when app is configured
   useEffect(() => {
@@ -392,26 +339,46 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange }) => {
     <div className="config-container">
       <div className="config-title">Configuration</div>
 
-      <ServerUrlPanel />
-      <AppIdPanel />
-      <AppMetadataPanel />
-      <EsIndexPanel />
-      <CollectionsPanel collections={collections} />
+      {panels_existence.showTestConnection && <TestConnection />}
+      {panels_existence.showAppIdManagement && <AppIdPanel />}
+      {panels_existence.showAppMetadata && <AppMetadataPanel />}
+      {panels_existence.showIndexStatus && <EsIndexPanel />}
+      {panels_existence.showCollections && <CollectionsPanel collections={collections} />}
     </div>
   )
 })
 
-// Main exported component with provider
+// component that is exported
 const MongoAppConfig = ({ 
   collections = [], 
   appName = '', 
   defaultServerUrl = '', 
   localStorageKey = 'mongo-app-config',
-  onConfigChange = null
+  onConfigChange = null,
+  externalStore = null,
+  panels_existence = null
 }) => {
+  const panelsExistence = panels_existence || {
+    showTestConnection: true,
+    showAppIdManagement: true,
+    showAppMetadata: true,
+    showIndexStatus: true,
+    showCollections: true
+  }
+
+  // If external store is provided, use ExternalStoreProvider
+  if (externalStore) {
+    return (
+      <ExternalStoreProvider store={externalStore}>
+        <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} panels_existence={panelsExistence} />
+      </ExternalStoreProvider>
+    )
+  }
+
+  // Otherwise use internal StoreProvider
   return (
     <StoreProvider appName={appName} defaultServerUrl={defaultServerUrl} localStorageKey={localStorageKey}>
-      <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} />
+      <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} panels_existence={panelsExistence} />
     </StoreProvider>
   )
 }

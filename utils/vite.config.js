@@ -6,11 +6,9 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: {
-        index: resolve(__dirname, 'src/index.js'),
-        'backend-server': resolve(__dirname, 'src/backend-server/index.js'),
-      },
+      entry: resolve(__dirname, 'src/index.js'),
       formats: ['es'],
+      fileName: 'index',
     },
     rollupOptions: {
       external: ['react', 'react-dom', 'mobx', 'mobx-react-lite', '@wwf971/react-comp-misc'],

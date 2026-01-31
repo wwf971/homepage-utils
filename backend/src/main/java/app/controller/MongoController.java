@@ -220,7 +220,7 @@ public class MongoController {
     }
 
     @PatchMapping({"db/{dbName}/coll/{collName}/docs/{docId}/update", "db/{dbName}/coll/{collName}/docs/{docId}/update/"})
-    public ApiResponse<org.bson.Document> updateDocument(
+    public ApiResponse<org.bson.Document> updateMongoDoc(
             @PathVariable String dbName,
             @PathVariable String collName,
             @PathVariable String docId,
@@ -231,7 +231,7 @@ public class MongoController {
             Object value = updateRequest.get("value");
             Integer position = updateRequest.containsKey("position") ? (Integer) updateRequest.get("position") : null;
 
-            org.bson.Document updatedDoc = mongoService.updateDocument(
+            org.bson.Document updatedDoc = mongoService.updateMongoDoc(
                 dbName, collName, docId, action, path, value, position);
             
             return new ApiResponse<>(0, updatedDoc, "Document updated successfully");

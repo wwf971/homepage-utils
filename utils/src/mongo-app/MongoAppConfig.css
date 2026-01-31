@@ -1,5 +1,5 @@
 .config-container {
-  padding: 12px;
+  padding: 0px;
   background: var(--bg-secondary);
   border-radius: 4px;
   margin-bottom: 20px;
@@ -164,6 +164,23 @@
   background-color: #0052a3;
 }
 
+.config-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.config-button-icon:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
 .config-found-apps {
   margin-top: 12px;
   padding: 8px;
@@ -266,6 +283,7 @@
 
 .config-metadata-item {
   display: flex;
+  align-items: center;
   gap: 8px;
   font-size: 13px;
 }
@@ -285,10 +303,6 @@
   font-size: 12px;
   color: #ef5350;
   font-weight: 500;
-}
-
-.config-inline-gap {
-  margin-left: 8px;
 }
 
 .config-message-box {
