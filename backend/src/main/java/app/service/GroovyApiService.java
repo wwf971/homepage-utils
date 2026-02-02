@@ -1,0 +1,410 @@
+package app.service;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.bson.Document;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+
+import app.pojo.ApiResponse;
+import app.pojo.GroovyApiScript;
+import app.util.TimeUtils;
+import groovy.lang.Binding;
+import groovy.lang.GroovyShell;
+
+/**
+ * Service for managing and executing Groovy API scripts
+ */
+@Service
+public class GroovyApiService {
+
+    @Autowired
+    private MongoService mongoService;
+
+    @Autowired
+    private MongoAppService mongoAppService;
+
+    @Autowired
+    private IdService idService;
+
+    private static final String DB_NAME = "main";
+    private static final String COLLECTION_NAME = "groovy-api";
+
+    // Cache of compiled scripts: endpoint -> compiled script
+    private final Map<String, groovy.lang.Script> scriptCache = new ConcurrentHashMap<>();
+    
+    // Cache of endpoint -> id mapping for quick lookup
+    private final Map<String, String> endpointToIdMap = new ConcurrentHashMap<>();
+
+    /**
+     * Get the groovy-api collection
+     */
+    private MongoCollection<Document> getCollection() {
+        MongoClient client = mongoService.getMongoClient();
+        if (client == null) {
+            throw new RuntimeException("MongoDB client not initialized");
+        }
+
+        MongoDatabase database = client.getDatabase(DB_NAME);
+
+        // Try to create collection if it doesn't exist
+        try {
+            database.createCollection(COLLECTION_NAME);
+            System.out.println("Created groovy-api collection");
+        } catch (com.mongodb.MongoCommandException e) {
+            if (e.getErrorCode() != 48) {
+                throw e;
+            }
+        }
+
+        return database.getCollection(COLLECTION_NAME);
+    }
+
+    /**
+     * Load all scripts from MongoDB on startup
+     */
+    public void loadAllScripts() {
+        try {
+            MongoCollection<Document> collection = getCollection();
+            scriptCache.clear();
+            endpointToIdMap.clear();
+
+            for (Document doc : collection.find()) {
+                String id = doc.getString("id");
+                String endpoint = doc.getString("endpoint");
+                String scriptSource = doc.getString("scriptSource");
+
+                if (id != null && endpoint != null && scriptSource != null) {
+                    try {
+                        compileAndCacheScript(endpoint, scriptSource);
+                        endpointToIdMap.put(endpoint, id);
+                        System.out.println("Loaded Groovy script: " + id + " (endpoint: " + endpoint + ")");
+                    } catch (Exception e) {
+                        System.err.println("Failed to compile script " + id + " for endpoint " + endpoint + ": " + e.getMessage());
+                    }
+                }
+            }
+
+            System.out.println("Loaded " + scriptCache.size() + " Groovy scripts");
+        } catch (Exception e) {
+            System.err.println("Failed to load Groovy scripts: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Upload or update a Groovy script
+     */
+    public ApiResponse<GroovyApiScript> uploadScript(String id, String endpoint, String scriptSource, String description, Integer timezoneOffset) {
+        if (endpoint == null || endpoint.trim().isEmpty()) {
+            return ApiResponse.error("Endpoint cannot be empty");
+        }
+
+        if (scriptSource == null || scriptSource.trim().isEmpty()) {
+            return ApiResponse.error("Script source cannot be empty");
+        }
+
+        // Validate endpoint name (alphanumeric, dash, underscore only)
+        if (!endpoint.matches("^[a-zA-Z0-9_-]+$")) {
+            return ApiResponse.error("Endpoint must contain only alphanumeric characters, dashes, and underscores");
+        }
+
+        // Try to compile the script to validate it
+        try {
+            compileAndCacheScript(endpoint, scriptSource);
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to compile script: " + e.getMessage());
+        }
+
+        MongoCollection<Document> collection = getCollection();
+        long currentTime = TimeUtils.getCurrentTimestamp();
+
+        Document existing = null;
+        boolean isUpdate = false;
+
+        if (id != null && !id.trim().isEmpty()) {
+            // Update existing by ID
+            existing = collection.find(Filters.eq("id", id)).first();
+            isUpdate = (existing != null);
+        } else {
+            // Check if endpoint already exists
+            existing = collection.find(Filters.eq("endpoint", endpoint)).first();
+            if (existing != null) {
+                return ApiResponse.error("Endpoint already exists: " + endpoint + ". Use the existing script ID to update it.");
+            }
+        }
+
+        if (isUpdate) {
+            // Update existing script
+            int tz = (timezoneOffset != null) ? timezoneOffset : 0;
+            
+            Document doc = new Document();
+            doc.append("id", id);
+            doc.append("endpoint", endpoint);
+            doc.append("scriptSource", scriptSource);
+            doc.append("description", description != null ? description : "");
+            doc.append("createdAt", existing.getLong("createdAt"));
+            doc.append("createdAtTimezone", existing.get("createdAtTimezone", 0));
+            doc.append("updatedAt", currentTime);
+            doc.append("updatedAtTimezone", tz);
+
+            collection.replaceOne(Filters.eq("id", id), doc);
+
+            GroovyApiScript result = new GroovyApiScript();
+            result.setId(id);
+            result.setEndpoint(endpoint);
+            result.setScriptSource(scriptSource);
+            result.setDescription(description);
+            result.setCreatedAt(doc.getLong("createdAt"));
+            result.setUpdatedAt(currentTime);
+
+            endpointToIdMap.put(endpoint, id);
+
+            return ApiResponse.success(result, "Script updated");
+        } else {
+            // Create new script with generated ID
+            try {
+                app.pojo.IdIssueRequest idRequest = new app.pojo.IdIssueRequest();
+                idRequest.setType("groovy-api");
+                idRequest.setMetadata("endpoint: " + endpoint);
+
+                ApiResponse<app.pojo.IdEntity> idResponse = idService.issueRandomId(idRequest);
+                if (idResponse.getCode() != 0) {
+                    return ApiResponse.error("Failed to generate script ID: " + idResponse.getMessage());
+                }
+
+                String newId = app.util.IdFormatConverter.longToBase36(idResponse.getData().getValue());
+                int tz = (timezoneOffset != null) ? timezoneOffset : 0;
+
+                Document doc = new Document();
+                doc.append("id", newId);
+                doc.append("endpoint", endpoint);
+                doc.append("scriptSource", scriptSource);
+                doc.append("description", description != null ? description : "");
+                doc.append("createdAt", currentTime);
+                doc.append("createdAtTimezone", tz);
+                doc.append("updatedAt", currentTime);
+                doc.append("updatedAtTimezone", tz);
+
+                collection.insertOne(doc);
+
+                GroovyApiScript result = new GroovyApiScript();
+                result.setId(newId);
+                result.setEndpoint(endpoint);
+                result.setScriptSource(scriptSource);
+                result.setDescription(description);
+                result.setCreatedAt(currentTime);
+                result.setUpdatedAt(currentTime);
+
+                endpointToIdMap.put(endpoint, newId);
+
+                return ApiResponse.success(result, "Script created");
+            } catch (Exception e) {
+                return ApiResponse.error("Failed to create script: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Get a script by ID
+     */
+    public ApiResponse<GroovyApiScript> getScriptById(String id) {
+        MongoCollection<Document> collection = getCollection();
+        Document doc = collection.find(Filters.eq("id", id)).first();
+
+        if (doc == null) {
+            return ApiResponse.error("Script not found: " + id);
+        }
+
+        GroovyApiScript script = new GroovyApiScript();
+        script.setId(doc.getString("id"));
+        script.setEndpoint(doc.getString("endpoint"));
+        script.setScriptSource(doc.getString("scriptSource"));
+        script.setDescription(doc.getString("description"));
+        script.setCreatedAt(doc.getLong("createdAt"));
+        script.setUpdatedAt(doc.getLong("updatedAt"));
+
+        return ApiResponse.success(script);
+    }
+
+    /**
+     * List all scripts (returns as a map keyed by script ID)
+     */
+    public ApiResponse<Map<String, Object>> listScripts() {
+        try {
+            MongoCollection<Document> collection = getCollection();
+            Map<String, Object> scripts = new HashMap<>();
+
+            for (Document doc : collection.find()) {
+                String id = doc.getString("id");
+                
+                // Skip documents without ID (shouldn't happen, but be safe)
+                if (id == null || id.isEmpty()) {
+                    System.err.println("Warning: Found script document without ID.");
+                    id = "ID_DOES_NOT_EXIST";
+                }
+                
+                Map<String, Object> script = new HashMap<>();
+                script.put("id", id);
+                script.put("endpoint", doc.getString("endpoint"));
+                script.put("description", doc.getString("description"));
+                script.put("scriptSource", doc.getString("scriptSource"));
+                script.put("createdAt", doc.getLong("createdAt"));
+                script.put("createdAtTimezone", doc.get("createdAtTimezone", 0));
+                script.put("updatedAt", doc.getLong("updatedAt"));
+                script.put("updatedAtTimezone", doc.get("updatedAtTimezone", 0));
+                
+                scripts.put(id, script);
+            }
+
+            return ApiResponse.success(scripts);
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to list scripts: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Delete a script by ID
+     */
+    public ApiResponse<String> deleteScript(String id) {
+        MongoCollection<Document> collection = getCollection();
+        Document doc = collection.find(Filters.eq("id", id)).first();
+        
+        if (doc == null) {
+            return ApiResponse.error("Script not found: " + id);
+        }
+        
+        String endpoint = doc.getString("endpoint");
+        long deletedCount = collection.deleteOne(Filters.eq("id", id)).getDeletedCount();
+
+        if (deletedCount > 0) {
+            scriptCache.remove(endpoint);
+            endpointToIdMap.remove(endpoint);
+            return ApiResponse.success(id, "Script deleted");
+        } else {
+            return ApiResponse.error("Script not found: " + id);
+        }
+    }
+
+    /**
+     * Execute a script for a given endpoint
+     * Returns a standardized response: {code: 0, data: xxx, message: xxx}
+     * code = 0 means success, code < 0 means failure
+     */
+    public Map<String, Object> executeScript(String endpoint, Map<String, Object> params, Map<String, String> headers) {
+        groovy.lang.Script script = scriptCache.get(endpoint);
+
+        if (script == null) {
+            // Try to load from database
+            MongoCollection<Document> collection = getCollection();
+            Document doc = collection.find(Filters.eq("endpoint", endpoint)).first();
+
+            if (doc == null) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("code", -1);
+                error.put("message", "No script found for endpoint: " + endpoint);
+                error.put("data", null);
+                return error;
+            }
+
+            String scriptSource = doc.getString("scriptSource");
+            try {
+                script = compileAndCacheScript(endpoint, scriptSource);
+            } catch (Exception e) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("code", -2);
+                error.put("message", "Failed to compile script: " + e.getMessage());
+                error.put("data", null);
+                return error;
+            }
+        }
+
+        // Create a new binding for each execution
+        Binding binding = new Binding();
+        
+        // Provide tool functions
+        binding.setVariable("mongoAppService", mongoAppService);
+        binding.setVariable("params", params != null ? params : new HashMap<>());
+        binding.setVariable("headers", headers != null ? headers : new HashMap<>());
+
+        // Set the binding and run
+        script.setBinding(binding);
+
+        try {
+            Object result = script.run();
+            
+            // Validate and normalize the response format
+            if (result instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> resultMap = (Map<String, Object>) result;
+                
+                // Check if it already has the standard format
+                if (resultMap.containsKey("code")) {
+                    // Ensure required fields exist
+                    if (!resultMap.containsKey("data")) {
+                        resultMap.put("data", null);
+                    }
+                    if (!resultMap.containsKey("message")) {
+                        resultMap.put("message", null);
+                    }
+                    return resultMap;
+                } else {
+                    // Wrap the result in standard format
+                    Map<String, Object> wrapped = new HashMap<>();
+                    wrapped.put("code", 0);
+                    wrapped.put("data", resultMap);
+                    wrapped.put("message", null);
+                    return wrapped;
+                }
+            } else {
+                // Wrap non-map results in standard format
+                Map<String, Object> wrapped = new HashMap<>();
+                wrapped.put("code", 0);
+                wrapped.put("data", result);
+                wrapped.put("message", null);
+                return wrapped;
+            }
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -3);
+            error.put("message", "Script execution failed: " + e.getMessage());
+            error.put("data", getStackTraceString(e));
+            return error;
+        }
+    }
+
+    /**
+     * Compile and cache a script
+     */
+    private groovy.lang.Script compileAndCacheScript(String endpoint, String scriptSource) {
+        GroovyShell shell = new GroovyShell();
+        groovy.lang.Script script = shell.parse(scriptSource);
+        scriptCache.put(endpoint, script);
+        return script;
+    }
+
+    /**
+     * Clear script cache (useful for testing)
+     */
+    public void clearCache() {
+        scriptCache.clear();
+    }
+
+    /**
+     * Get stack trace as string
+     */
+    private String getStackTraceString(Exception e) {
+        StringBuilder sb = new StringBuilder();
+        for (StackTraceElement element : e.getStackTrace()) {
+            sb.append(element.toString()).append("\n");
+        }
+        return sb.toString();
+    }
+}

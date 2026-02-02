@@ -87,10 +87,10 @@ const DocCard = ({ doc, index, onDelete }) => {
 
   return (
     <>
-      <div className="doc-card">
-        <div className="doc-card-header">
+      <div className="mongo-doc-card">
+        <div className="mongo-doc-card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="doc-card-index">#{index + 1}</span>
+            <span className="mongo-doc-card-index">#{index + 1}</span>
             {docUrl && (
               <div className="fetch-file-url-row">
                 <span className="fetch-file-url" title={docUrl}>{docUrl}</span>
@@ -106,7 +106,7 @@ const DocCard = ({ doc, index, onDelete }) => {
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              className="doc-card-edit-button"
+              className="mongo-doc-card-edit-button"
               onClick={() => setShowJsonView(true)}
               disabled={deleting}
               title="View/Edit in structured format"
@@ -114,7 +114,7 @@ const DocCard = ({ doc, index, onDelete }) => {
               Edit
             </button>
             <button
-              className="doc-card-delete-button"
+              className="mongo-doc-card-delete-button"
               onClick={handleDelete}
               disabled={deleting}
               title="Delete this document"
@@ -134,15 +134,15 @@ const DocCard = ({ doc, index, onDelete }) => {
             {deleteError}
           </div>
         )}
-        <pre className="doc-card-content">
+        <pre className="mongo-doc-card-content">
           {JSON.stringify(doc, null, 2)}
         </pre>
       </div>
 
       {showJsonView && (
-        <div className="doc-editor-overlay" onClick={() => setShowJsonView(false)}>
-          <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="doc-editor-header">
+        <div className="mongo-doc-editor-overlay" onClick={() => setShowJsonView(false)}>
+          <div className="mongo-doc-editor-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="mongo-doc-editor-header">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ flex: 1 }}>
                   <div className="panel-title">Document #{index + 1}</div>
@@ -170,7 +170,7 @@ const DocCard = ({ doc, index, onDelete }) => {
                     </span>
                   )}
                   <button
-                    className="doc-editor-close-button"
+                    className="mongo-doc-editor-close-button"
                     onClick={() => setShowJsonView(false)}
                   >
                     ✕
@@ -178,7 +178,7 @@ const DocCard = ({ doc, index, onDelete }) => {
                 </div>
               </div>
             </div>
-            <div className="doc-editor-content">
+            <div className="mongo-doc-editor-content">
               <JsonComp 
                 data={doc} 
                 isEditable={true}

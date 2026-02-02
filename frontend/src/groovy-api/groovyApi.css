@@ -1,0 +1,128 @@
+/* Groovy API Card Styles */
+.groovy-api-card {
+  position: relative;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.groovy-api-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background-color: #e8e8e8;
+  border-bottom: 1px solid #ddd;
+}
+
+.groovy-api-card-index {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+}
+
+.groovy-api-card-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.groovy-api-card-button:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.groovy-api-card-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.groovy-api-card-delete-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.groovy-api-card-delete-button:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.groovy-api-card-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.groovy-api-card-content {
+  padding: 12px;
+  font-size: 12px;
+  overflow: auto;
+  margin: 0;
+  background-color: #f5f5f5;
+  max-height: 400px;
+}
+
+/* Groovy API Editor Overlay */
+.groovy-api-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.groovy-api-editor-panel {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  height: 90%;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.groovy-api-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+}
+
+.groovy-api-editor-close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.groovy-api-editor-close-button:hover {
+  color: #333;
+}
+
+.groovy-api-editor-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}

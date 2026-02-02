@@ -22,6 +22,7 @@ import IdDataPanel from './id/IdDataPanel';
 import BackendServerPanel from './remote/BackendServerPanel';
 import FilePanel from './file/FilePanel';
 import PanelMongoApp from './mongo-app/PanelMongApp';
+import PanelGroovyApi from './groovy-api/PanelGroovyApi';
 import './App.css';
 
 function App() {
@@ -154,6 +155,14 @@ function App() {
             <SubTab label="Access Points">
               <Panel>
                 <FilePanel />
+              </Panel>
+            </SubTab>
+          </Tab>
+
+          <Tab label="Groovy API">
+            <SubTab label="Scripts">
+              <Panel>
+                <PanelGroovyApi />
               </Panel>
             </SubTab>
           </Tab>
