@@ -1,13 +1,17 @@
 package app.service;
 
-import app.config.RabbitMQConfig;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import app.config.RabbitMQConfig;
 
 @Service
 public class RabbitMQTaskPublishService {
@@ -15,6 +19,10 @@ public class RabbitMQTaskPublishService {
     @Autowired(required = false)
     @Lazy
     private RabbitTemplate rabbitTemplate;
+
+    @Autowired(required = false)
+    @Lazy
+    private MessageConverter messageConverter;
 
     /**
      * Publish a task to the queue
@@ -29,12 +37,21 @@ public class RabbitMQTaskPublishService {
         }
 
         try {
-            Map<String, Object> message = new HashMap<>();
-            message.put("taskType", taskType);
-            message.put("payload", payload);
-            message.put("timestamp", System.currentTimeMillis());
+            // Create message body
+            Map<String, Object> messageBody = new HashMap<>();
+            messageBody.put("payload", payload);
+            messageBody.put("timestamp", System.currentTimeMillis());
 
-            rabbitTemplate.convertAndSend(
+            // Create message properties with headers
+            MessageProperties properties = new MessageProperties();
+            properties.setHeader("taskType", taskType);
+            properties.setContentType("application/json");
+
+            // Convert body to bytes using the message converter
+            Message message = messageConverter.toMessage(messageBody, properties);
+
+            // Send the message
+            rabbitTemplate.send(
                 RabbitMQConfig.TASK_EXCHANGE,
                 RabbitMQConfig.TASK_ROUTING_KEY,
                 message

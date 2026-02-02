@@ -15,7 +15,7 @@ import {
 } from '../remote/dataStore';
 import '../styles/common.css';
 
-export const RabbitMQConfigPanel = () => {
+export const RabbitMQConfig = () => {
   const appConfig = useAtomValue(rabbitMQAppConfigAtom);
   const localConfig = useAtomValue(rabbitMQLocalConfigAtom);
   const computedConfig = useAtomValue(rabbitMQComputedConfigAtom);
@@ -233,4 +233,4 @@ export const RabbitMQConfigPanel = () => {
   );
 };
 
-export default RabbitMQConfigPanel;
+export default RabbitMQConfig;

@@ -1,6 +1,11 @@
 package app.config;
 
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -92,5 +97,30 @@ public class RabbitMQConfig {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(messageConverter);
         return template;
+    }
+
+    @Bean
+    @Lazy
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            ConnectionFactory connectionFactory, 
+            MessageConverter messageConverter) {
+        if (connectionFactory == null) {
+            System.err.println("WARNING: ConnectionFactory is null, cannot create listener container factory");
+            return null;
+        }
+        
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(messageConverter);
+        
+        // Manual acknowledgment mode - consumer must explicitly ack/nack messages
+        factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+        
+        // Prefetch count = 1: Only one unacknowledged message per consumer at a time
+        // This ensures fair dispatch and prevents other instances from consuming
+        // the same message while it's being processed
+        factory.setPrefetchCount(1);
+        
+        return factory;
     }
 }

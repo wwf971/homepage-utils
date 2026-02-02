@@ -1,24 +1,24 @@
 import React from 'react';
-import { TabsOnTop } from '@wwf971/react-comp-misc';
-import RabbitMQConfigPanel from './RabbitMQConfigPanel';
+import { PanelToggle } from '@wwf971/react-comp-misc';
+import RabbitMQConfig from './RabbitMQConfig';
 import TestConnectionRabbitMQ from './TestConnectionRabbitMQ';
 import TestPublishAndReceive from './TestPublishAndReceive';
 
 const RabbitMQPanel = () => {
   return (
-    <TabsOnTop defaultTab="Config">
-      <TabsOnTop.Tab label="Config">
-        <RabbitMQConfigPanel />
-      </TabsOnTop.Tab>
+    <div style={{ padding: '0px 12px' }}>
+      <PanelToggle title="Config" defaultExpanded={false}>
+        <RabbitMQConfig />
+      </PanelToggle>
       
-      <TabsOnTop.Tab label="Test Connection">
+      <PanelToggle title="Test Connection" defaultExpanded={false}>
         <TestConnectionRabbitMQ />
-      </TabsOnTop.Tab>
+      </PanelToggle>
       
-      <TabsOnTop.Tab label="Test Publish & Receive">
+      <PanelToggle title="Test Publish & Receive" defaultExpanded={true}>
         <TestPublishAndReceive />
-      </TabsOnTop.Tab>
-    </TabsOnTop>
+      </PanelToggle>
+    </div>
   );
 };
 

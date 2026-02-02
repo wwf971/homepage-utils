@@ -1,6 +1,6 @@
 import { observer } from 'mobx-react-lite'
 import { useState } from 'react'
-import { PanelWithToggle, SpinningCircle } from '@wwf971/react-comp-misc'
+import { PanelToggle, SpinningCircle } from '@wwf971/react-comp-misc'
 import { useMongoAppStore } from './mongoAppStore.jsx'
 import './MongoAppConfig.css'
 
@@ -35,7 +35,7 @@ const TestConnection = observer(() => {
   }
 
   return (
-    <PanelWithToggle title="Server URL" defaultExpanded={!store.serverUrl}>
+    <PanelToggle title="Server URL" defaultExpanded={!store.serverUrl}>
       <div className="config-panel-content">
         {isEditingUrl ? (
           <div className="config-row">
@@ -106,7 +106,7 @@ const TestConnection = observer(() => {
           </div>
         )}
       </div>
-    </PanelWithToggle>
+    </PanelToggle>
   )
 })
 

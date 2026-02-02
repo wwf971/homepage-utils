@@ -1,7 +1,7 @@
 import { observer } from 'mobx-react-lite'
 import { reaction } from 'mobx'
 import { useEffect, useRef } from 'react'
-import { PanelWithToggle, SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc'
+import { PanelToggle, SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc'
 import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoAppStore.jsx'
 import TestConnection from './TestConnection.jsx'
 import './MongoAppConfig.css'
@@ -11,7 +11,7 @@ const AppIdPanel = observer(() => {
   const store = useMongoAppStore()
   
   return (
-  <PanelWithToggle title="App ID Management" defaultExpanded={!store.appId}>
+  <PanelToggle title="App ID Management" defaultExpanded={!store.appId}>
     <div className="config-panel-content">
       <div className="config-row">
         <label className="config-label">App Name:</label>
@@ -96,7 +96,7 @@ const AppIdPanel = observer(() => {
         </div>
       )}
     </div>
-  </PanelWithToggle>
+  </PanelToggle>
   )
 })
 
@@ -106,7 +106,7 @@ const AppMetadataPanel = observer(() => {
   if (!store.appMetadata) return null
   
   return (
-    <PanelWithToggle title="App Metadata" defaultExpanded={false}>
+    <PanelToggle title="App Metadata" defaultExpanded={false}>
       <div className="config-panel-content">
         <div className="config-metadata">
           <div className="config-metadata-item">
@@ -135,7 +135,7 @@ const AppMetadataPanel = observer(() => {
           </div>
         </div>
       </div>
-    </PanelWithToggle>
+    </PanelToggle>
   )
 })
 
@@ -145,7 +145,7 @@ const EsIndexPanel = observer(() => {
   if (!store.isConfigured) return null
   
   return (
-    <PanelWithToggle title="Elasticsearch Index" defaultExpanded={false}>
+    <PanelToggle title="Elasticsearch Index" defaultExpanded={false}>
       <div className="config-panel-content">
         <div className="config-metadata">
           <div className="config-metadata-item">
@@ -193,7 +193,7 @@ const EsIndexPanel = observer(() => {
           </div>
         )}
       </div>
-    </PanelWithToggle>
+    </PanelToggle>
   )
 })
 
@@ -203,7 +203,7 @@ const CollectionsPanel = observer(({ collections }) => {
   if (!store.isConfigured) return null
   
   return (
-    <PanelWithToggle title="Collections Status" defaultExpanded={true}>
+    <PanelToggle title="Collections Status" defaultExpanded={true}>
     <div className="config-panel-content">
       {store.isCheckingCollections ? (
         <div className="config-loading">Checking collections...</div>
@@ -239,7 +239,7 @@ const CollectionsPanel = observer(({ collections }) => {
         </div>
       )}
     </div>
-  </PanelWithToggle>
+  </PanelToggle>
   )
 })
 
