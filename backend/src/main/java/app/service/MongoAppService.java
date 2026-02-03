@@ -41,6 +41,10 @@ public class MongoAppService {
     @Autowired
     private IdService idService;
     
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private GroovyApiService groovyApiService;
+    
     private static final String APP_DB_NAME = "mongo-app";
     private static final String APP_METADATA_COLL_NAME = "__app__";
     
@@ -97,11 +101,23 @@ public class MongoAppService {
         Document existing = metadataCollection.find(Filters.eq("appName", appName)).first();
         if (existing != null) {
             // Return existing app info
+            // Migrate old apps to support multiple indices
+            @SuppressWarnings("unchecked")
+            List<String> esIndices = (List<String>) existing.get("esIndices");
+            if (esIndices == null) {
+                esIndices = new ArrayList<>();
+                String esIndex = existing.getString("esIndex");
+                if (esIndex != null) {
+                    esIndices.add(esIndex);
+                }
+            }
+            
             return ApiResponse.success(
                 Map.of(
                     "appId", existing.getString("appId"),
                     "appName", existing.getString("appName"),
                     "esIndex", existing.getString("esIndex"),
+                    "esIndices", esIndices,
                     "collections", existing.get("collections", new ArrayList<>())
                 ),
                 "App already exists"
@@ -134,10 +150,14 @@ public class MongoAppService {
         // Get timezone offset in hours (-12 to +12)
         int createdAtTimezone = TimeUtils.getCurrentTimezoneOffset() / 60;
         
-        // Create app metadata document
+        // Create app metadata document with multiple ES indices support
+        List<String> esIndices = new ArrayList<>();
+        esIndices.add(esIndexName);
+        
         Document appDoc = new Document("appId", appId)
             .append("appName", appName)
-            .append("esIndex", esIndexName)
+            .append("esIndex", esIndexName)  // Keep for backward compatibility
+            .append("esIndices", esIndices)   // New field for multiple indices
             .append("collections", new ArrayList<String>())
             .append("createdAt", createdAt)
             .append("createdAtTimezone", createdAtTimezone);
@@ -177,6 +197,7 @@ public class MongoAppService {
                 "appId", appId,
                 "appName", appName,
                 "esIndex", esIndexName,
+                "esIndices", esIndices,
                 "collections", new ArrayList<>()
             ),
             "App with id: " + appId + " initialized successfully"
@@ -363,13 +384,33 @@ public class MongoAppService {
             System.err.println("Failed to delete index metadata: " + e.getMessage());
         }
         
+        // Delete all Groovy API scripts for this app
+        int deletedScripts = 0;
+        try {
+            app.pojo.ApiResponse<Map<String, Object>> scriptsResponse = listMongoAppGroovyApis(appId);
+            if (scriptsResponse.getCode() == 0) {
+                Map<String, Object> scripts = scriptsResponse.getData();
+                for (String scriptId : scripts.keySet()) {
+                    try {
+                        groovyApiService.deleteScript(scriptId);
+                        deletedScripts++;
+                    } catch (Exception e) {
+                        System.err.println("Failed to delete script " + scriptId + ": " + e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to delete Groovy API scripts: " + e.getMessage());
+        }
+        
         // Delete app metadata
         metadataCollection.deleteOne(Filters.eq("appId", appId));
         
         return ApiResponse.success(
             Map.of(
                 "appId", appId,
-                "deletedCollections", collections.size()
+                "deletedCollections", collections.size(),
+                "deletedScripts", deletedScripts
             ),
             "App deleted successfully"
         );
@@ -589,11 +630,23 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
         
+        // Migrate old apps to support multiple indices
+        @SuppressWarnings("unchecked")
+        List<String> esIndices = (List<String>) appDoc.get("esIndices");
+        if (esIndices == null) {
+            esIndices = new ArrayList<>();
+            String esIndex = appDoc.getString("esIndex");
+            if (esIndex != null) {
+                esIndices.add(esIndex);
+            }
+        }
+        
         return ApiResponse.success(
             Map.of(
                 "appId", appDoc.getString("appId"),
                 "appName", appDoc.getString("appName"),
                 "esIndex", appDoc.getString("esIndex"),
+                "esIndices", esIndices,
                 "collections", appDoc.get("collections", new ArrayList<>()),
                 "createdAt", appDoc.get("createdAt")
             )
@@ -808,6 +861,19 @@ public class MongoAppService {
                 app.put("appId", doc.getString("appId"));
                 app.put("appName", doc.getString("appName"));
                 app.put("esIndex", doc.getString("esIndex"));
+                
+                // Migrate old apps to support multiple indices
+                @SuppressWarnings("unchecked")
+                List<String> esIndices = (List<String>) doc.get("esIndices");
+                if (esIndices == null) {
+                    esIndices = new ArrayList<>();
+                    String esIndex = doc.getString("esIndex");
+                    if (esIndex != null) {
+                        esIndices.add(esIndex);
+                    }
+                }
+                app.put("esIndices", esIndices);
+                
                 app.put("createdAt", doc.getLong("createdAt"));
                 app.put("collections", doc.get("collections", new ArrayList<>()));
                 apps.add(app);
@@ -817,6 +883,260 @@ public class MongoAppService {
         } catch (Exception e) {
             return ApiResponse.error("Failed to list apps: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Create a custom API script for a MongoApp
+     */
+    public ApiResponse<Map<String, Object>> createApiScript(String appId, String endpoint, String scriptSource, String description, Integer timezoneOffset) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Transform endpoint name to {appId}_{endpoint}
+        String actualEndpoint = appId + "_" + endpoint;
+        
+        // Create script with owner=appId and source=mongoApp
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.uploadScript(
+            null, actualEndpoint, scriptSource, description, timezoneOffset, appId, "mongoApp"
+        );
+        
+        if (result.getCode() != 0) {
+            return createErrorResult(result.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript script = result.getData();
+        Map<String, Object> data = new HashMap<>();
+        data.put("scriptId", script.getId());
+        data.put("endpoint", script.getEndpoint());
+        data.put("apiPath", endpoint); // Store the original api name without prefix
+        data.put("description", script.getDescription());
+        
+        return ApiResponse.success(data, "API script created");
+    }
+    
+    /**
+     * List all API scripts for a MongoApp
+     */
+    public ApiResponse<Map<String, Object>> listMongoAppGroovyApis(String appId) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Get all scripts with owner=appId and source=mongoApp
+        app.pojo.ApiResponse<Map<String, Object>> allScripts = groovyApiService.listScripts();
+        if (allScripts.getCode() != 0) {
+            return createErrorResult(allScripts.getMessage());
+        }
+        
+        Map<String, Object> scripts = allScripts.getData();
+        Map<String, Object> appScripts = new HashMap<>();
+        String prefix = appId + "_";
+        
+        for (Map.Entry<String, Object> entry : scripts.entrySet()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> script = (Map<String, Object>) entry.getValue();
+            String owner = (String) script.get("owner");
+            String source = (String) script.get("source");
+            
+            if (appId.equals(owner) && "mongoApp".equals(source)) {
+                // Strip appId prefix from endpoint to get apiPath
+                String endpoint = (String) script.get("endpoint");
+                String apiPath = endpoint;
+                if (endpoint != null && endpoint.startsWith(prefix)) {
+                    apiPath = endpoint.substring(prefix.length());
+                }
+                
+                // Add apiPath to the script map
+                script.put("apiPath", apiPath);
+                
+                appScripts.put(entry.getKey(), script);
+            }
+        }
+        
+        return ApiResponse.success(appScripts);
+    }
+    
+    /**
+     * Get an API script by ID
+     */
+    public ApiResponse<Map<String, Object>> getGroovyApi(String appId, String scriptId) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Get script
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.getScriptById(scriptId);
+        if (result.getCode() != 0) {
+            return createErrorResult(result.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript script = result.getData();
+        
+        // Verify ownership
+        if (!appId.equals(script.getOwner()) || !"mongoApp".equals(script.getSource())) {
+            return createErrorResult("Script not found or does not belong to this app");
+        }
+        
+        // Strip appId prefix from endpoint to get apiPath
+        String endpoint = script.getEndpoint();
+        String apiPath = endpoint;
+        String prefix = appId + "_";
+        if (endpoint != null && endpoint.startsWith(prefix)) {
+            apiPath = endpoint.substring(prefix.length());
+        }
+        
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", script.getId());
+        data.put("endpoint", script.getEndpoint());
+        data.put("apiPath", apiPath);
+        data.put("scriptSource", script.getScriptSource());
+        data.put("description", script.getDescription());
+        data.put("createdAt", script.getCreatedAt());
+        data.put("updatedAt", script.getUpdatedAt());
+        
+        return ApiResponse.success(data);
+    }
+    
+    /**
+     * Update an API script
+     */
+    public ApiResponse<Map<String, Object>> updateGroovyApi(String appId, String scriptId, String endpoint, String scriptSource, String description, Integer timezoneOffset) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Verify script exists and belongs to this app
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> existingResult = groovyApiService.getScriptById(scriptId);
+        if (existingResult.getCode() != 0) {
+            return createErrorResult(existingResult.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript existing = existingResult.getData();
+        if (!appId.equals(existing.getOwner()) || !"mongoApp".equals(existing.getSource())) {
+            return createErrorResult("Script not found or does not belong to this app");
+        }
+        
+        // Transform endpoint name to {appId}_{endpoint}
+        String actualEndpoint = appId + "_" + endpoint;
+        
+        // Update script
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.uploadScript(
+            scriptId, actualEndpoint, scriptSource, description, timezoneOffset, appId, "mongoApp"
+        );
+        
+        if (result.getCode() != 0) {
+            return createErrorResult(result.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript script = result.getData();
+        Map<String, Object> data = new HashMap<>();
+        data.put("scriptId", script.getId());
+        data.put("endpoint", script.getEndpoint());
+        data.put("apiPath", endpoint); // Store the original api name without prefix
+        data.put("description", script.getDescription());
+        
+        return ApiResponse.success(data, "API script updated");
+    }
+    
+    /**
+     * Delete an API script
+     */
+    public ApiResponse<Map<String, Object>> deleteApiScript(String appId, String scriptId) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Verify script exists and belongs to this app
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> existingResult = groovyApiService.getScriptById(scriptId);
+        if (existingResult.getCode() != 0) {
+            return createErrorResult(existingResult.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript existing = existingResult.getData();
+        if (!appId.equals(existing.getOwner()) || !"mongoApp".equals(existing.getSource())) {
+            return createErrorResult("Script not found or does not belong to this app");
+        }
+        
+        // Delete script
+        app.pojo.ApiResponse<String> result = groovyApiService.deleteScript(scriptId);
+        if (result.getCode() != 0) {
+            return createErrorResult(result.getMessage());
+        }
+        
+        return ApiResponse.success(Map.of("scriptId", scriptId), "API script deleted");
+    }
+    
+    /**
+     * Execute a custom API script for a MongoApp
+     */
+    public Map<String, Object> executeApiScript(String appId, String endpoint, Map<String, Object> params, Map<String, String> headers) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -1);
+            error.put("message", "App not found: " + appId);
+            error.put("data", null);
+            return error;
+        }
+        
+        // Transform endpoint name to {appId}_{endpoint}
+        String actualEndpoint = appId + "_" + endpoint;
+        
+        // Get all scripts for this app
+        app.pojo.ApiResponse<Map<String, Object>> allScripts = groovyApiService.listScripts();
+        if (allScripts.getCode() != 0) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -2);
+            error.put("message", "Failed to list scripts: " + allScripts.getMessage());
+            error.put("data", null);
+            return error;
+        }
+        
+        // Find script with matching endpoint, owner, and source
+        Map<String, Object> scripts = allScripts.getData();
+        String matchingEndpoint = null;
+        
+        for (Map.Entry<String, Object> entry : scripts.entrySet()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> script = (Map<String, Object>) entry.getValue();
+            String scriptEndpoint = (String) script.get("endpoint");
+            String owner = (String) script.get("owner");
+            String source = (String) script.get("source");
+            
+            if (actualEndpoint.equals(scriptEndpoint) && appId.equals(owner) && "mongoApp".equals(source)) {
+                matchingEndpoint = scriptEndpoint;
+                break;
+            }
+        }
+        
+        if (matchingEndpoint == null) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -3);
+            error.put("message", "No API script found for endpoint: " + endpoint);
+            error.put("data", null);
+            return error;
+        }
+        
+        // Execute the script
+        return groovyApiService.executeScript(matchingEndpoint, params, headers);
     }
     
     /**

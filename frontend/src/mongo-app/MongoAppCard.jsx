@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { observer } from 'mobx-react-lite'
-import { MongoAppConfig } from '@wwf971/homepage-utils-utils'
+import { MongoAppConfig as MongoAppConfigPanel} from '@wwf971/homepage-utils-utils'
 import { mongoAppStore } from './mongoAppStore'
 import './mongoApp.css'
 
@@ -10,7 +10,9 @@ const SECTIONS_EXISTENCE = {
   showAppIdManagement: false,
   showAppMetadata: true,
   showIndexStatus: true,
-  showCollections: true
+  showCollections: true,
+  showGroovyApi: true,
+  showGroovyApiTest: true
 }
 
 const MongoAppCard = observer(() => {
@@ -33,8 +35,9 @@ const MongoAppCard = observer(() => {
   }
 
   return (
+    // make MongoAppConfigPanel use data from the store provided by us, instead of using its own store
     <div className="mongo-app-card-container">
-      <MongoAppConfig
+      <MongoAppConfigPanel
         externalStore={store}
         collections={collections}
         panels_existence={SECTIONS_EXISTENCE}

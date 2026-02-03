@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import { PanelToggle, SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc'
 import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoAppStore.jsx'
 import TestConnection from './TestConnection.jsx'
+import MongoAppGroovyApi from './mongoAppGroovyApi.jsx'
+import MongoAppGroovyApiTest from './mongoAppGroovyApiTest.jsx'
 import './MongoAppConfig.css'
 
 // App ID Management Panel
@@ -344,6 +346,8 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
       {panels_existence.showAppMetadata && <AppMetadataPanel />}
       {panels_existence.showIndexStatus && <EsIndexPanel />}
       {panels_existence.showCollections && <CollectionsPanel collections={collections} />}
+      {panels_existence.showGroovyApi && <MongoAppGroovyApi store={store} />}
+      {panels_existence.showGroovyApiTest && <MongoAppGroovyApiTest store={store} />}
     </div>
   )
 })
@@ -363,7 +367,9 @@ const MongoAppConfig = ({
     showAppIdManagement: true,
     showAppMetadata: true,
     showIndexStatus: true,
-    showCollections: true
+    showCollections: true,
+    showGroovyApi: true,
+    showGroovyApiTest: true
   }
 
   // If external store is provided, use ExternalStoreProvider

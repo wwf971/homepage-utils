@@ -16,8 +16,12 @@ At frontend, scripts data are managed by mobx store. mobx store structure:
       endpoint: "list-apps",
       description: "List all MongoDB apps",
       scriptSource: "...",
+      owner: "mongo-app-system",      // Optional: identifies who owns this script
+      source: "mongo-app-id-123",     // Optional: identifies source context
       createdAt: 1706789012345,
-      updatedAt: 1706789012345
+      createdAtTimezone: 0,
+      updatedAt: 1706789012345,
+      updatedAtTimezone: 0
     },
     "7pm2f": { ... }
   },
@@ -85,10 +89,20 @@ if (response.code == 0) {
 
 ## API Endpoints
 
-POST   /groovy-api/upload                       - Upload/update script
+POST   /groovy-api/upload                       - Upload/update script (params: id, endpoint, scriptSource, description, owner, source, timezoneOffset)
 GET    /groovy-api/list                         - List all scripts (returns map keyed by ID)
 GET    /groovy-api/get/{id}                     - Get script by ID
 DELETE /groovy-api/delete/{id}                  - Delete script by ID
 POST   /groovy-api/reload                       - Reload all scripts from DB
 POST   /groovy-api/{endpoint}                   - Execute script (with request body)
 GET    /groovy-api/{endpoint}                   - Execute script (with query params)
+
+### Upload Parameters
+
+- `id` (optional): Script ID for updating existing script
+- `endpoint` (required): Endpoint name (alphanumeric, dash, underscore only)
+- `scriptSource` (required): Groovy script source code
+- `description` (optional): Description of the script
+- `owner` (optional): Identifies who owns this script (e.g., "mongo-app-system")
+- `source` (optional): Identifies source context (e.g., "mongo-app-id-123")
+- `timezoneOffset` (optional): Timezone offset in hours for timestamps

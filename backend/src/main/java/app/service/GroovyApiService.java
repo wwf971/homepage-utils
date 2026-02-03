@@ -102,7 +102,7 @@ public class GroovyApiService {
     /**
      * Upload or update a Groovy script
      */
-    public ApiResponse<GroovyApiScript> uploadScript(String id, String endpoint, String scriptSource, String description, Integer timezoneOffset) {
+    public ApiResponse<GroovyApiScript> uploadScript(String id, String endpoint, String scriptSource, String description, Integer timezoneOffset, String owner, String source) {
         if (endpoint == null || endpoint.trim().isEmpty()) {
             return ApiResponse.error("Endpoint cannot be empty");
         }
@@ -111,9 +111,9 @@ public class GroovyApiService {
             return ApiResponse.error("Script source cannot be empty");
         }
 
-        // Validate endpoint name (alphanumeric, dash, underscore only)
-        if (!endpoint.matches("^[a-zA-Z0-9_-]+$")) {
-            return ApiResponse.error("Endpoint must contain only alphanumeric characters, dashes, and underscores");
+        // Validate endpoint name (alphanumeric, dash, underscore, slash)
+        if (!endpoint.matches("^[a-zA-Z0-9_/-]+$")) {
+            return ApiResponse.error("Endpoint must contain only alphanumeric characters, dashes, underscores, and slashes");
         }
 
         // Try to compile the script to validate it
@@ -150,6 +150,8 @@ public class GroovyApiService {
             doc.append("endpoint", endpoint);
             doc.append("scriptSource", scriptSource);
             doc.append("description", description != null ? description : "");
+            doc.append("owner", owner != null ? owner : existing.getString("owner"));
+            doc.append("source", source != null ? source : existing.getString("source"));
             doc.append("createdAt", existing.getLong("createdAt"));
             doc.append("createdAtTimezone", existing.get("createdAtTimezone", 0));
             doc.append("updatedAt", currentTime);
@@ -162,6 +164,8 @@ public class GroovyApiService {
             result.setEndpoint(endpoint);
             result.setScriptSource(scriptSource);
             result.setDescription(description);
+            result.setOwner(doc.getString("owner"));
+            result.setSource(doc.getString("source"));
             result.setCreatedAt(doc.getLong("createdAt"));
             result.setUpdatedAt(currentTime);
 
@@ -188,6 +192,8 @@ public class GroovyApiService {
                 doc.append("endpoint", endpoint);
                 doc.append("scriptSource", scriptSource);
                 doc.append("description", description != null ? description : "");
+                doc.append("owner", owner != null ? owner : "");
+                doc.append("source", source != null ? source : "");
                 doc.append("createdAt", currentTime);
                 doc.append("createdAtTimezone", tz);
                 doc.append("updatedAt", currentTime);
@@ -200,6 +206,8 @@ public class GroovyApiService {
                 result.setEndpoint(endpoint);
                 result.setScriptSource(scriptSource);
                 result.setDescription(description);
+                result.setOwner(owner);
+                result.setSource(source);
                 result.setCreatedAt(currentTime);
                 result.setUpdatedAt(currentTime);
 
@@ -228,6 +236,8 @@ public class GroovyApiService {
         script.setEndpoint(doc.getString("endpoint"));
         script.setScriptSource(doc.getString("scriptSource"));
         script.setDescription(doc.getString("description"));
+        script.setOwner(doc.getString("owner"));
+        script.setSource(doc.getString("source"));
         script.setCreatedAt(doc.getLong("createdAt"));
         script.setUpdatedAt(doc.getLong("updatedAt"));
 
@@ -256,6 +266,8 @@ public class GroovyApiService {
                 script.put("endpoint", doc.getString("endpoint"));
                 script.put("description", doc.getString("description"));
                 script.put("scriptSource", doc.getString("scriptSource"));
+                script.put("owner", doc.getString("owner"));
+                script.put("source", doc.getString("source"));
                 script.put("createdAt", doc.getLong("createdAt"));
                 script.put("createdAtTimezone", doc.get("createdAtTimezone", 0));
                 script.put("updatedAt", doc.getLong("updatedAt"));

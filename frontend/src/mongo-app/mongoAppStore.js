@@ -27,6 +27,7 @@ class MongoAppStore {
   appMetadata = null
   indexExists = false
   indexName = ''
+  esIndices = []  // Array of ES index names
 
   constructor() {
     makeAutoObservable(this)
@@ -83,6 +84,7 @@ class MongoAppStore {
         this.appId = app.appId
         this.appName = app.appName
         this.indexName = app.esIndex
+        this.esIndices = app.esIndices || (app.esIndex ? [app.esIndex] : [])
         
         // Reset state
         this.appError = null
@@ -297,6 +299,7 @@ class MongoAppStore {
       if (result.code === 0) {
         runInAction(() => {
           this.appMetadata = result.data
+          this.esIndices = result.data.esIndices || (result.data.esIndex ? [result.data.esIndex] : [])
         })
       }
     } catch (error) {

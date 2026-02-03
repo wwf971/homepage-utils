@@ -10,6 +10,8 @@ public class GroovyApiScript {
     private Long createdAt;
     private Long updatedAt;
     private String description;
+    private String owner;
+    private String source;
 
     public GroovyApiScript() {
     }
@@ -60,5 +62,21 @@ public class GroovyApiScript {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getOwner() {
+        return owner;
+    }
+
+    public void setOwner(String owner) {
+        this.owner = owner;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 }

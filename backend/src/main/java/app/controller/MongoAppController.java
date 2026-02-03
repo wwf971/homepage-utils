@@ -1,12 +1,23 @@
 package app.controller;
 
-import app.pojo.ApiResponse;
-import app.service.MongoAppService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import app.pojo.ApiResponse;
+import app.service.MongoAppService;
 
 /**
  * REST API controller for MongoDB app subsystem
@@ -219,5 +230,93 @@ public class MongoAppController {
                                         @RequestParam(required = false) Integer limit,
                                         @RequestParam(required = false) Integer skip) {
         return mongoAppService.listDocs(appId, collectionName, limit, skip);
+    }
+    
+    /**
+     * Create a custom API script for a MongoApp
+     * POST /mongo-app/{appId}/api-config/create
+     * Body: { "endpoint": "my-api", "scriptSource": "...", "description": "...", "timezoneOffset": 0 }
+     */
+    @PostMapping("/{appId}/api-config/create")
+    public ApiResponse<Map<String, Object>> createApiScript(@PathVariable String appId,
+                                                            @RequestBody Map<String, Object> request) {
+        String endpoint = (String) request.get("endpoint");
+        String scriptSource = (String) request.get("scriptSource");
+        String description = (String) request.get("description");
+        Integer timezoneOffset = request.get("timezoneOffset") != null ? 
+            ((Number) request.get("timezoneOffset")).intValue() : null;
+        
+        return mongoAppService.createApiScript(appId, endpoint, scriptSource, description, timezoneOffset);
+    }
+    
+    /**
+     * List all API scripts for a MongoApp
+     * GET /mongo-app/{appId}/api-config/list
+     */
+    @GetMapping("/{appId}/api-config/list")
+    public ApiResponse<Map<String, Object>> listMongoAppGroovyApis(@PathVariable String appId) {
+        return mongoAppService.listMongoAppGroovyApis(appId);
+    }
+    
+    /**
+     * Get an API script by ID
+     * GET /mongo-app/{appId}/api-config/get/{scriptId}
+     */
+    @GetMapping("/{appId}/api-config/get/{scriptId}")
+    public ApiResponse<Map<String, Object>> getGroovyApi(@PathVariable String appId,
+                                                         @PathVariable String scriptId) {
+        return mongoAppService.getGroovyApi(appId, scriptId);
+    }
+    
+    /**
+     * Update an API script
+     * PUT /mongo-app/{appId}/api-config/update/{scriptId}
+     * Body: { "endpoint": "my-api", "scriptSource": "...", "description": "...", "timezoneOffset": 0 }
+     */
+    @PutMapping("/{appId}/api-config/update/{scriptId}")
+    public ApiResponse<Map<String, Object>> updateGroovyApi(@PathVariable String appId,
+                                                            @PathVariable String scriptId,
+                                                            @RequestBody Map<String, Object> request) {
+        String endpoint = (String) request.get("endpoint");
+        String scriptSource = (String) request.get("scriptSource");
+        String description = (String) request.get("description");
+        Integer timezoneOffset = request.get("timezoneOffset") != null ? 
+            ((Number) request.get("timezoneOffset")).intValue() : null;
+        
+        return mongoAppService.updateGroovyApi(appId, scriptId, endpoint, scriptSource, description, timezoneOffset);
+    }
+    
+    /**
+     * Delete an API script
+     * DELETE /mongo-app/{appId}/api-config/delete/{scriptId}
+     */
+    @DeleteMapping("/{appId}/api-config/delete/{scriptId}")
+    public ApiResponse<Map<String, Object>> deleteApiScript(@PathVariable String appId,
+                                                            @PathVariable String scriptId) {
+        return mongoAppService.deleteApiScript(appId, scriptId);
+    }
+    
+    /**
+     * Execute a custom API script for a MongoApp
+     * POST /mongo-app/{appId}/api/{endpoint}
+     */
+    @PostMapping("/{appId}/api/{endpoint}")
+    public Map<String, Object> executeApiScriptPost(@PathVariable String appId,
+                                                     @PathVariable String endpoint,
+                                                     @RequestBody(required = false) Map<String, Object> params,
+                                                     @RequestHeader Map<String, String> headers) {
+        return mongoAppService.executeApiScript(appId, endpoint, params, headers);
+    }
+    
+    /**
+     * Execute a custom API script for a MongoApp
+     * GET /mongo-app/{appId}/api/{endpoint}
+     */
+    @GetMapping("/{appId}/api/{endpoint}")
+    public Map<String, Object> executeApiScriptGet(@PathVariable String appId,
+                                                    @PathVariable String endpoint,
+                                                    @RequestParam(required = false) Map<String, Object> params,
+                                                    @RequestHeader Map<String, String> headers) {
+        return mongoAppService.executeApiScript(appId, endpoint, params, headers);
     }
 }

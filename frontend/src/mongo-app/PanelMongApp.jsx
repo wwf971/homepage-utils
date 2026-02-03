@@ -5,6 +5,7 @@ import './mongoApp.css'
 
 const PanelMongoApp = () => {
   return (
+    // left-right layout
     <div className="mongo-app-panel">
       <MongoAppListAll />
       <MongoAppCard />

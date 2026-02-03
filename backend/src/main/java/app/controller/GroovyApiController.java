@@ -45,10 +45,12 @@ public class GroovyApiController {
         String endpoint = (String) request.get("endpoint");
         String scriptSource = (String) request.get("scriptSource");
         String description = (String) request.get("description");
+        String owner = (String) request.get("owner");
+        String source = (String) request.get("source");
         Integer timezoneOffset = request.get("timezoneOffset") != null ? 
             ((Number) request.get("timezoneOffset")).intValue() : null;
 
-        return groovyApiService.uploadScript(id, endpoint, scriptSource, description, timezoneOffset);
+        return groovyApiService.uploadScript(id, endpoint, scriptSource, description, timezoneOffset, owner, source);
     }
 
     /**
@@ -92,12 +94,34 @@ public class GroovyApiController {
      * Dynamic endpoint handler - executes Groovy script based on endpoint
      * Handles both GET and POST requests
      * Returns standardized response: {code: 0, data: xxx, message: xxx}
+     * 
+     * Note: Scripts with source="mongoApp" should be accessed via /mongo-app/{appId}/api/{endpoint}
      */
     @PostMapping("{endpoint}")
     public Map<String, Object> executeScriptPost(
             @PathVariable String endpoint,
             @RequestBody(required = false) Map<String, Object> params,
             @RequestHeader Map<String, String> headers) {
+        // Check if this endpoint belongs to a mongoApp
+        ApiResponse<Map<String, Object>> allScripts = groovyApiService.listScripts();
+        if (allScripts.getCode() == 0) {
+            Map<String, Object> scripts = allScripts.getData();
+            for (Map.Entry<String, Object> entry : scripts.entrySet()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> script = (Map<String, Object>) entry.getValue();
+                String scriptEndpoint = (String) script.get("endpoint");
+                String source = (String) script.get("source");
+                
+                if (endpoint.equals(scriptEndpoint) && "mongoApp".equals(source)) {
+                    java.util.Map<String, Object> error = new java.util.HashMap<>();
+                    error.put("code", -1);
+                    error.put("message", "This script belongs to a MongoApp. Access it via /mongo-app/{appId}/api/" + endpoint);
+                    error.put("data", null);
+                    return error;
+                }
+            }
+        }
+        
         return groovyApiService.executeScript(endpoint, params, headers);
     }
 
@@ -106,6 +130,26 @@ public class GroovyApiController {
             @PathVariable String endpoint,
             @RequestParam(required = false) Map<String, Object> params,
             @RequestHeader Map<String, String> headers) {
+        // Check if this endpoint belongs to a mongoApp
+        ApiResponse<Map<String, Object>> allScripts = groovyApiService.listScripts();
+        if (allScripts.getCode() == 0) {
+            Map<String, Object> scripts = allScripts.getData();
+            for (Map.Entry<String, Object> entry : scripts.entrySet()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> script = (Map<String, Object>) entry.getValue();
+                String scriptEndpoint = (String) script.get("endpoint");
+                String source = (String) script.get("source");
+                
+                if (endpoint.equals(scriptEndpoint) && "mongoApp".equals(source)) {
+                    java.util.Map<String, Object> error = new java.util.HashMap<>();
+                    error.put("code", -1);
+                    error.put("message", "This script belongs to a MongoApp. Access it via /mongo-app/{appId}/api/" + endpoint);
+                    error.put("data", null);
+                    return error;
+                }
+            }
+        }
+        
         return groovyApiService.executeScript(endpoint, params, headers);
     }
 }

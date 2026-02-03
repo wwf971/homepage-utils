@@ -55,40 +55,42 @@ const GroovyApiTest = observer(({ refreshTrigger }) => {
       <div className="section-title">Test Groovy API Endpoints</div>
 
       <div style={{ marginTop: '0px' }}>
-        <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold', fontSize: '12px' }}>
-          Select Endpoint:
-        </label>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <select
-            value={selectedEndpoint}
-            onChange={(e) => setSelectedEndpoint(e.target.value)}
-            style={{
-              padding: '6px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              flex: 1
-            }}
-          >
-            <option value="">-- Select an endpoint --</option>
-            {groovyApiStore.scriptsArray.map(script => (
-              <option key={script.id} value={script.endpoint}>
-                {script.endpoint} {script.description ? `- ${script.description}` : ''}
-              </option>
-            ))}
-          </select>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '12px' }}>
+            Available Endpoints {groovyApiStore.scriptsArray.length > 0 && `(${groovyApiStore.scriptsArray.length})`}:
+          </label>
           <button
             onClick={forceRefresh}
             style={{
-              padding: '6px 12px',
+              padding: '4px 10px',
               border: '1px solid #ddd',
               borderRadius: '4px',
               background: '#fff',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontSize: '11px'
             }}
           >
             Refresh
           </button>
         </div>
+        {groovyApiStore.scriptsArray.length === 0 ? (
+          <div style={{ color: '#666', fontStyle: 'italic', fontSize: '12px', padding: '4px 0' }}>
+            {groovyApiStore.loading ? 'Loading...' : 'No endpoints available'}
+          </div>
+        ) : (
+          <div className="mongo-tags-container">
+            {groovyApiStore.scriptsArray.map(script => (
+              <span
+                key={script.id}
+                className={`mongo-tag mongo-tag-clickable ${selectedEndpoint === script.endpoint ? 'mongo-tag-selected' : ''}`}
+                onClick={() => setSelectedEndpoint(script.endpoint)}
+                title={script.description || script.endpoint}
+              >
+                {script.endpoint}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: '12px' }}>

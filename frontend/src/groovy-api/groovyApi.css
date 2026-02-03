@@ -9,8 +9,9 @@
 
 .groovy-api-card-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 8px;
   padding: 6px 8px;
   background-color: #e8e8e8;
   border-bottom: 1px solid #ddd;
@@ -38,6 +39,26 @@
 }
 
 .groovy-api-card-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.groovy-api-card-edit-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.groovy-api-card-edit-button:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.groovy-api-card-edit-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -99,7 +120,7 @@
 
 .groovy-api-editor-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid #e0e0e0;

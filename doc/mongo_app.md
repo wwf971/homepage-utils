@@ -1,30 +1,40 @@
 
 
-1. App Registration:
-  - Apps register with a name and receive a unique random app ID (16 chars: 0-9, a-z)
-  - Each app gets a dedicated Elasticsearch index: {appId}_index_default
-  - App metadata stored in mongo-app.__app__ collection
+### MongoApp metadata
 
-2. Collection Management:
-  - Apps can create collections: {appId}_{collectionName} in mongo-app database
-  - Collections are automatically added to the app's ES index
-  - Apps can list their collections
+- mongo app instance metadata is stored as mongo document in a special collection. typical database name: `mongo-app`. typical collection name: `__app__`
 
-3. Document Management:
-  - Document IDs are auto-generated (16 chars: 0-9, a-z) if not provided
-  - If docId is provided and already exists, creation is rejected with error
-  - Documents include createdAt (Unix timestamp ms) and createdAtTimezone fields
+- mongo app document data format:
 
-mongo-app (database)
-├── apps (collection)                    # App metadata
-│   ├── appId (unique)
-│   ├── appName
-│   ├── esIndex
-│   ├── collections []
-│   └── createdAt
-│
-└── {appId}_{collectionName}             # App collections
-    └── Documents with custom 'id' field
+```
+app mongodb document
+ ├── appId (unique)
+ ├── appName
+ ├── esIndices (array of index names, default includes one index)
+ ├── collections []
+ └── createdAt
+```
+
+**appId**: upon creation, each mongo app is assigned a unique app id. app id is string, consisting of 0-9, a-z chars.
+**createdAt**: unix timestamp in milliseconds.
+**createAtTimezone**: optional. integer with range [-12, 12].
+
+
+### MongoApp collections
+- each mongo app instance can apply for multiple mongodb collections to store their data.
+- all mongo app instances' collections are put in same mongodb database. typical database name: `mongo-app`.
+- the actual collection name is `{appId}_{collectionName}`.
+
+### MongoApp indices
+- each mongo app instance can apply for elasticsearch indices.
+- a default elasticsearch index is generated for each newly created mongo app.
+  - default elasticsearch index name: `{appId}_index_default`
+
+### MongoApp dynamic apis
+
+Each MongoApp can have its own Groovy scripts for custom API endpoints. These scripts are managed through the Groovy API system with `owner=appId` and `source=mongoApp`.
+
+Scripts are accessed via: `POST /mongo-app/{appId}/api/{endpoint}` or `GET /mongo-app/{appId}/api/{endpoint}`
 
 ## API Endpoints
 
@@ -41,3 +51,13 @@ PUT    /mongo-app/{appId}/coll/{collName}/doc/{docId}/update        - Update doc
 GET    /mongo-app/{appId}/coll/{collName}/doc/{docId}/get           - Get document
 DELETE /mongo-app/{appId}/coll/{collName}/doc/{docId}/delete        - Delete document
 GET    /mongo-app/{appId}/coll/{collName}/doc/list                  - List all documents
+
+
+### Groovy Api Management endpoints:
+POST   /mongo-app/{appId}/api-config/create                         - Create custom API script
+GET    /mongo-app/{appId}/api-config/list                           - List API scripts
+GET    /mongo-app/{appId}/api-config/get/{scriptId}                 - Get API script
+PUT    /mongo-app/{appId}/api-config/update/{scriptId}              - Update API script
+DELETE /mongo-app/{appId}/api-config/delete/{scriptId}              - Delete API script
+POST   /mongo-app/{appId}/api/{endpoint}                            - Execute custom API (POST)
+GET    /mongo-app/{appId}/api/{endpoint}                            - Execute custom API (GET)

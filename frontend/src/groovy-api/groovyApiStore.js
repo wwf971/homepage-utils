@@ -76,7 +76,7 @@ class GroovyApiStore {
   }
 
   // Upload or update a script
-  async uploadScript(id, endpoint, scriptSource, description) {
+  async uploadScript(id, endpoint, scriptSource, description, owner, source) {
     if (!endpoint || !endpoint.trim()) {
       return { success: false, error: 'Endpoint name is required' };
     }
@@ -100,6 +100,8 @@ class GroovyApiStore {
           endpoint,
           scriptSource,
           description,
+          owner: owner || undefined,
+          source: source || undefined,
           timezoneOffset
         })
       });
