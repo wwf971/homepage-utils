@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PanelToggle } from '@wwf971/react-comp-misc';
 
 const MongoAppGroovyApi = ({ store }) => {
   const [scripts, setScripts] = useState({});
@@ -60,7 +59,7 @@ const MongoAppGroovyApi = ({ store }) => {
     setMessage(null);
     
     try {
-      const timezoneOffset = -new Date().getTimezoneOffset() / 60;
+      const timezone = -new Date().getTimezoneOffset() / 60;
       const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +67,7 @@ const MongoAppGroovyApi = ({ store }) => {
           endpoint: uploadEndpoint,
           scriptSource: uploadScriptSource,
           description: uploadDescription,
-          timezoneOffset
+          timezone
         })
       });
       
@@ -102,7 +101,7 @@ const MongoAppGroovyApi = ({ store }) => {
     setMessage(null);
     
     try {
-      const timezoneOffset = -new Date().getTimezoneOffset() / 60;
+      const timezone = -new Date().getTimezoneOffset() / 60;
       const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/update/${scriptId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -110,7 +109,7 @@ const MongoAppGroovyApi = ({ store }) => {
           endpoint: editEndpoint,
           scriptSource: editScriptSource,
           description: editDescription,
-          timezoneOffset
+          timezone
         })
       });
       
@@ -184,9 +183,7 @@ const MongoAppGroovyApi = ({ store }) => {
   const scriptsArray = Object.values(scripts);
 
   return (
-    <div style={{ padding: '0px' }}>
-      <PanelToggle title="Groovy API Scripts" defaultExpanded={true}>
-        <div style={{ padding: '8px 0' }}>
+    <div style={{ padding: '8px 0' }}>
           {error && (
             <div style={{ 
               padding: '8px', 
@@ -524,8 +521,6 @@ const MongoAppGroovyApi = ({ store }) => {
             ))}
           </div>
         </div>
-      </PanelToggle>
-    </div>
   );
 };
 

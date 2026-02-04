@@ -69,6 +69,7 @@ public class GroovyApiService {
 
     /**
      * Load all scripts from MongoDB on startup
+     * Using lazy compilation: scripts are registered but not compiled until first execution
      */
     public void loadAllScripts() {
         try {
@@ -76,23 +77,20 @@ public class GroovyApiService {
             scriptCache.clear();
             endpointToIdMap.clear();
 
+            int count = 0;
             for (Document doc : collection.find()) {
                 String id = doc.getString("id");
                 String endpoint = doc.getString("endpoint");
-                String scriptSource = doc.getString("scriptSource");
 
-                if (id != null && endpoint != null && scriptSource != null) {
-                    try {
-                        compileAndCacheScript(endpoint, scriptSource);
-                        endpointToIdMap.put(endpoint, id);
-                        System.out.println("Loaded Groovy script: " + id + " (endpoint: " + endpoint + ")");
-                    } catch (Exception e) {
-                        System.err.println("Failed to compile script " + id + " for endpoint " + endpoint + ": " + e.getMessage());
-                    }
+                if (id != null && endpoint != null) {
+                    // Just register the endpoint, don't compile yet (lazy compilation)
+                    endpointToIdMap.put(endpoint, id);
+                    count++;
+                    System.out.println("Registered Groovy script: " + id + " (endpoint: " + endpoint + ")");
                 }
             }
 
-            System.out.println("Loaded " + scriptCache.size() + " Groovy scripts");
+            System.out.println("Registered " + count + " Groovy scripts (lazy compilation enabled)");
         } catch (Exception e) {
             System.err.println("Failed to load Groovy scripts: " + e.getMessage());
             e.printStackTrace();
@@ -102,7 +100,7 @@ public class GroovyApiService {
     /**
      * Upload or update a Groovy script
      */
-    public ApiResponse<GroovyApiScript> uploadScript(String id, String endpoint, String scriptSource, String description, Integer timezoneOffset, String owner, String source) {
+    public ApiResponse<GroovyApiScript> uploadScript(String id, String endpoint, String scriptSource, String description, Integer timezone, String owner, String source) {
         if (endpoint == null || endpoint.trim().isEmpty()) {
             return ApiResponse.error("Endpoint cannot be empty");
         }
@@ -143,7 +141,7 @@ public class GroovyApiService {
 
         if (isUpdate) {
             // Update existing script
-            int tz = (timezoneOffset != null) ? timezoneOffset : 0;
+            int tz = (timezone != null) ? timezone : 0;
             
             Document doc = new Document();
             doc.append("id", id);
@@ -185,7 +183,7 @@ public class GroovyApiService {
                 }
 
                 String newId = app.util.IdFormatConverter.longToBase36(idResponse.getData().getValue());
-                int tz = (timezoneOffset != null) ? timezoneOffset : 0;
+                int tz = (timezone != null) ? timezone : 0;
 
                 Document doc = new Document();
                 doc.append("id", newId);
@@ -311,6 +309,13 @@ public class GroovyApiService {
      * code = 0 means success, code < 0 means failure
      */
     public Map<String, Object> executeScript(String endpoint, Map<String, Object> params, Map<String, String> headers) {
+        return executeScript(endpoint, params, headers, null);
+    }
+    
+    /**
+     * Execute a script by endpoint with optional backend APIs wrapper
+     */
+    public Map<String, Object> executeScript(String endpoint, Map<String, Object> params, Map<String, String> headers, MongoAppScriptBackendApis backendApis) {
         groovy.lang.Script script = scriptCache.get(endpoint);
 
         if (script == null) {
@@ -341,10 +346,19 @@ public class GroovyApiService {
         // Create a new binding for each execution
         Binding binding = new Binding();
         
-        // Provide tool functions
-        binding.setVariable("mongoAppService", mongoAppService);
+        // Provide parameters with new naming convention
+        binding.setVariable("requestParams", params != null ? params : new HashMap<>());
+        binding.setVariable("requestHeaders", headers != null ? headers : new HashMap<>());
+        
+        // Provide backend APIs wrapper if available (for MongoApp scripts)
+        if (backendApis != null) {
+            binding.setVariable("backendApis", backendApis);
+        }
+        
+        // Legacy support: Keep old variable names for backward compatibility
         binding.setVariable("params", params != null ? params : new HashMap<>());
         binding.setVariable("headers", headers != null ? headers : new HashMap<>());
+        binding.setVariable("mongoAppService", mongoAppService);
 
         // Set the binding and run
         script.setBinding(binding);

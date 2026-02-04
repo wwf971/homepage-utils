@@ -47,10 +47,10 @@ public class GroovyApiController {
         String description = (String) request.get("description");
         String owner = (String) request.get("owner");
         String source = (String) request.get("source");
-        Integer timezoneOffset = request.get("timezoneOffset") != null ? 
-            ((Number) request.get("timezoneOffset")).intValue() : null;
+        Integer timezone = request.get("timezone") != null ? 
+            ((Number) request.get("timezone")).intValue() : null;
 
-        return groovyApiService.uploadScript(id, endpoint, scriptSource, description, timezoneOffset, owner, source);
+        return groovyApiService.uploadScript(id, endpoint, scriptSource, description, timezone, owner, source);
     }
 
     /**

@@ -278,7 +278,7 @@
 .config-metadata {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .config-metadata-item {

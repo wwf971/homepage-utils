@@ -89,7 +89,7 @@ class GroovyApiStore {
 
     try {
       const backendUrl = getBackendServerUrl();
-      const timezoneOffset = getTimezoneInt();
+      const timezone = getTimezoneInt();
       const res = await fetch(`${backendUrl}/groovy-api/upload`, {
         method: 'POST',
         headers: {
@@ -102,7 +102,7 @@ class GroovyApiStore {
           description,
           owner: owner || undefined,
           source: source || undefined,
-          timezoneOffset
+          timezone
         })
       });
 

@@ -30,13 +30,15 @@ At frontend, scripts data are managed by mobx store. mobx store structure:
 ```
 
 
-## Available Tool Functions
+## Available Input Parameters
 
-Scripts can access these variables/services:
+Scripts can access these variables:
 
-- `mongoAppService` - MongoAppService for managing MongoDB apps
-- `params` - Request body parameters (Map)
-- `headers` - HTTP headers (Map)
+- `backendApis` - Backend API methods for the current app (MongoAppScriptBackendApis)
+- `requestParams` - Request body parameters (Map<String, Object>)
+- `requestHeaders` - HTTP request headers (Map<String, String>)
+
+**Note:** For MongoApp scripts, `backendApis` provides scoped access to only the current app's data. For system-level Groovy API scripts, `backendApis` may have broader access.
 
 ## Script Response Format
 
@@ -59,24 +61,92 @@ If the script returns data without this format, it will be automatically wrapped
 [code: 0, data: yourReturnValue, message: null]
 ```
 
-## Example Script
+## Example Scripts
+
+### Example 1: List all collections in current app
 
 ```groovy
-// List all MongoDB apps
-def response = mongoAppService.listAllApps()
+// List all collections for this app
+def response = backendApis.listAllCollections()
 
 if (response.code == 0) {
-    def apps = response.data
-    def appNames = apps.collect { it.appName }
+    def collections = response.data
     
     return [
         code: 0,
         data: [
-            apps: appNames,
-            count: apps.size(),
-            fullData: apps
+            collections: collections,
+            count: collections.size()
         ],
-        message: "Found ${apps.size()} apps"
+        message: "Found ${collections.size()} collections"
+    ]
+} else {
+    return [
+        code: -1,
+        data: null,
+        message: response.message
+    ]
+}
+```
+
+### Example 2: Create and query documents
+
+```groovy
+// Get parameters from request
+def collectionName = requestParams.collection
+def userId = requestParams.userId
+
+if (!collectionName || !userId) {
+    return [
+        code: -1,
+        data: null,
+        message: "Missing required parameters: collection, userId"
+    ]
+}
+
+// Create a document
+def docId = "user_${userId}_${System.currentTimeMillis()}"
+def content = [
+    userId: userId,
+    name: requestParams.name ?: "Unknown",
+    email: requestParams.email,
+    createdAt: System.currentTimeMillis()
+]
+
+def createResult = backendApis.createDoc(collectionName, docId, content)
+
+if (createResult.code == 0) {
+    return [
+        code: 0,
+        data: [
+            docId: docId,
+            content: content
+        ],
+        message: "Document created successfully"
+    ]
+} else {
+    return [
+        code: -1,
+        data: null,
+        message: "Failed to create document: ${createResult.message}"
+    ]
+}
+```
+
+### Example 3: Search documents
+
+```groovy
+// Search for documents with specific criteria
+def collectionName = requestParams.collection ?: "users"
+def searchQuery = requestParams.query ?: [:]
+
+def response = backendApis.searchDocs(collectionName, searchQuery)
+
+if (response.code == 0) {
+    return [
+        code: 0,
+        data: response.data,
+        message: "Search completed successfully"
     ]
 } else {
     return [
@@ -89,13 +159,15 @@ if (response.code == 0) {
 
 ## API Endpoints
 
-POST   /groovy-api/upload                       - Upload/update script (params: id, endpoint, scriptSource, description, owner, source, timezoneOffset)
-GET    /groovy-api/list                         - List all scripts (returns map keyed by ID)
-GET    /groovy-api/get/{id}                     - Get script by ID
-DELETE /groovy-api/delete/{id}                  - Delete script by ID
-POST   /groovy-api/reload                       - Reload all scripts from DB
-POST   /groovy-api/{endpoint}                   - Execute script (with request body)
-GET    /groovy-api/{endpoint}                   - Execute script (with query params)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/groovy-api/upload` | Upload/update script (params: id, endpoint, scriptSource, description, owner, source, timezone) |
+| GET | `/groovy-api/list` | List all scripts (returns map keyed by ID) |
+| GET | `/groovy-api/get/{id}` | Get script by ID |
+| DELETE | `/groovy-api/delete/{id}` | Delete script by ID |
+| POST | `/groovy-api/reload` | Reload all scripts from DB |
+| POST | `/groovy-api/{endpoint}` | Execute script (with request body) |
+| GET | `/groovy-api/{endpoint}` | Execute script (with query params) |
 
 ### Upload Parameters
 
@@ -105,4 +177,4 @@ GET    /groovy-api/{endpoint}                   - Execute script (with query par
 - `description` (optional): Description of the script
 - `owner` (optional): Identifies who owns this script (e.g., "mongo-app-system")
 - `source` (optional): Identifies source context (e.g., "mongo-app-id-123")
-- `timezoneOffset` (optional): Timezone offset in hours for timestamps
+- `timezone` (optional): Timezone offset in hours (-12 to +12). Sets `createdAtTimezone` on creation, `updatedAtTimezone` on update

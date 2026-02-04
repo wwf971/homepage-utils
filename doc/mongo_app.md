@@ -38,26 +38,20 @@ Scripts are accessed via: `POST /mongo-app/{appId}/api/{endpoint}` or `GET /mong
 
 ## API Endpoints
 
-POST   /mongo-app/create                                            - Initialize app
-GET    /mongo-app/list                                              - List all mongo apps
-GET    /mongo-app/get-id/{appName}                                  - Get app IDs by name
-GET    /mongo-app/{appId}/config                                    - Get app info
-POST   /mongo-app/{appId}/coll/create                               - Create collection
-GET    /mongo-app/{appId}/coll/list                                 - List collections
-GET    /mongo-app/{appId}/coll/exists/{collName}                    - Check if collection exists
-DELETE /mongo-app/{appId}/delete                                    - Delete app
-POST   /mongo-app/{appId}/coll/{collName}/doc/create                - Create document
-PUT    /mongo-app/{appId}/coll/{collName}/doc/{docId}/update        - Update document
-GET    /mongo-app/{appId}/coll/{collName}/doc/{docId}/get           - Get document
-DELETE /mongo-app/{appId}/coll/{collName}/doc/{docId}/delete        - Delete document
-GET    /mongo-app/{appId}/coll/{collName}/doc/list                  - List all documents
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/mongo-app/create` | Initialize app |
+| GET | `/mongo-app/list` | List all mongo apps |
+| GET | `/mongo-app/get-id/{appName}` | Get app IDs by name |
+| GET | `/mongo-app/{appId}/config` | Get app info |
+| POST | `/mongo-app/{appId}/coll/create` | Create collection |
+| GET | `/mongo-app/{appId}/coll/list` | List collections |
+| GET | `/mongo-app/{appId}/coll/exists/{collName}` | Check if collection exists |
+| DELETE | `/mongo-app/{appId}/delete` | Delete app |
+| POST | `/mongo-app/{appId}/coll/{collName}/doc/create` | Create document |
+| PUT | `/mongo-app/{appId}/coll/{collName}/doc/{docId}/update` | Update document |
+| GET | `/mongo-app/{appId}/coll/{collName}/doc/{docId}/get` | Get document |
+| DELETE | `/mongo-app/{appId}/coll/{collName}/doc/{docId}/delete` | Delete document |
+| GET | `/mongo-app/{appId}/coll/{collName}/doc/list` | List all documents |
 
-
-### Groovy Api Management endpoints:
-POST   /mongo-app/{appId}/api-config/create                         - Create custom API script
-GET    /mongo-app/{appId}/api-config/list                           - List API scripts
-GET    /mongo-app/{appId}/api-config/get/{scriptId}                 - Get API script
-PUT    /mongo-app/{appId}/api-config/update/{scriptId}              - Update API script
-DELETE /mongo-app/{appId}/api-config/delete/{scriptId}              - Delete API script
-POST   /mongo-app/{appId}/api/{endpoint}                            - Execute custom API (POST)
-GET    /mongo-app/{appId}/api/{endpoint}                            - Execute custom API (GET)
+**Dynamic API Endpoints**: Refer to ./mongo_app_dynamic_api.md

@@ -6,8 +6,8 @@ const MongoAppGroovyApiTest = ({ store }) => {
   const [requestBody, setRequestBody] = useState('{}');
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [executing, setExecuting] = useState(false);
+  const [isLoading, setIsLoadingg] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const appId = store?.appId;
   const serverUrl = store?.serverUrl;
@@ -15,7 +15,7 @@ const MongoAppGroovyApiTest = ({ store }) => {
   const fetchScripts = useCallback(async () => {
     if (!appId || !serverUrl) return;
     
-    setLoading(true);
+    setIsLoadingg(true);
     setError(null);
     
     try {
@@ -38,7 +38,7 @@ const MongoAppGroovyApiTest = ({ store }) => {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsLoadingg(false);
     }
   }, [appId, serverUrl, selectedEndpoint]);
 
@@ -54,14 +54,14 @@ const MongoAppGroovyApiTest = ({ store }) => {
 
     setError(null);
     setResponse(null);
-    setExecuting(true);
+    setIsExecuting(true);
 
     let params = {};
     try {
       params = JSON.parse(requestBody);
     } catch (e) {
       setError('Invalid JSON in request body');
-      setExecuting(false);
+      setIsExecuting(false);
       return;
     }
 
@@ -77,7 +77,7 @@ const MongoAppGroovyApiTest = ({ store }) => {
     } catch (err) {
       setError(err.message);
     } finally {
-      setExecuting(false);
+      setIsExecuting(false);
     }
   };
 
@@ -98,22 +98,22 @@ const MongoAppGroovyApiTest = ({ store }) => {
           </label>
           <button
             onClick={forceRefresh}
-            disabled={loading}
+            disabled={isLoading}
             style={{
               padding: '4px 10px',
               border: '1px solid #ddd',
               borderRadius: '4px',
               background: '#fff',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
               fontSize: '11px'
             }}
           >
-            {loading ? 'Loading...' : 'Refresh'}
+            {isLoading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
         {scriptsArray.length === 0 ? (
           <div style={{ color: '#666', fontStyle: 'italic', fontSize: '12px', padding: '4px 0' }}>
-            {loading ? 'Loading...' : 'No APIs available'}
+            {isLoading ? 'Loading...' : 'No APIs available'}
           </div>
         ) : (
           <div className="mongo-tags-container">
@@ -158,19 +158,19 @@ const MongoAppGroovyApiTest = ({ store }) => {
       <div style={{ marginTop: '12px' }}>
         <button
           onClick={executeScript}
-          disabled={executing || !selectedEndpoint}
+          disabled={isExecuting || !selectedEndpoint}
           style={{
             padding: '8px 16px',
             border: 'none',
             borderRadius: '4px',
-            background: executing || !selectedEndpoint ? '#ccc' : '#4CAF50',
+            background: isExecuting || !selectedEndpoint ? '#ccc' : '#4CAF50',
             color: '#fff',
-            cursor: executing || !selectedEndpoint ? 'not-allowed' : 'pointer',
+            cursor: isExecuting || !selectedEndpoint ? 'not-allowed' : 'pointer',
             fontWeight: 'bold',
             fontSize: '12px'
           }}
         >
-          {executing ? 'Executing...' : 'Execute API'}
+          {isExecuting ? 'Executing...' : 'Execute API'}
         </button>
       </div>
 

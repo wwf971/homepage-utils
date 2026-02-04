@@ -13,7 +13,6 @@ const AppIdPanel = observer(() => {
   const store = useMongoAppStore()
   
   return (
-  <PanelToggle title="App ID Management" defaultExpanded={!store.appId}>
     <div className="config-panel-content">
       <div className="config-row">
         <label className="config-label">App Name:</label>
@@ -98,7 +97,6 @@ const AppIdPanel = observer(() => {
         </div>
       )}
     </div>
-  </PanelToggle>
   )
 })
 
@@ -108,8 +106,7 @@ const AppMetadataPanel = observer(() => {
   if (!store.appMetadata) return null
   
   return (
-    <PanelToggle title="App Metadata" defaultExpanded={false}>
-      <div className="config-panel-content">
+    <div className="config-panel-content">
         <div className="config-metadata">
           <div className="config-metadata-item">
             <span className="config-metadata-label">App ID:</span>
@@ -137,7 +134,6 @@ const AppMetadataPanel = observer(() => {
           </div>
         </div>
       </div>
-    </PanelToggle>
   )
 })
 
@@ -147,8 +143,7 @@ const EsIndexPanel = observer(() => {
   if (!store.isConfigured) return null
   
   return (
-    <PanelToggle title="Elasticsearch Index" defaultExpanded={false}>
-      <div className="config-panel-content">
+    <div className="config-panel-content">
         <div className="config-metadata">
           <div className="config-metadata-item">
             <span className="config-metadata-label">Index Name:</span>
@@ -195,7 +190,6 @@ const EsIndexPanel = observer(() => {
           </div>
         )}
       </div>
-    </PanelToggle>
   )
 })
 
@@ -205,7 +199,6 @@ const CollectionsPanel = observer(({ collections }) => {
   if (!store.isConfigured) return null
   
   return (
-    <PanelToggle title="Collections Status" defaultExpanded={true}>
     <div className="config-panel-content">
       {store.isCheckingCollections ? (
         <div className="config-loading">Checking collections...</div>
@@ -241,7 +234,6 @@ const CollectionsPanel = observer(({ collections }) => {
         </div>
       )}
     </div>
-  </PanelToggle>
   )
 })
 
@@ -341,13 +333,41 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
     <div className="config-container">
       <div className="config-title">Configuration</div>
 
-      {panels_existence.showTestConnection && <TestConnection />}
-      {panels_existence.showAppIdManagement && <AppIdPanel />}
-      {panels_existence.showAppMetadata && <AppMetadataPanel />}
-      {panels_existence.showIndexStatus && <EsIndexPanel />}
-      {panels_existence.showCollections && <CollectionsPanel collections={collections} />}
-      {panels_existence.showGroovyApi && <MongoAppGroovyApi store={store} />}
-      {panels_existence.showGroovyApiTest && <MongoAppGroovyApiTest store={store} />}
+      {panels_existence.showTestConnection && (
+        <PanelToggle title="Server URL" defaultExpanded={!store.serverUrl}>
+          <TestConnection />
+        </PanelToggle>
+      )}
+      {panels_existence.showAppIdManagement && (
+        <PanelToggle title="App ID Management" defaultExpanded={!store.appId}>
+          <AppIdPanel />
+        </PanelToggle>
+      )}
+      {panels_existence.showAppMetadata && (
+        <PanelToggle title="App Metadata" defaultExpanded={false}>
+          <AppMetadataPanel />
+        </PanelToggle>
+      )}
+      {panels_existence.showIndexStatus && (
+        <PanelToggle title="Elasticsearch Index" defaultExpanded={false}>
+          <EsIndexPanel />
+        </PanelToggle>
+      )}
+      {panels_existence.showCollections && (
+        <PanelToggle title="Collections Status" defaultExpanded={true}>
+          <CollectionsPanel collections={collections} />
+        </PanelToggle>
+      )}
+      {panels_existence.showGroovyApi && (
+        <PanelToggle title="Groovy API Scripts" defaultExpanded={true}>
+          <MongoAppGroovyApi store={store} />
+        </PanelToggle>
+      )}
+      {panels_existence.showGroovyApiTest && (
+        <PanelToggle title="Test MongoApp Groovy APIs" defaultExpanded={true}>
+          <MongoAppGroovyApiTest store={store} />
+        </PanelToggle>
+      )}
     </div>
   )
 })

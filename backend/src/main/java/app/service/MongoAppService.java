@@ -888,7 +888,7 @@ public class MongoAppService {
     /**
      * Create a custom API script for a MongoApp
      */
-    public ApiResponse<Map<String, Object>> createApiScript(String appId, String endpoint, String scriptSource, String description, Integer timezoneOffset) {
+    public ApiResponse<Map<String, Object>> createApiScript(String appId, String endpoint, String scriptSource, String description, Integer timezone) {
         // Verify app exists
         MongoCollection<Document> metadataCollection = getAppMetadataCollection();
         Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
@@ -901,7 +901,7 @@ public class MongoAppService {
         
         // Create script with owner=appId and source=mongoApp
         app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.uploadScript(
-            null, actualEndpoint, scriptSource, description, timezoneOffset, appId, "mongoApp"
+            null, actualEndpoint, scriptSource, description, timezone, appId, "mongoApp"
         );
         
         if (result.getCode() != 0) {
@@ -1010,7 +1010,7 @@ public class MongoAppService {
     /**
      * Update an API script
      */
-    public ApiResponse<Map<String, Object>> updateGroovyApi(String appId, String scriptId, String endpoint, String scriptSource, String description, Integer timezoneOffset) {
+    public ApiResponse<Map<String, Object>> updateGroovyApi(String appId, String scriptId, String endpoint, String scriptSource, String description, Integer timezone) {
         // Verify app exists
         MongoCollection<Document> metadataCollection = getAppMetadataCollection();
         Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
@@ -1034,7 +1034,7 @@ public class MongoAppService {
         
         // Update script
         app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.uploadScript(
-            scriptId, actualEndpoint, scriptSource, description, timezoneOffset, appId, "mongoApp"
+            scriptId, actualEndpoint, scriptSource, description, timezone, appId, "mongoApp"
         );
         
         if (result.getCode() != 0) {
@@ -1135,8 +1135,11 @@ public class MongoAppService {
             return error;
         }
         
-        // Execute the script
-        return groovyApiService.executeScript(matchingEndpoint, params, headers);
+        // Create backend APIs wrapper with appId from URL (not from script)
+        MongoAppScriptBackendApis backendApis = new MongoAppScriptBackendApis(appId, this);
+        
+        // Execute the script with the scoped backend APIs
+        return groovyApiService.executeScript(matchingEndpoint, params, headers, backendApis);
     }
     
     /**

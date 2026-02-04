@@ -235,7 +235,7 @@ public class MongoAppController {
     /**
      * Create a custom API script for a MongoApp
      * POST /mongo-app/{appId}/api-config/create
-     * Body: { "endpoint": "my-api", "scriptSource": "...", "description": "...", "timezoneOffset": 0 }
+     * Body: { "endpoint": "my-api", "scriptSource": "...", "description": "...", "timezone": 0 }
      */
     @PostMapping("/{appId}/api-config/create")
     public ApiResponse<Map<String, Object>> createApiScript(@PathVariable String appId,
@@ -243,10 +243,10 @@ public class MongoAppController {
         String endpoint = (String) request.get("endpoint");
         String scriptSource = (String) request.get("scriptSource");
         String description = (String) request.get("description");
-        Integer timezoneOffset = request.get("timezoneOffset") != null ? 
-            ((Number) request.get("timezoneOffset")).intValue() : null;
+        Integer timezone = request.get("timezone") != null ? 
+            ((Number) request.get("timezone")).intValue() : null;
         
-        return mongoAppService.createApiScript(appId, endpoint, scriptSource, description, timezoneOffset);
+        return mongoAppService.createApiScript(appId, endpoint, scriptSource, description, timezone);
     }
     
     /**
@@ -271,7 +271,7 @@ public class MongoAppController {
     /**
      * Update an API script
      * PUT /mongo-app/{appId}/api-config/update/{scriptId}
-     * Body: { "endpoint": "my-api", "scriptSource": "...", "description": "...", "timezoneOffset": 0 }
+     * Body: { "endpoint": "my-api", "scriptSource": "...", "description": "...", "timezone": 0 }
      */
     @PutMapping("/{appId}/api-config/update/{scriptId}")
     public ApiResponse<Map<String, Object>> updateGroovyApi(@PathVariable String appId,
@@ -280,10 +280,10 @@ public class MongoAppController {
         String endpoint = (String) request.get("endpoint");
         String scriptSource = (String) request.get("scriptSource");
         String description = (String) request.get("description");
-        Integer timezoneOffset = request.get("timezoneOffset") != null ? 
-            ((Number) request.get("timezoneOffset")).intValue() : null;
+        Integer timezone = request.get("timezone") != null ? 
+            ((Number) request.get("timezone")).intValue() : null;
         
-        return mongoAppService.updateGroovyApi(appId, scriptId, endpoint, scriptSource, description, timezoneOffset);
+        return mongoAppService.updateGroovyApi(appId, scriptId, endpoint, scriptSource, description, timezone);
     }
     
     /**
