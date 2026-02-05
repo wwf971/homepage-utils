@@ -6,6 +6,7 @@ import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoA
 import TestConnection from './TestConnection.jsx'
 import MongoAppGroovyApi from './mongoAppGroovyApi.jsx'
 import MongoAppGroovyApiTest from './mongoAppGroovyApiTest.jsx'
+import MongoAppCollectionConfig from './MongoAppCollectionConfig.jsx'
 import './MongoAppConfig.css'
 
 // App ID Management Panel
@@ -354,8 +355,8 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
         </PanelToggle>
       )}
       {panels_existence.showCollections && (
-        <PanelToggle title="Collections Status" defaultExpanded={true}>
-          <CollectionsPanel collections={collections} />
+        <PanelToggle title="Collections" defaultExpanded={true}>
+          <MongoAppCollectionConfig store={store} collections={collections} />
         </PanelToggle>
       )}
       {panels_existence.showGroovyApi && (

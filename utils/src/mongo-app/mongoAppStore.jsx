@@ -23,8 +23,8 @@ class MongoAppStore {
   // App search results
   foundApps = []
   
-  // Collection status
-  collectionStatus = {}
+  // Collections info (with indices and existence status)
+  collectionsInfo = {}
   
   // App metadata
   appMetadata = null
@@ -259,9 +259,11 @@ class MongoAppStore {
       )
 
       runInAction(() => {
-        this.collectionStatus = {}
         checks.forEach(({ collName, exists }) => {
-          this.collectionStatus[collName] = exists
+          if (!this.collectionsInfo[collName]) {
+            this.collectionsInfo[collName] = {}
+          }
+          this.collectionsInfo[collName].exists = exists
         })
         this.isCheckingCollections = false
       })
@@ -294,8 +296,13 @@ class MongoAppStore {
       
       if (result.code === 0) {
         runInAction(() => {
-          this.collectionStatus[collectionName] = true
+          if (!this.collectionsInfo[collectionName]) {
+            this.collectionsInfo[collectionName] = {}
+          }
+          this.collectionsInfo[collectionName].exists = true
         })
+        // Refresh to get updated info
+        await this.fetchAllCollections()
         return true
       } else {
         this.collectionError = result.message || 'Failed to create collection'
@@ -326,6 +333,32 @@ class MongoAppStore {
       }
     } catch (error) {
       console.error('Failed to fetch app metadata:', error)
+    }
+  }
+
+  async fetchAllCollections() {
+    if (!this.isConfigured) return
+
+    this.collectionError = null
+
+    try {
+      const response = await fetch(`${this.apiBase}/${this.appId}/coll/list-detailed`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch collections: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      
+      if (result.code === 0) {
+        runInAction(() => {
+          this.collectionsInfo = result.data || {}
+        })
+      } else {
+        this.collectionError = result.message || 'Failed to fetch collections'
+      }
+    } catch (error) {
+      this.collectionError = error instanceof Error ? error.message : 'Unknown error'
     }
   }
 
@@ -442,7 +475,7 @@ class MongoAppStore {
     this.collectionError = null
     this.indexError = null
     this.foundApps = []
-    this.collectionStatus = {}
+    this.collectionsInfo = {}
     this.appMetadata = null
     this.indexExists = false
     this.indexName = ''

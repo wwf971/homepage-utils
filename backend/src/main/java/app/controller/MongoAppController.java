@@ -123,6 +123,17 @@ public class MongoAppController {
     public ApiResponse<Map<String, Object>> listCollections(@PathVariable String appId) {
         return mongoAppService.listCollections(appId);
     }
+    
+    /**
+     * List all collections with detailed info
+     * GET /mongo-app/{appId}/coll/list-detailed
+     * 
+     * @return { "code": 0, "data": { "collName": { "exists": true, "indices": [...] }, ... } }
+     */
+    @GetMapping("/{appId}/coll/list-detailed")
+    public ApiResponse<Map<String, Object>> listCollectionsInfo(@PathVariable String appId) {
+        return mongoAppService.listCollectionsInfo(appId);
+    }
 
     /**
      * Check if a collection exists

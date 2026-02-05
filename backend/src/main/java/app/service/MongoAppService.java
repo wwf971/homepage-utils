@@ -313,6 +313,68 @@ public class MongoAppService {
     }
     
     /**
+     * List all collections with detailed info including indices
+     * @param appId The app ID
+     * @return Result with collection details
+     */
+    public ApiResponse<Map<String, Object>> listCollectionsInfo(String appId) {
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<String> collections = (List<String>) appDoc.get("collections");
+        if (collections == null) {
+            collections = new ArrayList<>();
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<String> esIndices = (List<String>) appDoc.get("esIndices");
+        if (esIndices == null || esIndices.isEmpty()) {
+            esIndices = new ArrayList<>();
+            // Backward compatibility: check for single esIndex field
+            String esIndex = appDoc.getString("esIndex");
+            if (esIndex != null && !esIndex.isEmpty()) {
+                esIndices.add(esIndex);
+            }
+        }
+        
+        // Build detailed collection info
+        Map<String, Object> collectionsInfo = new HashMap<>();
+        
+        // Check if collections actually exist in MongoDB
+        MongoClient client = mongoService.getMongoClient();
+        MongoDatabase database = client.getDatabase(APP_DB_NAME);
+        
+        for (String collName : collections) {
+            String appCollNameFull = appId + "_" + collName;
+            
+            Map<String, Object> collInfo = new HashMap<>();
+            
+            // Check if collection exists
+            boolean exists = false;
+            try {
+                database.getCollection(appCollNameFull).estimatedDocumentCount();
+                exists = true;
+            } catch (Exception e) {
+                // Collection doesn't exist
+            }
+            
+            collInfo.put("exists", exists);
+            // For now, all collections belong to all indices of the app
+            // In the future, this could be more granular
+            collInfo.put("indices", esIndices);
+            
+            collectionsInfo.put(collName, collInfo);
+        }
+        
+        return ApiResponse.success(collectionsInfo);
+    }
+    
+    /**
      * Check if a collection exists for an app
      * 
      * @param appId The app ID
