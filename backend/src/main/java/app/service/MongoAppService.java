@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -332,13 +333,13 @@ public class MongoAppService {
         }
         
         @SuppressWarnings("unchecked")
-        List<String> esIndices = (List<String>) appDoc.get("esIndices");
-        if (esIndices == null || esIndices.isEmpty()) {
-            esIndices = new ArrayList<>();
+        List<String> appEsIndices = (List<String>) appDoc.get("esIndices");
+        if (appEsIndices == null || appEsIndices.isEmpty()) {
+            appEsIndices = new ArrayList<>();
             // Backward compatibility: check for single esIndex field
             String esIndex = appDoc.getString("esIndex");
             if (esIndex != null && !esIndex.isEmpty()) {
-                esIndices.add(esIndex);
+                appEsIndices.add(esIndex);
             }
         }
         
@@ -354,19 +355,41 @@ public class MongoAppService {
             
             Map<String, Object> collInfo = new HashMap<>();
             
-            // Check if collection exists
+            // Check if collection exists and count documents
             boolean exists = false;
+            long docCount = 0;
             try {
-                database.getCollection(appCollNameFull).estimatedDocumentCount();
+                MongoCollection<Document> coll = database.getCollection(appCollNameFull);
+                docCount = coll.countDocuments();
                 exists = true;
             } catch (Exception e) {
                 // Collection doesn't exist
             }
             
             collInfo.put("exists", exists);
-            // For now, all collections belong to all indices of the app
-            // In the future, this could be more granular
-            collInfo.put("indices", esIndices);
+            collInfo.put("docCount", docCount);
+            
+            // Query MongoIndexService to get actual indices monitoring this collection
+            Set<String> monitoringIndexNames = mongoIndexService.getIndicesOfColl(APP_DB_NAME, appCollNameFull);
+            
+            // Build index list with external marker
+            List<Map<String, Object>> indicesList = new ArrayList<>();
+            for (String mongoIndexName : monitoringIndexNames) {
+                // Get the index metadata to find its ES index name
+                Map<String, Object> indexMeta = mongoIndexService.getIndex(mongoIndexName);
+                if (indexMeta != null) {
+                    String esIndexName = (String) indexMeta.get("esIndex");
+                    
+                    Map<String, Object> indexInfo = new HashMap<>();
+                    indexInfo.put("name", esIndexName);  // Return ES index name to frontend
+                    // Check if this ES index belongs to the current app
+                    boolean isAppIndex = appEsIndices.contains(esIndexName);
+                    indexInfo.put("external", !isAppIndex);
+                    indicesList.add(indexInfo);
+                }
+            }
+            
+            collInfo.put("indices", indicesList);
             
             collectionsInfo.put(collName, collInfo);
         }

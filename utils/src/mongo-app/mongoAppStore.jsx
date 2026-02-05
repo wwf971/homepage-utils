@@ -342,7 +342,7 @@ class MongoAppStore {
     this.collectionError = null
 
     try {
-      const response = await fetch(`${this.apiBase}/${this.appId}/coll/list-detailed`)
+      const response = await fetch(`${this.apiBase}/${this.appId}/coll/get-detail`)
       
       if (!response.ok) {
         throw new Error(`Failed to fetch collections: ${response.statusText}`)

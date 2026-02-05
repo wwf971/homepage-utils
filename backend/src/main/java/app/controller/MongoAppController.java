@@ -126,11 +126,11 @@ public class MongoAppController {
     
     /**
      * List all collections with detailed info
-     * GET /mongo-app/{appId}/coll/list-detailed
+     * GET /mongo-app/{appId}/coll/get-detail
      * 
      * @return { "code": 0, "data": { "collName": { "exists": true, "indices": [...] }, ... } }
      */
-    @GetMapping("/{appId}/coll/list-detailed")
+    @GetMapping("/{appId}/coll/get-detail")
     public ApiResponse<Map<String, Object>> listCollectionsInfo(@PathVariable String appId) {
         return mongoAppService.listCollectionsInfo(appId);
     }
