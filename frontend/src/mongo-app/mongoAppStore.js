@@ -25,9 +25,12 @@ class MongoAppStore {
   foundApps = []
   collectionsInfo = {}  // Collection info with indices and existence status
   appMetadata = null
-  indexExists = false
-  indexName = ''
   esIndices = []  // Array of ES index names
+  
+  // Mongo-index system cache (shared across all apps)
+  allMongoIndices = []
+  isLoadingMongoIndices = false
+  mongoIndicesError = null
 
   constructor() {
     makeAutoObservable(this)
@@ -83,8 +86,7 @@ class MongoAppStore {
         this.selectedApp = app
         this.appId = app.appId
         this.appName = app.appName
-        this.indexName = app.esIndex
-        this.esIndices = app.esIndices || (app.esIndex ? [app.esIndex] : [])
+        this.esIndices = app.esIndices || []
         
         // Reset state
         this.appError = null
@@ -97,7 +99,6 @@ class MongoAppStore {
       
       // Fetch fresh metadata
       this.fetchAppMetadata()
-      this.checkIndexExists()
       this.fetchAllCollections()
     }
   }
@@ -124,13 +125,6 @@ class MongoAppStore {
     this.collectionError = null
   }
 
-  clearIndexError() {
-    this.indexError = null
-  }
-
-  clearIndexSuccess() {
-    this.indexSuccess = null
-  }
 
   // ============ Backend API ============
 
@@ -341,68 +335,40 @@ class MongoAppStore {
     }
   }
 
-  async checkIndexExists() {
-    if (!this.isConfigured) return
+  async fetchAllMongoIndices(force = false) {
+    // Skip if already loaded and not forcing refresh
+    if (!force && this.allMongoIndices.length > 0) {
+      return
+    }
+
+    this.isLoadingMongoIndices = true
+    this.mongoIndicesError = null
 
     try {
-      const response = await fetch(`${this.apiBase}/${this.appId}/index/exists`)
+      const response = await fetch(`${this.serverUrl}/mongo-index/list`)
       
       if (!response.ok) {
-        throw new Error(`Failed to check index: ${response.statusText}`)
+        throw new Error(`Failed to fetch mongo-indices: ${response.statusText}`)
       }
       
       const result = await response.json()
       
-      if (result.code === 0) {
-        runInAction(() => {
-          this.indexExists = result.data?.exists || false
-          this.indexName = result.data?.indexName || ''
-        })
-      } else {
-        console.error('Failed to check index:', result.message)
-      }
-    } catch (error) {
-      console.error('Failed to check index:', error)
-    }
-  }
-
-  async createIndex() {
-    if (!this.isConfigured) {
-      this.indexError = 'App not configured'
-      return false
-    }
-
-    this.indexError = null
-    this.indexSuccess = null
-
-    try {
-      const response = await fetch(`${this.apiBase}/${this.appId}/index/create`, {
-        method: 'POST',
+      runInAction(() => {
+        if (result.code === 0 && Array.isArray(result.data)) {
+          this.allMongoIndices = result.data
+        } else {
+          this.mongoIndicesError = result.message || 'Failed to fetch mongo-indices'
+        }
+        this.isLoadingMongoIndices = false
       })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create index: ${response.statusText}`)
-      }
-      
-      const result = await response.json()
-      
-      if (result.code === 0) {
-        runInAction(() => {
-          this.indexExists = true
-          this.indexSuccess = 'Index created successfully'
-        })
-        // Re-check to verify
-        await this.checkIndexExists()
-        return true
-      } else {
-        this.indexError = result.message || 'Failed to create index'
-        return false
-      }
     } catch (error) {
-      this.indexError = error instanceof Error ? error.message : 'Unknown error'
-      return false
+      runInAction(() => {
+        this.mongoIndicesError = error instanceof Error ? error.message : 'Unknown error'
+        this.isLoadingMongoIndices = false
+      })
     }
   }
+
 
   // ============ Utility ============
 
@@ -430,8 +396,7 @@ class MongoAppStore {
     this.foundApps = []
     this.collectionsInfo = {}
     this.appMetadata = null
-    this.indexExists = false
-    this.indexName = ''
+    // Note: Keep allMongoIndices cache across app switches
   }
 }
 

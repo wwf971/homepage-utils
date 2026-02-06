@@ -29,10 +29,10 @@ class MongoAppStore {
   // App metadata
   appMetadata = null
   
-  // Index status
-  indexExists = false
-  indexName = ''
-  indexSuccess = null
+  // Mongo-index system cache (shared across all apps)
+  allMongoIndices = []
+  isLoadingMongoIndices = false
+  mongoIndicesError = null
 
   // Config
   localStorageKey = 'mongo-app-config'
@@ -88,13 +88,6 @@ class MongoAppStore {
     this.collectionError = null
   }
 
-  clearIndexError() {
-    this.indexError = null
-  }
-
-  clearIndexSuccess() {
-    this.indexSuccess = null
-  }
 
   // ============ Backend API ============
 
@@ -362,68 +355,6 @@ class MongoAppStore {
     }
   }
 
-  async checkIndexExists() {
-    if (!this.isConfigured) return
-
-    try {
-      const response = await fetch(`${this.apiBase}/${this.appId}/index/exists`)
-      
-      if (!response.ok) {
-        throw new Error(`Failed to check index: ${response.statusText}`)
-      }
-      
-      const result = await response.json()
-      
-      if (result.code === 0) {
-        runInAction(() => {
-          this.indexExists = result.data?.exists || false
-          this.indexName = result.data?.indexName || ''
-        })
-      } else {
-        console.error('Failed to check index:', result.message)
-      }
-    } catch (error) {
-      console.error('Failed to check index:', error)
-    }
-  }
-
-  async createIndex() {
-    if (!this.isConfigured) {
-      this.indexError = 'App not configured'
-      return false
-    }
-
-    this.indexError = null
-    this.indexSuccess = null
-
-    try {
-      const response = await fetch(`${this.apiBase}/${this.appId}/index/create`, {
-        method: 'POST',
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create index: ${response.statusText}`)
-      }
-      
-      const result = await response.json()
-      
-      if (result.code === 0) {
-        runInAction(() => {
-          this.indexExists = true
-          this.indexSuccess = 'Index created successfully'
-        })
-        // Re-check to verify
-        await this.checkIndexExists()
-        return true
-      } else {
-        this.indexError = result.message || 'Failed to create index'
-        return false
-      }
-    } catch (error) {
-      this.indexError = error instanceof Error ? error.message : 'Unknown error'
-      return false
-    }
-  }
 
   // ============ Utility ============
 
@@ -477,8 +408,7 @@ class MongoAppStore {
     this.foundApps = []
     this.collectionsInfo = {}
     this.appMetadata = null
-    this.indexExists = false
-    this.indexName = ''
+    // Note: Keep allMongoIndices cache across app switches
     localStorage.removeItem(this.localStorageKey)
   }
 }

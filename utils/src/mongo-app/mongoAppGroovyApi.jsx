@@ -461,7 +461,7 @@ const MongoAppGroovyApi = ({ store }) => {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      padding: '8px 12px',
+                      padding: '6px 8px',
                       backgroundColor: '#f5f5f5',
                       borderBottom: '1px solid #ddd'
                     }}>

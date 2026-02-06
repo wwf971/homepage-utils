@@ -9,8 +9,8 @@ const SECTIONS_EXISTENCE = {
   showTestConnection: false,
   showAppIdManagement: false,
   showAppMetadata: true,
-  showIndexStatus: true,
   showCollections: true,
+  showEsIndices: true,
   showGroovyApi: true,
   showGroovyApiTest: true
 }

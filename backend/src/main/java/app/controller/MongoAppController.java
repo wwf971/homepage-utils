@@ -77,27 +77,6 @@ public class MongoAppController {
         return mongoAppService.getAppInfo(appId);
     }
 
-    /**
-     * Check if ES index exists
-     * GET /mongo-app/{appId}/index/exists
-     * 
-     * @return { "code": 0, "data": { "exists": true/false, "indexName": "..." } }
-     */
-    @GetMapping("/{appId}/index/exists")
-    public ApiResponse<Map<String, Object>> indexExists(@PathVariable String appId) {
-        return mongoAppService.checkIndexExists(appId);
-    }
-
-    /**
-     * Create ES index for app
-     * POST /mongo-app/{appId}/index/create
-     * 
-     * @return { "code": 0, "message": "...", "data": { "indexName": "..." } }
-     */
-    @PostMapping("/{appId}/index/create")
-    public ApiResponse<Map<String, Object>> createIndex(@PathVariable String appId) {
-        return mongoAppService.createIndexForApp(appId);
-    }
 
     /**
      * Create a collection for an app

@@ -339,3 +339,199 @@
   font-size: 12px;
   margin-top: 2px;
 }
+
+/* Collection/Index Item Styles */
+.collection-item-container {
+  margin-bottom: 4px;
+}
+
+.collection-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  background: #f8f9fa;
+  border-left: 2px solid #28a745;
+  cursor: pointer;
+}
+
+.collection-item-header-nonexist {
+  background: #fff;
+  border-left: 2px solid #ddd;
+  cursor: default;
+}
+
+.index-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  background: #f8f9fa;
+  border-left: 2px solid #0969da;
+  cursor: pointer;
+}
+
+.collection-item-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.collection-item-name {
+  font-size: 12px;
+  color: #333;
+  line-height: 1;
+}
+
+.collection-item-name-nonexist {
+  color: #999;
+}
+
+.collection-item-count {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #666;
+  font-weight: normal;
+}
+
+.collection-item-status {
+  display: flex;
+  align-items: center;
+}
+
+.collection-item-status-exists {
+  font-size: 10px;
+  color: #28a745;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.collection-item-details {
+  padding: 4px 6px 4px 24px;
+  background: #fafbfc;
+  border-left: 2px solid #28a745;
+  font-size: 11px;
+}
+
+.index-item-details {
+  padding: 4px 6px 4px 24px;
+  background: #fafbfc;
+  border-left: 2px solid #0969da;
+  font-size: 11px;
+}
+
+.collection-item-details-label {
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.collection-indices-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.collection-indices-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.index-tag-internal {
+  padding: 1px 4px;
+  background: #e8f4f8;
+  color: #0969da;
+  border-radius: 2px;
+  font-size: 10px;
+}
+
+.index-tag-external {
+  padding: 1px 4px;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 2px;
+  font-size: 10px;
+  border: 1px solid #ffc107;
+}
+
+.collection-tag-internal {
+  padding: 1px 4px;
+  background: #e8f4f8;
+  color: #0969da;
+  border-radius: 2px;
+  font-size: 10px;
+  font-family: monospace;
+}
+
+.collection-tag-external {
+  padding: 1px 4px;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 2px;
+  font-size: 10px;
+  border: 1px solid #ffc107;
+  font-family: monospace;
+}
+
+.external-label {
+  color: #999;
+  font-size: 9px;
+  margin-bottom: 2px;
+}
+
+.no-items-text {
+  color: #999;
+  font-size: 10px;
+}
+
+.items-header {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.items-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.items-count-text {
+  font-size: 11px;
+  color: #666;
+  font-weight: 500;
+}
+
+.items-loading {
+  padding: 8px;
+  color: #999;
+  font-size: 11px;
+  text-align: center;
+}
+
+.items-empty {
+  padding: 8px;
+  color: #999;
+  font-size: 11px;
+  text-align: center;
+}
+
+.es-index-name-label {
+  color: #666;
+  font-size: 10px;
+}
+
+.es-index-name-value {
+  color: #333;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.index-item-metadata {
+  margin-bottom: 6px;
+}

@@ -134,13 +134,27 @@ const EsDocSearch = ({ indexName }) => {
       {!searching && results.length > 0 && (
         <div style={{ marginTop: '12px' }}>
           <div className="es-search-results-header">
-            <div style={{ marginBottom: '8px' }}>
-              Found {totalResults} document{totalResults !== 1 ? 's' : ''} with matches
-              {totalPages > 1 && (
-                <span style={{ marginLeft: '8px', color: '#666' }}>
-                  (Page {currentPage} of {totalPages})
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px' }}>
+                Found {totalResults} doc{totalResults !== 1 ? 's' : ''} with matches
+                {totalPages > 1 && (
+                  <span style={{ marginLeft: '8px', color: '#666' }}>
+                    (Page {currentPage}/{totalPages})
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={() => {
+                  setResults([]);
+                  setHasSearched(false);
+                  setTotalResults(0);
+                  setTotalPages(0);
+                  setCurrentPage(1);
+                }}
+                className="es-button-clear-search-results"
+              >
+                Clear Results
+              </button>
             </div>
             {totalPages > 1 && (
               <div className="es-pagination">

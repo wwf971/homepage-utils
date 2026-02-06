@@ -7,6 +7,7 @@ import TestConnection from './TestConnection.jsx'
 import MongoAppGroovyApi from './mongoAppGroovyApi.jsx'
 import MongoAppGroovyApiTest from './mongoAppGroovyApiTest.jsx'
 import MongoAppCollectionConfig from './MongoAppCollectionConfig.jsx'
+import MongoAppEsConfig from './MongoAppEsConfig.jsx'
 import './MongoAppConfig.css'
 
 // App ID Management Panel
@@ -118,10 +119,6 @@ const AppMetadataPanel = observer(() => {
             <span className="config-metadata-value">{store.appMetadata.appName}</span>
           </div>
           <div className="config-metadata-item">
-            <span className="config-metadata-label">ES Index:</span>
-            <span className="config-metadata-value">{store.appMetadata.esIndex}</span>
-          </div>
-          <div className="config-metadata-item">
             <span className="config-metadata-label">Collections:</span>
             <span className="config-metadata-value">
               {store.appMetadata.collections?.length || 0} collection(s)
@@ -138,61 +135,6 @@ const AppMetadataPanel = observer(() => {
   )
 })
 
-// Elasticsearch Index Status Panel
-const EsIndexPanel = observer(() => {
-  const store = useMongoAppStore()
-  if (!store.isConfigured) return null
-  
-  return (
-    <div className="config-panel-content">
-        <div className="config-metadata">
-          <div className="config-metadata-item">
-            <span className="config-metadata-label">Index Name:</span>
-            <span className="config-metadata-value">{store.indexName}</span>
-          </div>
-          <div className="config-metadata-item">
-            <span className="config-metadata-label">Status:</span>
-            {store.indexExists ? (
-              <>
-                <span className="config-status-ok">Exists</span>
-                <button
-                  className="config-button-icon"
-                  onClick={() => store.checkIndexExists()}
-                  title="Refresh index status"
-                >
-                  <RefreshIcon width={16} height={16} />
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="config-status-error">Not Found</span>
-                <button
-                  className="config-button-small config-button-small-primary config-inline-gap"
-                  onClick={() => store.createIndex()}
-                >
-                  Create
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {store.indexSuccess && (
-          <div className="config-message-box config-message-success-box">
-            <strong>Success</strong>
-            <div className="config-message-success-text">{store.indexSuccess}</div>
-          </div>
-        )}
-
-        {store.indexError && (
-          <div className="config-message-box config-message-error-box">
-            <strong>Error</strong>
-            <div className="config-message-error-text">{store.indexError}</div>
-          </div>
-        )}
-      </div>
-  )
-})
 
 // Collections Status Panel
 const CollectionsPanel = observer(({ collections }) => {
@@ -349,14 +291,14 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
           <AppMetadataPanel />
         </PanelToggle>
       )}
-      {panels_existence.showIndexStatus && (
-        <PanelToggle title="Elasticsearch Index" defaultExpanded={false}>
-          <EsIndexPanel />
-        </PanelToggle>
-      )}
       {panels_existence.showCollections && (
         <PanelToggle title="Collections" defaultExpanded={true}>
           <MongoAppCollectionConfig store={store} collections={collections} />
+        </PanelToggle>
+      )}
+      {panels_existence.showEsIndices && (
+        <PanelToggle title="ES Indices" defaultExpanded={false}>
+          <MongoAppEsConfig store={store} />
         </PanelToggle>
       )}
       {panels_existence.showGroovyApi && (
@@ -387,8 +329,8 @@ const MongoAppConfig = ({
     showTestConnection: true,
     showAppIdManagement: true,
     showAppMetadata: true,
-    showIndexStatus: true,
     showCollections: true,
+    showEsIndices: true,
     showGroovyApi: true,
     showGroovyApiTest: true
   }

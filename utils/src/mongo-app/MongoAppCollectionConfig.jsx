@@ -20,21 +20,12 @@ const CollectionItem = observer(({ collName, collectionInfo, store }) => {
   };
 
   return (
-    <div style={{ marginBottom: '4px' }}>
+    <div className="collection-item-container">
       <div 
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'flex-start',
-          gap: '8px',
-          padding: '4px 6px',
-          background: exists ? '#f8f9fa' : '#fff',
-          borderLeft: exists ? '2px solid #28a745' : '2px solid #ddd',
-          cursor: exists ? 'pointer' : 'default'
-        }}
+        className={`collection-item-header ${!exists ? 'collection-item-header-nonexist' : ''}`}
         onClick={exists ? () => setIsExpanded(!isExpanded) : undefined}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+        <div className="collection-item-content">
           {exists && (
             isExpanded ? (
               <MinusIcon width={10} height={10} color="#999" strokeWidth={2} />
@@ -42,18 +33,18 @@ const CollectionItem = observer(({ collName, collectionInfo, store }) => {
               <PlusIcon width={10} height={10} color="#999" strokeWidth={2} />
             )
           )}
-          <span style={{ fontSize: '12px', color: exists ? '#333' : '#999', lineHeight: '1' }}>
+          <span className={`collection-item-name ${!exists ? 'collection-item-name-nonexist' : ''}`}>
             {collName}
             {exists && docCount > 0 && (
-              <span style={{ marginLeft: '6px', fontSize: '10px', color: '#666', fontWeight: 'normal' }}>
+              <span className="collection-item-count">
                 ({docCount})
               </span>
             )}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div className="collection-item-status">
           {exists ? (
-            <span style={{ fontSize: '10px', color: '#28a745', fontWeight: '500', lineHeight: '1' }}>Exists</span>
+            <span className="collection-item-status-exists">Exists</span>
           ) : (
             <button
               className="config-button-small config-button-small-primary"
@@ -67,28 +58,14 @@ const CollectionItem = observer(({ collName, collectionInfo, store }) => {
       </div>
       
       {exists && isExpanded && (
-        <div style={{ 
-          padding: '4px 6px 4px 24px',
-          background: '#fafbfc',
-          borderLeft: exists ? '2px solid #28a745' : '2px solid #ddd',
-          fontSize: '11px'
-        }}>
-          <div style={{ color: '#666', marginBottom: '2px' }}>ES Indices:</div>
+        <div className="collection-item-details">
+          <div className="collection-item-details-label">ES Indices:</div>
           {indices.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="collection-indices-container">
               {internalIndices.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                <div className="collection-indices-row">
                   {internalIndices.map((indexInfo, idx) => (
-                    <span 
-                      key={idx}
-                      style={{
-                        padding: '1px 4px',
-                        background: '#e8f4f8',
-                        color: '#0969da',
-                        borderRadius: '2px',
-                        fontSize: '10px'
-                      }}
-                    >
+                    <span key={idx} className="index-tag-internal">
                       {indexInfo.name}
                     </span>
                   ))}
@@ -96,20 +73,10 @@ const CollectionItem = observer(({ collName, collectionInfo, store }) => {
               )}
               {externalIndices.length > 0 && (
                 <div>
-                  <div style={{ color: '#999', fontSize: '9px', marginBottom: '2px' }}>External:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                  <div className="external-label">External:</div>
+                  <div className="collection-indices-row">
                     {externalIndices.map((indexInfo, idx) => (
-                      <span 
-                        key={idx}
-                        style={{
-                          padding: '1px 4px',
-                          background: '#fff3cd',
-                          color: '#856404',
-                          borderRadius: '2px',
-                          fontSize: '10px',
-                          border: '1px solid #ffc107'
-                        }}
-                      >
+                      <span key={idx} className="index-tag-external">
                         {indexInfo.name}
                       </span>
                     ))}
@@ -118,7 +85,7 @@ const CollectionItem = observer(({ collName, collectionInfo, store }) => {
               )}
             </div>
           ) : (
-            <div style={{ color: '#999', fontSize: '10px' }}>None</div>
+            <div className="no-items-text">None</div>
           )}
         </div>
       )}
@@ -132,7 +99,6 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
   const [selectedExternalIndices, setSelectedExternalIndices] = useState(new Set());
   const [externalSearchQuery, setExternalSearchQuery] = useState('');
   const [externalSearchResults, setExternalSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState(null);
@@ -140,6 +106,37 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
 
   // Get app's ES indices
   const appIndices = store.appMetadata?.esIndices || [];
+
+  // Load mongo-indices on mount
+  useEffect(() => {
+    store.fetchAllMongoIndices();
+  }, []);
+
+  // Filter indices based on search query (using cached data)
+  useEffect(() => {
+    if (!externalSearchQuery.trim()) {
+      setExternalSearchResults([]);
+      return;
+    }
+
+    const query = externalSearchQuery.toLowerCase();
+    const filtered = store.allMongoIndices
+      .filter(idx => {
+        const esIndexName = idx.esIndex || '';
+        // Exclude app's own indices and already selected external indices
+        if (appIndices.includes(esIndexName)) return false;
+        if (selectedExternalIndices.has(esIndexName)) return false;
+        // Filter by query
+        return esIndexName.toLowerCase().includes(query) ||
+               (idx.name && idx.name.toLowerCase().includes(query));
+      })
+      .map(idx => ({
+        esIndex: idx.esIndex,
+        name: idx.name
+      }));
+
+    setExternalSearchResults(filtered);
+  }, [externalSearchQuery, store.allMongoIndices, appIndices, selectedExternalIndices]);
 
   const handleToggleAppIndex = (indexName) => {
     const newSet = new Set(selectedAppIndices);
@@ -149,44 +146,6 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
       newSet.add(indexName);
     }
     setSelectedAppIndices(newSet);
-  };
-
-  const handleSearchExternalIndex = async (query) => {
-    if (!query || query.trim() === '') {
-      setExternalSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const response = await fetch(`${store.serverUrl}/mongo-index/list`);
-      const result = await response.json();
-
-      if (result.code === 0 && Array.isArray(result.data)) {
-        // Filter indices
-        const filtered = result.data
-          .filter(idx => {
-            const esIndexName = idx.esIndex || '';
-            // Exclude app's own indices and already selected external indices
-            if (appIndices.includes(esIndexName)) return false;
-            if (selectedExternalIndices.has(esIndexName)) return false;
-            // Filter by query
-            return esIndexName.toLowerCase().includes(query.toLowerCase()) ||
-                   (idx.name && idx.name.toLowerCase().includes(query.toLowerCase()));
-          })
-          .map(idx => ({
-            esIndex: idx.esIndex,
-            name: idx.name
-          }));
-
-        setExternalSearchResults(filtered);
-      }
-    } catch (error) {
-      console.error('Failed to search indices:', error);
-      setExternalSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
   };
 
   const handleSelectExternalIndex = (esIndexName) => {
@@ -202,14 +161,6 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
     newSet.delete(esIndexName);
     setSelectedExternalIndices(newSet);
   };
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearchExternalIndex(externalSearchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [externalSearchQuery]);
 
   // Update dropdown position when search results change
   useEffect(() => {
@@ -257,19 +208,14 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
       const fullCollName = createResult.data.fullCollectionName;
 
       // 2. Register collection with each selected index
-      const APP_DB_NAME = 'mongo-app-db';
+      const APP_DB_NAME = 'mongo-app';
       
-      // Fetch all mongo-indices once
-      const listResp = await fetch(`${store.serverUrl}/mongo-index/list`);
-      const listResult = await listResp.json();
-      
-      if (listResult.code !== 0) {
-        throw new Error('Failed to fetch mongo-indices list');
-      }
+      // Ensure mongo-indices are loaded
+      await store.fetchAllMongoIndices();
 
       // Map ES index names to mongo-index metadata
       const indicesMap = new Map();
-      listResult.data.forEach(idx => {
+      store.allMongoIndices.forEach(idx => {
         if (idx.esIndex) {
           indicesMap.set(idx.esIndex, idx);
         }
@@ -304,6 +250,9 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
       });
 
       await Promise.all(updatePromises);
+      
+      // Refresh mongo-indices cache after updates
+      await store.fetchAllMongoIndices(true);
 
       // Success - refresh and close
       await store.fetchAllCollections();
@@ -587,9 +536,9 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
 
   return (
     <div style={{ marginTop: '8px' }}>
-      <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '11px', color: '#666', fontWeight: '500' }}>
+      <div className="items-header">
+        <div className="items-header-left">
+          <span className="items-count-text">
             {collectionsList.length} collection{collectionsList.length !== 1 ? 's' : ''}
           </span>
           <button
@@ -627,7 +576,7 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
       </div>
 
       {isLoading ? (
-        <div style={{ padding: '8px', color: '#999', fontSize: '11px', textAlign: 'center' }}>
+        <div className="items-loading">
           Loading...
         </div>
       ) : collectionsList.length > 0 ? (
@@ -642,7 +591,7 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
           ))}
         </div>
       ) : (
-        <div style={{ padding: '8px', color: '#999', fontSize: '11px', textAlign: 'center' }}>
+        <div className="items-empty">
           No collections configured
         </div>
       )}
