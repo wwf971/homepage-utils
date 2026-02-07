@@ -1,22 +1,19 @@
 import React, { useEffect, useMemo } from 'react';
-import { useAtom, useAtomValue } from 'jotai';
+import { observer } from 'mobx-react-lite';
+import { useAtomValue } from 'jotai';
 import { RefreshIcon, SpinningCircle } from '@wwf971/react-comp-misc';
 import FileAccessPointCard from './FileAccessPointCard';
-import { 
-  fileAccessPointsAtom,
-  fileAccessPointsMetadataAtom,
-  fileAccessPointsLoadingAtom, 
-  fileAccessPointsErrorAtom,
-  fetchFileAccessPoints 
-} from './fileStore';
+import fileStore, { fetchFileAccessPoints } from './fileStore';
 import { mongoDocsAtom, extractDocId } from '../remote/dataStore';
 import './file.css';
 
-const FilePanel = () => {
-  const [fileAccessPoints, setFileAccessPoints] = useAtom(fileAccessPointsAtom);
-  const [metadata, setMetadata] = useAtom(fileAccessPointsMetadataAtom);
-  const [loading, setLoading] = useAtom(fileAccessPointsLoadingAtom);
-  const [error, setError] = useAtom(fileAccessPointsErrorAtom);
+const FilePanel = observer(() => {
+  const { 
+    fileAccessPoints, 
+    fileAccessPointsMetadata: metadata,
+    fileAccessPointsLoading: loading,
+    fileAccessPointsError: error
+  } = fileStore;
   
   // Subscribe to mongoDocsAtom to get live updates from editing operations
   const mongoDocs = useAtomValue(mongoDocsAtom);
@@ -27,19 +24,19 @@ const FilePanel = () => {
   }, []);
 
   const loadFileAccessPoints = async () => {
-    setLoading(true);
+    fileStore.setFileAccessPointsLoading(true);
     const result = await fetchFileAccessPoints();
     
     if (result.code === 0) {
-      setFileAccessPoints(result.data);
+      fileStore.setFileAccessPoints(result.data);
       if (result.metadata) {
-        setMetadata(result.metadata);
+        fileStore.setFileAccessPointsMetadata(result.metadata);
       }
-      setError(null);
+      fileStore.setFileAccessPointsError(null);
     } else {
-      setError(result.message);
+      fileStore.setFileAccessPointsError(result.message);
     }
-    setLoading(false);
+    fileStore.setFileAccessPointsLoading(false);
   };
 
   const handleRefresh = async () => {
@@ -113,7 +110,7 @@ const FilePanel = () => {
       )}
     </div>
   );
-};
+});
 
 export default FilePanel;
 

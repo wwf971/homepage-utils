@@ -15,8 +15,6 @@ import './mongo-index.css';
  * Adapter for SearchableValueComp to work with KeyValuesComp
  */
 const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType, editedIndex }) => {
-  const [searchResults, setSearchResults] = useState([]);
-  
   const handleSearch = async (value) => {
     if (!value || value.trim() === '') {
       return { code: 0, data: [] };
@@ -336,7 +334,7 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
         </div>
       )}
 
-      <TabsOnTop defaultTab="Config">
+      <TabsOnTop defaultTab="Config" autoSwitchToNewTab={false}>
           <TabsOnTop.Tab label="Config">
             <div style={{ padding: '8px 4px' }}>
               <div className="mongo-index-card-field">

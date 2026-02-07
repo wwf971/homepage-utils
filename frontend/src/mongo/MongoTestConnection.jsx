@@ -7,7 +7,7 @@ import '../styles/common.css';
 /**
  * MongoDB connection test area component
  */
-const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection }) => {
+const MongoTestConnection = () => {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
   const config = useAtomValue(mongoComputedConfigAtom);
@@ -42,14 +42,8 @@ const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection 
       
       setResult(testResult);
       
-      // Notify parent about test result
-      if (onTestResult) {
-        onTestResult(testResult);
-      }
-      
       // Auto-fetch databases after successful test
-      if (testResult.success && onTestSuccess) {
-        onTestSuccess();
+      if (testResult.success) {
         // Trigger database fetch by dispatching a custom event
         window.dispatchEvent(new CustomEvent('mongo-test-success'));
       }
@@ -72,9 +66,6 @@ const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection 
       }
       
       setResult(testResult);
-      if (onTestResult) {
-        onTestResult(testResult);
-      }
       return testResult;
     } finally {
       setTesting(false);
@@ -89,7 +80,7 @@ const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection 
   };
 
   return (
-    <div className="main-panel">
+    <>
       <div className="panel-title">MongoDB Connection</div>
       
       <div className="test-config-section">
@@ -107,10 +98,10 @@ const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection 
         <div className="test-buttons">
           <button 
             onClick={handleTest} 
-            disabled={testing || isTestingConnection}
+            disabled={testing}
             className="test-button"
           >
-            {(testing || isTestingConnection) ? (
+            {testing ? (
               <>
                 <SpinningCircle width={16} height={16} color="white" />
                 <span style={{ marginLeft: '8px' }}>Testing...</span>
@@ -137,7 +128,7 @@ const MongoTestConnection = ({ onTestSuccess, onTestResult, isTestingConnection 
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 };
 

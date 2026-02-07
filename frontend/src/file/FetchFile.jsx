@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useAtom } from 'jotai';
+import { observer } from 'mobx-react-lite';
 import { SpinningCircle, EditableValueComp, KeyValuesComp } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
-import { fileCacheAtom, fetchFileData, renameFile } from './fileStore';
+import fileStore, { fetchFileData, renameFile } from './fileStore';
 import './file.css';
 
 /**
@@ -10,7 +10,7 @@ import './file.css';
  * 
  * @param {string} fileAccessPointId - The file access point ID
  */
-const FetchFile = ({ fileAccessPointId }) => {
+const FetchFile = observer(({ fileAccessPointId }) => {
   const [urlPath, setUrlPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,7 +19,6 @@ const FetchFile = ({ fileAccessPointId }) => {
   const [metadata, setMetadata] = useState(null);
   const [actualFetchUrl, setActualFetchUrl] = useState(null); // The actual URL used to fetch
   const [copied, setCopied] = useState(false);
-  const [, setFileCache] = useAtom(fileCacheAtom);
 
   const handleFetch = async () => {
     if (!urlPath.trim()) {
@@ -55,7 +54,7 @@ const FetchFile = ({ fileAccessPointId }) => {
       setActualFetchUrl(actualUrl);
       
       // Use the unified caching function from fileStore
-      const result = await fetchFileData(fileAccessPointId, cleanPath, setFileCache);
+      const result = await fetchFileData(fileAccessPointId, cleanPath);
       
       if (result.code !== 0) {
         throw new Error(result.message || 'Failed to load file');
@@ -280,7 +279,7 @@ const FetchFile = ({ fileAccessPointId }) => {
       )}
     </div>
   );
-};
+});
 
 export default FetchFile;
 

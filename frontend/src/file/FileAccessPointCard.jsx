@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { KeyValuesComp, JsonComp, TabsOnTop, RefreshIcon, EditableValueComp, SelectableValueComp } from '@wwf971/react-comp-misc';
-import ListFiles from './ListFiles';
+import FileExplorerLocalInternal from './FileExplorerLocalInternal';
+import FileExplorerLocalExternal from './FileExplorerLocalExternal';
 import FetchFile from './FetchFile';
 import { fetchFileAccessPoints, fetchComputedBaseDir } from './fileStore';
 import { useMongoDocEditor, extractDocId, mongoDocsAtom, backendLocalConfigAtom } from '../remote/dataStore';
@@ -525,7 +526,19 @@ const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, 
             </div>
           </TabsOnTop.Tab>
           <TabsOnTop.Tab label="Files">
-            <ListFiles fileAccessPoint={fileAccessPoint} />
+            {settingType === 'local/external' ? (
+              <FileExplorerLocalExternal fileAccessPoint={fileAccessPoint} />
+            ) : settingType === 'local/internal' ? (
+              <FileExplorerLocalInternal fileAccessPoint={fileAccessPoint} />
+            ) : (
+              <div className="file-explorer-coming-soon">
+                <div className="file-explorer-coming-soon-icon">🚧</div>
+                <div className="file-explorer-coming-soon-title">Coming Soon</div>
+                <div className="file-explorer-coming-soon-description">
+                  File explorer for "{settingType}" is not yet implemented
+                </div>
+              </div>
+            )}
           </TabsOnTop.Tab>
           {settingType === 'local/external' && (
             <TabsOnTop.Tab label="Fetch">

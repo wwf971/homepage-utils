@@ -10,7 +10,7 @@ const BackendServerPanel = () => {
       <PanelToggle title="Config" defaultExpanded={true}>
         <BackendServerConfig />
       </PanelToggle>
-      <PanelToggle title="Test Connection" defaultExpanded={true}>
+      <PanelToggle title="Test Connection" defaultExpanded={true} style={{ marginTop: '12px' }}>
         <BackendServerTestConnection />
       </PanelToggle>
     </div>

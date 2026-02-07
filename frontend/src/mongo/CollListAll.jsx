@@ -14,10 +14,8 @@ import './mongo.css';
 
 /**
  * CollListAll - Component for listing all collections in a selected MongoDB database
- * 
- * @param {boolean} hasSuccessfulTest - Whether a successful test result exists
  */
-const CollListAll = ({ hasSuccessfulTest }) => {
+const CollListAll = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showCreateConfirm, setShowCreateConfirm] = useState(false);
@@ -34,7 +32,7 @@ const CollListAll = ({ hasSuccessfulTest }) => {
   const setSelectedCollection = useSetAtom(mongoSelectedCollectionAtom);
 
   useEffect(() => {
-    if (selectedDatabase && hasSuccessfulTest) {
+    if (selectedDatabase) {
       // Clear previous collections and load new ones
       setCollections([]);
       loadCollections();
@@ -42,10 +40,10 @@ const CollListAll = ({ hasSuccessfulTest }) => {
       setCollections([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDatabase, hasSuccessfulTest]);
+  }, [selectedDatabase]);
 
   const handleRefresh = () => {
-    if (selectedDatabase && hasSuccessfulTest) {
+    if (selectedDatabase) {
       setCollections([]);
       loadCollections();
     }

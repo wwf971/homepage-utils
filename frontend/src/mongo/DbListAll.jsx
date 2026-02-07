@@ -9,13 +9,9 @@ import {
 import './mongo.css';
 
 /**
- * ListDatabases - Component for listing all databases in MongoDB
- * 
- * @param {Function} onTestConnection - Callback to trigger connection test
- * @param {boolean} hasSuccessfulTest - Whether a successful test result exists
- * @param {boolean} isTestingConnection - Whether a connection test is in progress
+ * DbListAll - Component for listing all databases in MongoDB
  */
-const ListDatabases = ({ onTestConnection, hasSuccessfulTest, isTestingConnection }) => {
+const DbListAll = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -27,7 +23,7 @@ const ListDatabases = ({ onTestConnection, hasSuccessfulTest, isTestingConnectio
   // Auto-fetch databases when test succeeds
   React.useEffect(() => {
     const handleTestSuccess = () => {
-      loadDatabases(true); // Skip test check since we know test just succeeded
+      loadDatabases();
     };
     
     window.addEventListener('mongo-test-success', handleTestSuccess);
@@ -35,16 +31,7 @@ const ListDatabases = ({ onTestConnection, hasSuccessfulTest, isTestingConnectio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadDatabases = async (skipTestCheck = false) => {
-    // If no successful test yet, trigger test first (unless skipTestCheck is true)
-    if (!skipTestCheck && !hasSuccessfulTest && onTestConnection) {
-      const testResult = await onTestConnection();
-      if (!testResult || !testResult.success) {
-        // Test failed, don't proceed
-        return;
-      }
-    }
-
+  const loadDatabases = async () => {
     // Clear previous databases and show spinner
     setDatabases([]);
     setLoading(true);
@@ -71,24 +58,11 @@ const ListDatabases = ({ onTestConnection, hasSuccessfulTest, isTestingConnectio
         <div className="section-title">MongoDB Databases</div>
         <button 
           onClick={loadDatabases}
-          disabled={loading || isTestingConnection}
+          disabled={loading}
           className="mongo-refresh-button"
         >
           <RefreshIcon width={16} height={16} />
         </button>
-      </div>
-      
-      <div>
-        {!hasSuccessfulTest && !isTestingConnection && (
-          <p style={{ 
-            fontSize: '12px', 
-            color: '#666', 
-            marginTop: '8px',
-            fontStyle: 'italic'
-          }}>
-            Note: This will test the connection first if not already tested.
-          </p>
-        )}
       </div>
 
       {error && (
@@ -127,5 +101,5 @@ const ListDatabases = ({ onTestConnection, hasSuccessfulTest, isTestingConnectio
   );
 };
 
-export default ListDatabases;
+export default DbListAll;
 

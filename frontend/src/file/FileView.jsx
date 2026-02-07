@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAtom } from 'jotai';
+import { observer } from 'mobx-react-lite';
 import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonComp } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
-import { fileCacheAtom, fetchFileData, renameFile } from './fileStore';
+import fileStore, { fetchFileData, renameFile } from './fileStore';
 import { useMongoDocEditor, getBackendServerUrl } from '../remote/dataStore';
 import './file.css';
 
@@ -14,13 +14,12 @@ import './file.css';
  * @param {Function} onClose - Callback to close the popup
  * @param {Function} onFileUpdate - Callback when file is updated (renamed, etc.)
  */
-const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
+const FileView = observer(({ file, fileAccessPointId, onClose, onFileUpdate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
   const [contentType, setContentType] = useState(null);
   const [metadata, setMetadata] = useState(null);
-  const [, setFileCache] = useAtom(fileCacheAtom);
   const [copied, setCopied] = useState(false);
   const [showMongoDoc, setShowMongoDoc] = useState(false);
   const [mongoDoc, setMongoDoc] = useState(null);
@@ -44,7 +43,7 @@ const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
         const fileId = file.id || file.path;
         
         // Use the unified caching function from fileStore
-        const result = await fetchFileData(fileAccessPointId, fileId, setFileCache);
+        const result = await fetchFileData(fileAccessPointId, fileId);
         
         if (result.code !== 0) {
           throw new Error(result.message || 'Failed to load file');
@@ -82,7 +81,7 @@ const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
         URL.revokeObjectURL(fileUrl);
       }
     };
-  }, [file, fileAccessPointId, setFileCache]);
+  }, [file, fileAccessPointId]);
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -370,7 +369,7 @@ const FileView = ({ file, fileAccessPointId, onClose, onFileUpdate }) => {
       )}
     </div>
   );
-};
+});
 
 export default FileView;
 

@@ -28,7 +28,7 @@ import {
   rabbitMQLocalConfigAtom,
   rabbitMQComputedConfigAtom
 } from './dataStore';
-import { clearFileCache, fileCacheAtom } from '../file/fileStore';
+import fileStore, { clearFileCache } from '../file/fileStore';
 import '../styles/common.css';
 import './backendServer.css';
 
@@ -39,7 +39,6 @@ const BackendServerConfig = () => {
   const [loading, setLoading] = useState(false);
   const [localConfigLoading, setLocalConfigLoading] = useState(false);
   const [localConfigError, setLocalConfigError] = useState(null);
-  const setFileCache = useSetAtom(fileCacheAtom);
 
   // Config setters for reloading
   const setMongoAppConfig = useSetAtom(mongoAppConfigAtom);
@@ -91,7 +90,7 @@ const BackendServerConfig = () => {
     updateBackendServerUrl(newValue);
     setBackendUrl(newValue);
     
-    clearFileCache(setFileCache);
+    clearFileCache();
 
     // Set loading state for local config
     setLocalConfigLoading(true);
@@ -133,7 +132,7 @@ const BackendServerConfig = () => {
     });
     
     return { code: 0, message: 'Backend URL updated' };
-  }, [setBackendUrl, setFileCache, setLocalConfig, setMongoAppConfig, setMongoLocalConfig, setMongoComputedConfig, setJdbcAppConfig, setJdbcLocalConfig, setJdbcComputedConfig, setEsAppConfig, setEsLocalConfig, setEsComputedConfig, setRedisAppConfig, setRedisLocalConfig, setRedisComputedConfig, setRabbitMQAppConfig, setRabbitMQLocalConfig, setRabbitMQComputedConfig]);
+  }, [setBackendUrl, setLocalConfig, setMongoAppConfig, setMongoLocalConfig, setMongoComputedConfig, setJdbcAppConfig, setJdbcLocalConfig, setJdbcComputedConfig, setEsAppConfig, setEsLocalConfig, setEsComputedConfig, setRedisAppConfig, setRedisLocalConfig, setRedisComputedConfig, setRabbitMQAppConfig, setRabbitMQLocalConfig, setRabbitMQComputedConfig]);
 
   const handleUpdateLocalConfig = useCallback(async (key, newValue) => {
     // Validate serverId format
