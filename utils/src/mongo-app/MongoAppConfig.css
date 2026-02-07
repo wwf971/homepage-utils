@@ -1,3 +1,22 @@
+.mongo-app-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #333;
+}
+
+.mongo-app-refresh-button:hover:not(:disabled) {
+  color: #2196F3;
+}
+
+.mongo-app-refresh-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
 .config-container {
   padding: 0px;
   background: var(--bg-secondary);
@@ -498,11 +517,11 @@
 .items-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .items-count-text {
-  font-size: 11px;
+  font-size: 13px;
   color: #666;
   font-weight: 500;
 }

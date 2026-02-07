@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-
+import { RefreshIcon } from '@wwf971/react-comp-misc';
 const MongoAppGroovyApiTest = ({ store }) => {
   const [scripts, setScripts] = useState({});
   const [selectedEndpoint, setSelectedEndpoint] = useState('');
@@ -92,23 +92,16 @@ const MongoAppGroovyApiTest = ({ store }) => {
       <div className="section-title">Test MongoApp Groovy APIs</div>
 
       <div style={{ marginTop: '0px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '4px', gap: '4px' }}>
           <label style={{ fontWeight: 'bold', fontSize: '12px' }}>
-            Available APIs {scriptsArray.length > 0 && `(${scriptsArray.length})`}:
+            Available APIs {scriptsArray.length > 0 && `(${scriptsArray.length})`}
           </label>
           <button
             onClick={forceRefresh}
             disabled={isLoading}
-            style={{
-              padding: '4px 10px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              background: '#fff',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              fontSize: '11px'
-            }}
+            className="mongo-app-refresh-button"
           >
-            {isLoading ? 'Loading...' : 'Refresh'}
+            <RefreshIcon width={16} height={16} />
           </button>
         </div>
         {scriptsArray.length === 0 ? (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import groovyApiStore from './groovyApiStore';
-import { formatTimestamp } from '../utils/utils';
+import { formatTimestamp } from '@wwf971/homepage-utils-utils/utils';
 import './groovyApi.css';
 
 const GroovyApiCard = observer(({ script, index, onDelete }) => {

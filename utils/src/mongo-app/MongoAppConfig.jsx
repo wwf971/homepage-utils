@@ -2,6 +2,7 @@ import { observer } from 'mobx-react-lite'
 import { reaction } from 'mobx'
 import { useEffect, useRef } from 'react'
 import { PanelToggle, SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc'
+import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils'
 import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoAppStore.jsx'
 import TestConnection from './TestConnection.jsx'
 import MongoAppGroovyApi from './mongoAppGroovyApi.jsx'
@@ -127,7 +128,7 @@ const AppMetadataPanel = observer(() => {
           <div className="config-metadata-item">
             <span className="config-metadata-label">Created:</span>
             <span className="config-metadata-value">
-              {new Date(store.appMetadata.createdAt).toLocaleString()}
+              {formatTimestamp(store.appMetadata.createdAt, getTimezoneInt())}
             </span>
           </div>
         </div>

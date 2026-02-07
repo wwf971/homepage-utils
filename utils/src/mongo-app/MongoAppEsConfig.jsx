@@ -106,15 +106,7 @@ const MongoAppEsConfig = observer(({ store }) => {
           <button
             onClick={handleRefresh}
             disabled={isLoading}
-            style={{
-              padding: '2px',
-              border: '1px solid #d0d7de',
-              borderRadius: '3px',
-              background: '#f6f8fa',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
+            className="mongo-app-refresh-button"
             title="Refresh"
           >
             <RefreshIcon width={14} height={14} color="#57606a" />

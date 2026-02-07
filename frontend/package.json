@@ -1,7 +1,10 @@
 {
-  "name": "@wwf971/homepage-utils/frontend",
+  "name": "@wwf971/homepage-utils-frontend",
   "version": "0.0.1",
   "type": "module",
+  "exports": {
+    "./elasticsearch.css": "./src/elasticsearch/elasticsearch.css"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { getBackendServerUrl } from '../remote/dataStore';
-import { getTimezoneInt } from '../utils/utils';
+import { getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 
 class GroovyApiStore {
   // Scripts keyed by ID

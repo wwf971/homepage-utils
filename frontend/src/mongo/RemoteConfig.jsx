@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { KeyValuesComp, KeyValues, SpinningCircle, RefreshIcon, EditableValueComp } from '@wwf971/react-comp-misc';
+import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import {
   mongoRemoteConfigAtom,
   mongoLocalConfigAtom,
@@ -137,7 +138,7 @@ const RemoteConfig = () => {
           database: result.data.database,
           collection: result.data.collection,
           document: result.data.document,
-          lastChecked: new Date().toLocaleTimeString()
+          lastChecked: formatTimestamp(new Date(), getTimezoneInt())
         });
       } else {
         setStatus(prev => ({

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from 'jotai';
 import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonComp, TabsOnTop } from '@wwf971/react-comp-misc';
+import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import { getBackendServerUrl } from '../remote/dataStore';
 import { updateMongoIndex, deleteMongoIndex } from './mongoIndexStore';
 import { searchDatabases, searchCollections, useMongoDocEditor } from '../mongo/mongoStore';
@@ -345,10 +346,10 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
                 <strong>ES Index Name:</strong> {index.esIndex}
               </div>
               <div className="mongo-index-card-field">
-                <strong>Created:</strong> {index.createAt ? new Date(index.createAt).toLocaleString() : 'N/A'}
+                <strong>Created:</strong> {index.createAt ? formatTimestamp(index.createAt, getTimezoneInt()) : 'N/A'}
               </div>
               <div className="mongo-index-card-field">
-                <strong>Updated:</strong> {index.updateAt ? new Date(index.updateAt).toLocaleString() : 'N/A'}
+                <strong>Updated:</strong> {index.updateAt ? formatTimestamp(index.updateAt, getTimezoneInt()) : 'N/A'}
               </div>
             </div>
           </TabsOnTop.Tab>

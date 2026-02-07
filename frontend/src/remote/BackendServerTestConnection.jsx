@@ -158,44 +158,45 @@ const BackendServerTestConnection = () => {
   return (
     <>
       <div className="section-title">Test Backend Connection</div>
-      
-      <div className="test-action-section">
-        <div className="test-description">
-          Click the button below to test the connection to the backend server.
-        </div>
-        
-        <div className="test-buttons">
-          {testing ? (
-            <button 
-              onClick={handleAbort}
-              className="test-button-container testing"
-            >
-              <SpinningCircle width={14} height={14} color="white" />
-              <span>Testing... (Click to abort)</span>
-            </button>
-          ) : (
-            <button 
-              onClick={handleTest}
-              className="test-button-container ready"
-            >
-              Test Connection
-            </button>
-          )}
-        </div>
-        
-        {testResult && (
-          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-            <strong>{testResult.success ? '✓ Success' : '✗ Failed'}</strong>
-            <div className="result-message">{testResult.message}</div>
-            {refetchingConfigs && (
-              <div className="test-progress" style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                <SpinningCircle width={12} height={12} color="#666" />
-                <span>Re-fetching all configs...</span>
-              </div>
-            )}
-          </div>
+    
+
+      <div className="test-description">
+        Click the button below to test the connection to the backend server.
+      </div>
+
+      <div className="test-buttons">
+        {testing ? (
+          <button 
+            onClick={handleAbort}
+            className="test-button-container testing"
+          >
+            <SpinningCircle width={14} height={14} color="white" />
+            <span>Testing... (Click to abort)</span>
+          </button>
+        ) : (
+          <button 
+            onClick={handleTest}
+            className="test-button-container ready"
+            style={{ marginBottom: '4px' }}
+          >
+            Test Connection
+          </button>
         )}
       </div>
+      
+      {testResult && (
+        <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
+          <strong>{testResult.success ? '✓ Success' : '✗ Failed'}</strong>
+          <div className="result-message">{testResult.message}</div>
+          {refetchingConfigs && (
+            <div className="test-progress" style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+              <SpinningCircle width={12} height={12} color="#666" />
+              <span>Re-fetching all configs...</span>
+            </div>
+          )}
+        </div>
+      )}
+
     </>
   );
 };
