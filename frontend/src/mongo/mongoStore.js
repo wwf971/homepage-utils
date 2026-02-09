@@ -7,29 +7,26 @@
  * - Database and collection listing and searching
  * - Path format conversion utilities
  * 
- * Note: useMongoDocEditor hook is in mongoEdit.js
+ * Note: Document editor hooks are now in mongoEditMobx.js (MobX-based)
  */
 
 import { atom } from 'jotai';
-import { convertPathToMongoDotNotation } from '@wwf971/react-comp-misc/src/layout/json/pathUtils';
+import { convertPathToMongoDotNotation } from '@wwf971/react-comp-misc';
 import { getBackendServerUrl } from '../remote/backendServerStore';
-
-// Re-export useMongoDocEditor from mongoEdit.js for backwards compatibility
-export { useMongoDocEditor } from './mongoEdit';
 
 // ========== MongoDB Configuration Atoms ==========
 export const mongoAppConfigAtom = atom([]);
-export const mongoLocalConfigAtom = atom([]);
-export const mongoRemoteConfigAtom = atom([]);
+export const mongoConfigLocalAtom = atom([]);
+export const mongoConfigRemoteAtom = atom([]);
 export const mongoRemoteSettingsAtom = atom({});
-export const mongoComputedConfigAtom = atom([]);
+export const mongoConfigComputedAtom = atom([]);
 export const mongoConfigErrorAtom = atom(null);
 
 // ========== MongoDB Databases & Collections Atoms ==========
-export const mongoDatabasesAtom = atom([]);
-export const mongoSelectedDatabaseAtom = atom(null);
-export const mongoCollectionsAtom = atom([]);
-export const mongoSelectedCollectionAtom = atom(null);
+export const mongoDbsAtom = atom([]);
+export const mongoDbSelectedAtom = atom(null);
+export const mongoCollsAtom = atom([]);
+export const mongoCollSelectedAtom = atom(null);
 
 // ========== MongoDB Docs Atoms ==========
 export const mongoDocsAtom = atom([]);
@@ -64,7 +61,7 @@ export async function fetchMongoAppConfig() {
 /**
  * Fetch MongoDB local config from SQLite
  */
-export async function fetchMongoLocalConfig() {
+export async function fetchMongoConfigLocal() {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(`${backendUrl}/local_config/category/mongo/`);
@@ -86,7 +83,7 @@ export async function fetchMongoLocalConfig() {
 /**
  * Fetch MongoDB computed config (merged)
  */
-export async function fetchMongoComputedConfig() {
+export async function fetchMongoConfigComputed() {
   try {
     const backendUrl = getBackendServerUrl();
     const response = await fetch(`${backendUrl}/mongo/config/`);

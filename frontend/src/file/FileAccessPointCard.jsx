@@ -1,48 +1,41 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { KeyValuesComp, JsonComp, TabsOnTop, RefreshIcon, EditableValueComp, SelectableValueComp } from '@wwf971/react-comp-misc';
+import { useAtomValue } from 'jotai';
+import { makeAutoObservable, isObservable, toJS } from 'mobx';
+import { observer } from 'mobx-react-lite';
+import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, EditableValueComp, SelectableValueComp } from '@wwf971/react-comp-misc';
 import FileExplorerLocalInternal from './FileExplorerLocalInternal';
 import FileExplorerLocalExternal from './FileExplorerLocalExternal';
 import FetchFile from './FetchFile';
 import { fetchFileAccessPoints, fetchComputedBaseDir } from './fileStore';
-import { useMongoDocEditor, extractDocId, mongoDocsAtom, backendLocalConfigAtom } from '../remote/dataStore';
+import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
+import { backendLocalConfigAtom } from '../remote/dataStore';
 import { formatTimestamp } from './fileUtils';
 import './file.css';
 
-const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, onOpenMongoDoc }) => {
+const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, onUpdate, onOpenMongoDoc }) => {
   const [showJsonView, setShowJsonView] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [computedBaseDir, setComputedBaseDir] = useState(null);
   const [computedBaseDirLoading, setComputedBaseDirLoading] = useState(false);
   const [computedBaseDirError, setComputedBaseDirError] = useState(null);
-
-  // Subscribe to mongoDocsAtom to ensure document is available for JsonComp
-  const setDocs = useSetAtom(mongoDocsAtom);
   
   // Get backend local config for serverName
   const localConfig = useAtomValue(backendLocalConfigAtom);
   
-  // Ensure the document is in the atom for JsonComp to work
-  const docId = fileAccessPoint ? extractDocId(fileAccessPoint) : null;
-  useEffect(() => {
-    if (!docId || !fileAccessPoint) return;
-    
-    // Add document to atom if not already present (needed for JsonComp)
-    setDocs(prev => {
-      const existsInAtom = prev.some(d => extractDocId(d) === docId);
-      if (!existsInAtom) {
-        return [...prev, fileAccessPoint];
-      }
-      return prev;
-    });
-  }, [fileAccessPoint, docId, setDocs]);
+  // Convert fileAccessPoint to observable for MobX
+  const observableDoc = useMemo(() => {
+    if (!fileAccessPoint) return null;
+    // If already observable, convert to plain object first
+    const plainDoc = isObservable(fileAccessPoint) ? toJS(fileAccessPoint) : fileAccessPoint;
+    return makeAutoObservable(plainDoc, {}, { deep: true });
+  }, [fileAccessPoint]);
 
-  // Use the custom hook for document editing (pass null-safe document)
-  const { handleChange, isUpdating } = useMongoDocEditor(
+  // Use the MobX-based custom hook for document editing
+  const { handleChange, isUpdating } = useMongoDocEditorMobx(
     database,
     collection,
-    fileAccessPoint || {}
+    observableDoc || {}
   );
 
   // Early return after all hooks are called
@@ -50,7 +43,7 @@ const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, 
     return <div className="file-access-point-card">Loading...</div>;
   }
 
-  // Handle field updates - use handleChange from useMongoDocEditor to ensure atom is updated
+  // Handle field updates - use handleChange from useMongoDocEditorMobx which updates the MobX observable in-place
   const handleFieldUpdate = async (fieldPath, newValue) => {
     // Get the old value from the nested path
     const pathParts = fieldPath.split('.');
@@ -582,8 +575,8 @@ const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, 
               </div>
             </div>
             <div className="doc-editor-content">
-              <JsonComp 
-                data={fileAccessPoint} 
+              <JsonCompMobx 
+                data={observableDoc} 
                 isEditable={true}
                 isKeyEditable={true}
                 isValueEditable={true}
@@ -637,7 +630,9 @@ const FileAccessPointCard = ({ fileAccessPoint, database, collection, onUpdate, 
       )}
     </>
   );
-};
+});
+
+FileAccessPointCard.displayName = 'FileAccessPointCard';
 
 export default FileAccessPointCard;
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useAtom, useSetAtom } from 'jotai';
-import { KeyValuesComp, EditableValueComp, PlusIcon, SpinningCircle } from '@wwf971/react-comp-misc';
-import { getBackendServerUrl, mongoDocsAtom } from '../remote/dataStore';
-import { extractDocId } from '../remote/dataStore';
+import { observer } from 'mobx-react-lite';
+import { KeyValuesComp, EditableValueComp, PlusIcon, SpinningCircle, extractDocId } from '@wwf971/react-comp-misc';
+import { getBackendServerUrl } from '../remote/dataStore';
+import mongoDocStore from './mongoDocStore';
 import DocList from './DocList';
 import './mongo.css';
 
@@ -43,7 +43,7 @@ const EditableValueAdapter = ({ data, onChangeAttempt, isEditable, field, index,
  * @param {string} dbName - Currently selected database
  * @param {string} collName - Currently selected collection
  */
-const MongoDocSearch = ({ dbName, collName }) => {
+const MongoDocSearch = observer(({ dbName, collName }) => {
   const [filterPairs, setFilterPairs] = useState([
     { key: '', value: '' }
   ]);
@@ -55,9 +55,6 @@ const MongoDocSearch = ({ dbName, collName }) => {
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [searchResultIds, setSearchResultIds] = useState(null); // Store only IDs for current search
-  
-  // Use jotai atom for document cache
-  const [cachedDocs, setCachedDocs] = useAtom(mongoDocsAtom);
 
   const handleFilterChange = (index, field, newValue) => {
     setFilterPairs(prev => {
@@ -167,12 +164,8 @@ const MongoDocSearch = ({ dbName, collName }) => {
         if (resultData.documents) {
           const newDocs = resultData.documents;
           
-          // Merge new documents into cache, avoiding duplicates
-          setCachedDocs(prevDocs => {
-            const existingIds = new Set(prevDocs.map(d => extractDocId(d)));
-            const docsToAdd = newDocs.filter(d => !existingIds.has(extractDocId(d)));
-            return [...prevDocs, ...docsToAdd];
-          });
+          // Add documents to MobX store (will merge/update automatically)
+          newDocs.forEach(doc => mongoDocStore.setDoc(doc));
           
           // Store only the IDs for this search result
           const resultIds = newDocs.map(d => extractDocId(d));
@@ -183,12 +176,8 @@ const MongoDocSearch = ({ dbName, collName }) => {
           // Fallback for backward compatibility
           const results = Array.isArray(data.data) ? data.data : [data.data];
           
-          // Merge into cache
-          setCachedDocs(prevDocs => {
-            const existingIds = new Set(prevDocs.map(d => extractDocId(d)));
-            const docsToAdd = results.filter(d => !existingIds.has(extractDocId(d)));
-            return [...prevDocs, ...docsToAdd];
-          });
+          // Add to MobX store
+          results.forEach(doc => mongoDocStore.setDoc(doc));
           
           const resultIds = results.map(d => extractDocId(d));
           setSearchResultIds(resultIds);
@@ -351,7 +340,7 @@ const MongoDocSearch = ({ dbName, collName }) => {
               Search Results ({total} total)
             </h4>
             <DocList
-              docs={cachedDocs.filter(d => searchResultIds.includes(extractDocId(d)))}
+              docs={searchResultIds.map(id => mongoDocStore.getDoc(id)).filter(Boolean)}
               total={total}
               page={page}
               pageSize={pageSize}
@@ -364,7 +353,9 @@ const MongoDocSearch = ({ dbName, collName }) => {
       </div>
     </div>
   );
-};
+});
+
+MongoDocSearch.displayName = 'MongoDocSearch';
 
 export default MongoDocSearch;
 

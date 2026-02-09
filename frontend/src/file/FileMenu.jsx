@@ -1,5 +1,5 @@
 import React from 'react';
-import Menu from '@wwf971/react-comp-misc/src/menu/Menu';
+import { Menu } from '@wwf971/react-comp-misc';
 
 /**
  * FileMenu - Context menu for file items

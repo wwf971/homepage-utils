@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
 import { TabsOnTop, PanelToggle } from '@wwf971/react-comp-misc';
-import { mongoSelectedDatabaseAtom, mongoSelectedCollectionAtom } from '../remote/dataStore';
+import { mongoDbSelectedAtom, mongoCollSelectedAtom } from '../remote/dataStore';
 import MongoTestConnection from './MongoTestConnection';
 import DbListAll from './DbListAll';
 import CollListAll from './CollListAll';
@@ -32,8 +32,8 @@ const DocListAllTabWrapper = ({ tabsState, tabKey }) => {
  * Main MongoDB Panel component that includes test connection and database operations
  */
 const MongoPanel = () => {
-  const hasSelectedDb = useAtomValue(mongoSelectedDatabaseAtom);
-  const hasSelectedColl = useAtomValue(mongoSelectedCollectionAtom);
+  const hasSelectedDb = useAtomValue(mongoDbSelectedAtom);
+  const hasSelectedColl = useAtomValue(mongoCollSelectedAtom);
 
   return (
     <div style={{ padding: '12px 8px' }}>

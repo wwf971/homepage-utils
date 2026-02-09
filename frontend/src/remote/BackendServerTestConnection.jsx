@@ -11,8 +11,8 @@ import {
 import { 
   createConfigReloader,
   mongoAppConfigAtom,
-  mongoLocalConfigAtom,
-  mongoComputedConfigAtom,
+  mongoConfigLocalAtom,
+  mongoConfigComputedAtom,
   jdbcAppConfigAtom,
   jdbcLocalConfigAtom,
   jdbcComputedConfigAtom,
@@ -40,8 +40,8 @@ const BackendServerTestConnection = () => {
 
   // Config setters for reloading
   const setMongoAppConfig = useSetAtom(mongoAppConfigAtom);
-  const setMongoLocalConfig = useSetAtom(mongoLocalConfigAtom);
-  const setMongoComputedConfig = useSetAtom(mongoComputedConfigAtom);
+  const setMongoLocalConfig = useSetAtom(mongoConfigLocalAtom);
+  const setMongoComputedConfig = useSetAtom(mongoConfigComputedAtom);
   const setJdbcAppConfig = useSetAtom(jdbcAppConfigAtom);
   const setJdbcLocalConfig = useSetAtom(jdbcLocalConfigAtom);
   const setJdbcComputedConfig = useSetAtom(jdbcComputedConfigAtom);

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon, Menu } from '@wwf971/react-comp-misc';
 import { 
-  mongoSelectedDatabaseAtom,
-  mongoCollectionsAtom,
-  mongoSelectedCollectionAtom,
+  mongoDbSelectedAtom,
+  mongoCollsAtom,
+  mongoCollSelectedAtom,
   fetchMongoCollections
 } from '../remote/dataStore';
 import CollDeleteConfirm from './CollDeleteConfirm';
@@ -25,11 +25,11 @@ const CollListAll = () => {
   const [collectionForIndexInfo, setCollectionForIndexInfo] = useState(null);
   const [showIndexInfo, setShowIndexInfo] = useState(false);
   
-  const selectedDatabase = useAtomValue(mongoSelectedDatabaseAtom);
-  const selectedCollection = useAtomValue(mongoSelectedCollectionAtom);
-  const collections = useAtomValue(mongoCollectionsAtom);
-  const setCollections = useSetAtom(mongoCollectionsAtom);
-  const setSelectedCollection = useSetAtom(mongoSelectedCollectionAtom);
+  const selectedDatabase = useAtomValue(mongoDbSelectedAtom);
+  const selectedCollection = useAtomValue(mongoCollSelectedAtom);
+  const collections = useAtomValue(mongoCollsAtom);
+  const setCollections = useSetAtom(mongoCollsAtom);
+  const setSelectedCollection = useSetAtom(mongoCollSelectedAtom);
 
   useEffect(() => {
     if (selectedDatabase) {

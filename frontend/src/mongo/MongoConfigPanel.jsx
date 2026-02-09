@@ -4,24 +4,24 @@ import { TabsOnTop, KeyValues, KeyValuesComp, EditableValueComp, RefreshIcon } f
 import RemoteConfig from './RemoteConfig';
 import {
   mongoAppConfigAtom,
-  mongoLocalConfigAtom,
-  mongoComputedConfigAtom,
+  mongoConfigLocalAtom,
+  mongoConfigComputedAtom,
   mongoConfigErrorAtom,
   fetchMongoAppConfig,
-  fetchMongoLocalConfig,
-  fetchMongoComputedConfig,
+  fetchMongoConfigLocal,
+  fetchMongoConfigComputed,
   updateMongoConfig
 } from '../remote/dataStore';
 import '../styles/common.css';
 
 const MongoConfigPanel = () => {
   const appConfig = useAtomValue(mongoAppConfigAtom);
-  const localConfig = useAtomValue(mongoLocalConfigAtom);
-  const computedConfig = useAtomValue(mongoComputedConfigAtom);
+  const localConfig = useAtomValue(mongoConfigLocalAtom);
+  const computedConfig = useAtomValue(mongoConfigComputedAtom);
   const configError = useAtomValue(mongoConfigErrorAtom);
   const setAppConfig = useSetAtom(mongoAppConfigAtom);
-  const setLocalConfig = useSetAtom(mongoLocalConfigAtom);
-  const setComputedConfig = useSetAtom(mongoComputedConfigAtom);
+  const setLocalConfig = useSetAtom(mongoConfigLocalAtom);
+  const setComputedConfig = useSetAtom(mongoConfigComputedAtom);
   const setConfigError = useSetAtom(mongoConfigErrorAtom);
   const [loading, setLoading] = useState(false);
 
@@ -36,8 +36,8 @@ const MongoConfigPanel = () => {
     try {
       const allPromises = Promise.all([
         fetchMongoAppConfig(),
-        fetchMongoLocalConfig(),
-        fetchMongoComputedConfig()
+        fetchMongoConfigLocal(),
+        fetchMongoConfigComputed()
       ]);
 
       const [appResult, localResult, computedResult] = await Promise.race([

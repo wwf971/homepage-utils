@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
-import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonComp } from '@wwf971/react-comp-misc';
+import { makeAutoObservable, isObservable, toJS } from 'mobx';
+import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonCompMobx } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
 import fileStore, { fetchFileData, renameFile } from './fileStore';
-import { useMongoDocEditor, getBackendServerUrl } from '../remote/dataStore';
+import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
+import { getBackendServerUrl } from '../remote/dataStore';
 import './file.css';
 
 /**
@@ -27,10 +29,18 @@ const FileView = observer(({ file, fileAccessPointId, onClose, onFileUpdate }) =
   const [mongoDocError, setMongoDocError] = useState(null);
   
   // MongoDB document editor (only used for local/internal files)
-  const { handleChange: handleMongoDocChange, isUpdating } = useMongoDocEditor(
+  // Convert to observable when mongoDoc changes
+  const observableMongoDoc = useMemo(() => {
+    if (!mongoDoc) return null;
+    // If already observable, convert to plain object first
+    const plainDoc = isObservable(mongoDoc) ? toJS(mongoDoc) : mongoDoc;
+    return makeAutoObservable(plainDoc, {}, { deep: true });
+  }, [mongoDoc]);
+  
+  const { handleChange: handleMongoDocChange, isUpdating } = useMongoDocEditorMobx(
     'main',
     'note',
-    mongoDoc || {}
+    observableMongoDoc || {}
   );
 
   useEffect(() => {
@@ -358,8 +368,8 @@ const FileView = observer(({ file, fileAccessPointId, onClose, onFileUpdate }) =
               </button>
             </div>
             <div className="file-view-mongo-content">
-              <JsonComp
-                data={mongoDoc}
+              <JsonCompMobx
+                data={observableMongoDoc}
                 onChange={handleMongoDocChange}
                 isLoading={isUpdating}
               />

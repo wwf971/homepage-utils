@@ -2,6 +2,11 @@ import { atom } from 'jotai';
 import * as mongoDocOps from '../mongo/mongoStore';
 import { extractDocId } from '../mongo/mongoUtils';
 import { getBackendServerUrl as getBackendUrl } from './backendServerStore';
+import {
+  fetchMongoAppConfig,
+  fetchMongoConfigLocal,
+  fetchMongoConfigComputed
+} from '../mongo/mongoStore';
 
 // ========== Re-export Backend Server Store ==========
 export {
@@ -19,22 +24,22 @@ export {
 // ========== Re-export MongoDB Store ==========
 export {
   mongoAppConfigAtom,
-  mongoLocalConfigAtom,
-  mongoRemoteConfigAtom,
+  mongoConfigLocalAtom,
+  mongoConfigRemoteAtom,
   mongoRemoteSettingsAtom,
-  mongoComputedConfigAtom,
+  mongoConfigComputedAtom,
   mongoConfigErrorAtom,
-  mongoDatabasesAtom,
-  mongoSelectedDatabaseAtom,
-  mongoCollectionsAtom,
-  mongoSelectedCollectionAtom,
+  mongoDbsAtom,
+  mongoDbSelectedAtom,
+  mongoCollsAtom,
+  mongoCollSelectedAtom,
   mongoDocsAtom,
   mongoDocsPageAtom,
   mongoDocsTotalAtom,
   mongoDocsPageSizeAtom,
   fetchMongoAppConfig,
-  fetchMongoLocalConfig,
-  fetchMongoComputedConfig,
+  fetchMongoConfigLocal,
+  fetchMongoConfigComputed,
   fetchMongoRemoteConfig,
   fetchMongoRemoteSettings,
   updateMongoRemoteSetting,
@@ -115,21 +120,21 @@ export function createConfigReloader() {
       reloadPromises.push(
         fetchMongoAppConfig().then(result => {
           if (result.code === 0) setMongoAppConfig(result.data);
-        }).catch(err => console.warn('Failed to reload MongoDB app config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload MongoDB app config:', err.message || err))
       );
     }
     if (setMongoLocalConfig) {
       reloadPromises.push(
-        fetchMongoLocalConfig().then(result => {
+        fetchMongoConfigLocal().then(result => {
           if (result.code === 0) setMongoLocalConfig(result.data);
-        }).catch(err => console.warn('Failed to reload MongoDB local config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload MongoDB local config:', err.message || err))
       );
     }
     if (setMongoComputedConfig) {
       reloadPromises.push(
-        fetchMongoComputedConfig().then(result => {
+        fetchMongoConfigComputed().then(result => {
           if (result.code === 0) setMongoComputedConfig(result.data);
-        }).catch(err => console.warn('Failed to reload MongoDB computed config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload MongoDB computed config:', err.message || err))
       );
     }
 
@@ -138,44 +143,44 @@ export function createConfigReloader() {
       reloadPromises.push(
         fetchJdbcAppConfig().then(result => {
           if (result.code === 0) setJdbcAppConfig(result.data);
-        }).catch(err => console.warn('Failed to reload JDBC app config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload JDBC app config:', err.message || err))
       );
     }
     if (setJdbcLocalConfig) {
       reloadPromises.push(
         fetchJdbcLocalConfig().then(result => {
           if (result.code === 0) setJdbcLocalConfig(result.data);
-        }).catch(err => console.warn('Failed to reload JDBC local config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload JDBC local config:', err.message || err))
       );
     }
     if (setJdbcComputedConfig) {
       reloadPromises.push(
         fetchJdbcComputedConfig().then(result => {
           if (result.code === 0) setJdbcComputedConfig(result.data);
-        }).catch(err => console.warn('Failed to reload JDBC computed config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload JDBC computed config:', err.message || err))
       );
     }
 
     // Elasticsearch configs
     if (setEsAppConfig) {
       reloadPromises.push(
-        fetchElasticsearchAppConfig().then(result => {
+        fetchEsAppConfig().then(result => {
           if (result.code === 0) setEsAppConfig(result.data);
-        }).catch(err => console.warn('Failed to reload ES app config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload ES app config:', err.message || err))
       );
     }
     if (setEsLocalConfig) {
       reloadPromises.push(
-        fetchElasticsearchLocalConfig().then(result => {
+        fetchEsLocalConfig().then(result => {
           if (result.code === 0) setEsLocalConfig(result.data);
-        }).catch(err => console.warn('Failed to reload ES local config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload ES local config:', err.message || err))
       );
     }
     if (setEsComputedConfig) {
       reloadPromises.push(
-        fetchElasticsearchComputedConfig().then(result => {
+        fetchEsComputedConfig().then(result => {
           if (result.code === 0) setEsComputedConfig(result.data);
-        }).catch(err => console.warn('Failed to reload ES computed config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload ES computed config:', err.message || err))
       );
     }
 
@@ -184,21 +189,21 @@ export function createConfigReloader() {
       reloadPromises.push(
         fetchRedisAppConfig().then(result => {
           if (result.code === 0) setRedisAppConfig(result.data);
-        }).catch(err => console.warn('Failed to reload Redis app config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload Redis app config:', err.message || err))
       );
     }
     if (setRedisLocalConfig) {
       reloadPromises.push(
         fetchRedisLocalConfig().then(result => {
           if (result.code === 0) setRedisLocalConfig(result.data);
-        }).catch(err => console.warn('Failed to reload Redis local config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload Redis local config:', err.message || err))
       );
     }
     if (setRedisComputedConfig) {
       reloadPromises.push(
         fetchRedisComputedConfig().then(result => {
           if (result.code === 0) setRedisComputedConfig(result.data);
-        }).catch(err => console.warn('Failed to reload Redis computed config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload Redis computed config:', err.message || err))
       );
     }
 
@@ -207,21 +212,21 @@ export function createConfigReloader() {
       reloadPromises.push(
         fetchRabbitMQAppConfig().then(result => {
           if (result.code === 0) setRabbitMQAppConfig(result.data);
-        }).catch(err => console.warn('Failed to reload RabbitMQ app config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload RabbitMQ app config:', err.message || err))
       );
     }
     if (setRabbitMQLocalConfig) {
       reloadPromises.push(
         fetchRabbitMQLocalConfig().then(result => {
           if (result.code === 0) setRabbitMQLocalConfig(result.data);
-        }).catch(err => console.warn('Failed to reload RabbitMQ local config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload RabbitMQ local config:', err.message || err))
       );
     }
     if (setRabbitMQComputedConfig) {
       reloadPromises.push(
         fetchRabbitMQComputedConfig().then(result => {
           if (result.code === 0) setRabbitMQComputedConfig(result.data);
-        }).catch(err => console.warn('Failed to reload RabbitMQ computed config:', err))
+        }).catch(err => console.log('[ERROR] Failed to reload RabbitMQ computed config:', err.message || err))
       );
     }
 
@@ -300,7 +305,7 @@ export async function fetchJdbcComputedConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.error('Failed to fetch JDBC computed config:', error);
+    console.log('[ERROR]Failed to fetch JDBC computed config:', error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -329,7 +334,7 @@ export async function updateJdbcConfig(key, value) {
     }
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
-    console.error('Failed to update JDBC config:', error);
+    console.log('[ERROR] Failed to update JDBC config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -344,8 +349,7 @@ export const {
   removeArrayItem
 } = mongoDocOps;
 
-// Export the hook and utility functions separately
-export { useMongoDocEditor } from '../mongo/mongoStore';
+// Export utility functions
 export { extractDocId };
 
 // ========== Elasticsearch API Functions ==========
@@ -353,7 +357,7 @@ export { extractDocId };
 /**
  * Fetch Elasticsearch config from application.properties
  */
-export async function fetchElasticsearchAppConfig() {
+export async function fetchEsAppConfig() {
   try {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/elasticsearch/config/app/`);
@@ -367,7 +371,7 @@ export async function fetchElasticsearchAppConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.error('Failed to fetch Elasticsearch app config:', error);
+    console.log('[ERROR] Failed to fetch Elasticsearch app config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -375,7 +379,7 @@ export async function fetchElasticsearchAppConfig() {
 /**
  * Fetch Elasticsearch local config from SQLite
  */
-export async function fetchElasticsearchLocalConfig() {
+export async function fetchEsLocalConfig() {
   try {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/local_config/category/elasticsearch/`);
@@ -389,7 +393,7 @@ export async function fetchElasticsearchLocalConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.error('Failed to fetch Elasticsearch local config:', error);
+    console.log('[ERROR] Failed to fetch Elasticsearch local config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -397,7 +401,7 @@ export async function fetchElasticsearchLocalConfig() {
 /**
  * Fetch Elasticsearch computed config (merged)
  */
-export async function fetchElasticsearchComputedConfig() {
+export async function fetchEsComputedConfig() {
   try {
     const backendUrl = getBackendUrl();
     const response = await fetch(`${backendUrl}/elasticsearch/config/`);
@@ -418,7 +422,7 @@ export async function fetchElasticsearchComputedConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.error('Failed to fetch Elasticsearch computed config:', error);
+    console.log('[ERROR] Failed to fetch Elasticsearch computed config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -447,7 +451,7 @@ export async function updateElasticsearchConfig(key, value) {
     }
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
-    console.error('Failed to update Elasticsearch config:', error);
+    console.log('[ERROR] Failed to update Elasticsearch config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -466,7 +470,7 @@ export async function fetchEsIndices() {
     }
     return { code: -1, message: result.message || 'Failed to fetch indices' };
   } catch (error) {
-    console.error('Failed to fetch Elasticsearch indices:', error);
+    console.log('[ERROR] Failed to fetch Elasticsearch indices:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -485,7 +489,7 @@ export async function fetchEsIndexInfo(indexName) {
     }
     return { code: -1, message: result.message || 'Failed to fetch index info' };
   } catch (error) {
-    console.error('Failed to fetch Elasticsearch index info:', error);
+    console.log('[ERROR] Failed to fetch Elasticsearch index info:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -510,7 +514,7 @@ export async function fetchRedisAppConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch config' };
   } catch (error) {
-    console.error('Failed to fetch Redis application.properties config:', error);
+    console.log('[ERROR] Failed to fetch Redis application.properties config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -533,7 +537,7 @@ export async function fetchRedisLocalConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch local config' };
   } catch (error) {
-    console.error('Failed to fetch Redis local config:', error);
+    console.log('[ERROR] Failed to fetch Redis local config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -563,7 +567,7 @@ export async function fetchRedisComputedConfig() {
     }
     return { code: -1, message: 'Invalid response' };
   } catch (error) {
-    console.error('Failed to fetch Redis computed config:', error);
+    console.log('[ERROR] Failed to fetch Redis computed config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -592,7 +596,7 @@ export async function updateRedisConfig(key, value) {
     }
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
-    console.error('Failed to update Redis config:', error);
+    console.log('[ERROR] Failed to update Redis config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -613,7 +617,7 @@ export async function fetchRabbitMQAppConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch RabbitMQ application config' };
   } catch (error) {
-    console.error('Failed to fetch RabbitMQ application.properties config:', error);
+    console.log('[ERROR] Failed to fetch RabbitMQ application.properties config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -630,7 +634,7 @@ export async function fetchRabbitMQLocalConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch RabbitMQ local config' };
   } catch (error) {
-    console.error('Failed to fetch RabbitMQ local config:', error);
+    console.log('[ERROR] Failed to fetch RabbitMQ local config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -647,7 +651,7 @@ export async function fetchRabbitMQComputedConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch RabbitMQ computed config' };
   } catch (error) {
-    console.error('Failed to fetch RabbitMQ computed config:', error);
+    console.log('[ERROR] Failed to fetch RabbitMQ computed config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -670,7 +674,7 @@ export async function updateRabbitMQConfig(path, value) {
     }
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
-    console.error('Failed to update RabbitMQ config:', error);
+    console.log('[ERROR] Failed to update RabbitMQ config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -692,7 +696,7 @@ export async function fetchIdAppConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch ID service application config' };
   } catch (error) {
-    console.error('Failed to fetch ID service application.properties config:', error);
+    console.log('[ERROR] Failed to fetch ID service application.properties config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -712,7 +716,7 @@ export async function fetchIdLocalConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch ID service local config' };
   } catch (error) {
-    console.error('Failed to fetch ID service local config:', error);
+    console.log('[ERROR] Failed to fetch ID service local config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -738,7 +742,7 @@ export async function fetchIdComputedConfig() {
     }
     return { code: -1, message: result.message || 'Failed to fetch ID service computed config' };
   } catch (error) {
-    console.error('Failed to fetch ID service computed config:', error);
+    console.log('[ERROR] Failed to fetch ID service computed config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -764,7 +768,7 @@ export async function updateIdConfig(key, value) {
     }
     return { code: -1, message: result.message || 'Update failed' };
   } catch (error) {
-    console.error('Failed to update ID service config:', error);
+    console.log('[ERROR] Failed to update ID service config:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -776,7 +780,7 @@ export async function checkIdTable() {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to check ID table:', error);
+    console.log('[ERROR] Failed to check ID table:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -788,7 +792,7 @@ export async function checkIdTableStructure() {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to check ID table structure:', error);
+    console.log('[ERROR] Failed to check ID table structure:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -802,7 +806,7 @@ export async function createIdTable() {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to create ID table:', error);
+    console.log('[ERROR] Failed to create ID table:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -816,7 +820,7 @@ export async function deleteIdTable() {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to delete ID table:', error);
+    console.log('[ERROR] Failed to delete ID table:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -830,7 +834,7 @@ export async function recreateIdTable() {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to recreate ID table:', error);
+    console.log('[ERROR] Failed to recreate ID table:', error.message || error);
     return { code: -2, message: error.message || 'Network error' };
   }
 }
@@ -847,7 +851,7 @@ export async function issueRandomId(request) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to issue random ID:', error);
+    console.log('[ERROR] Failed to issue random ID:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -863,7 +867,7 @@ export async function issueMs48Id(request) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to issue ms48 ID:', error);
+    console.log('[ERROR] Failed to issue ms48 ID:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -875,7 +879,7 @@ export async function getIdByValue(value) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to get ID:', error);
+    console.log('[ERROR] Failed to get ID:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -887,7 +891,7 @@ export async function listIds(page = 0, pageSize = 20) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to list IDs:', error);
+    console.log('[ERROR] Failed to list IDs:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -903,7 +907,7 @@ export async function searchIds(request) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to search IDs:', error);
+    console.log('[ERROR] Failed to search IDs:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -919,7 +923,7 @@ export async function updateIdMetadata(value, metadata) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to update ID metadata:', error);
+    console.log('[ERROR] Failed to update ID metadata:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -933,7 +937,7 @@ export async function deleteId(value) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to delete ID:', error);
+    console.log('[ERROR] Failed to delete ID:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -945,7 +949,7 @@ export async function convertId(value, format) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to convert ID:', error);
+    console.log('[ERROR] Failed to convert ID:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }
@@ -961,7 +965,7 @@ export async function searchIdsBySubstring(request) {
     const result = await response.json();
     return result;
   } catch (error) {
-    console.error('Failed to search IDs by substring:', error);
+    console.log('[ERROR] Failed to search IDs by substring:', error.message || error);
     return { code: -2, data: null, message: error.message || 'Network error' };
   }
 }

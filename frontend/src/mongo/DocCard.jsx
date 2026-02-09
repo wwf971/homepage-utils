@@ -1,35 +1,38 @@
 import React, { useState } from 'react';
+import { observer } from 'mobx-react-lite';
 import { useAtomValue } from 'jotai';
-import { JsonComp } from '@wwf971/react-comp-misc';
-import { 
-  mongoSelectedDatabaseAtom,
-  mongoSelectedCollectionAtom,
-  useMongoDocEditor,
-  deleteMongoDocument
-} from '../remote/dataStore';
+import { JsonCompMobx, extractDocId } from '@wwf971/react-comp-misc';
+import { useMongoDocEditorMobx } from './mongoEditMobx';
+import { mongoDbSelectedAtom, mongoCollSelectedAtom } from '../remote/dataStore';
+import mongoDocStore from './mongoDocStore';
 import './mongo.css';
 
 /**
  * DocCard - Component for displaying a single MongoDB document
  * 
- * @param {Object} doc - The document to display
+ * @param {Object} doc - The observable document from MobX store
  * @param {number} index - The index of the document in the list
  * @param {Function} onDelete - Callback function when document is deleted
  */
-const DocCard = ({ doc, index, onDelete }) => {
+const DocCard = observer(({ doc, index, onDelete }) => {
   const [showJsonView, setShowJsonView] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [copied, setCopied] = useState(false);
   
-  const selectedDatabase = useAtomValue(mongoSelectedDatabaseAtom);
-  const selectedCollection = useAtomValue(mongoSelectedCollectionAtom);
+  // Get selected database/collection from Jotai atoms (UI state)
+  const selectedDatabase = useAtomValue(mongoDbSelectedAtom);
+  const selectedCollection = useAtomValue(mongoCollSelectedAtom);
   
-  // Use the custom hook for document editing
-  const { handleChange, isUpdating } = useMongoDocEditor(
+  // Always get the latest document from the store to ensure we have the freshest observable
+  const docId = extractDocId(doc);
+  const latestDoc = mongoDocStore.getDoc(docId) || doc;
+  
+  // Use the MobX-based custom hook for document editing
+  const { handleChange, isUpdating } = useMongoDocEditorMobx(
     selectedDatabase,
     selectedCollection,
-    doc
+    latestDoc
   );
 
   const handleDelete = async () => {
@@ -40,10 +43,10 @@ const DocCard = ({ doc, index, onDelete }) => {
     setDeleting(true);
     setDeleteError(null);
 
-    const result = await deleteMongoDocument(selectedDatabase, selectedCollection, doc._id);
+    const result = await mongoDocStore.deleteDoc(selectedDatabase, selectedCollection, doc._id);
     
     if (result.code === 0) {
-      // Call the onDelete callback to remove from parent list
+      // Call the onDelete callback if provided
       if (onDelete) {
         onDelete(doc._id);
       }
@@ -179,7 +182,7 @@ const DocCard = ({ doc, index, onDelete }) => {
               </div>
             </div>
             <div className="mongo-doc-editor-content">
-              <JsonComp 
+              <JsonCompMobx 
                 data={doc} 
                 isEditable={true}
                 isKeyEditable={true}
@@ -192,7 +195,9 @@ const DocCard = ({ doc, index, onDelete }) => {
       )}
     </>
   );
-};
+});
+
+DocCard.displayName = 'DocCard';
 
 export default DocCard;
 

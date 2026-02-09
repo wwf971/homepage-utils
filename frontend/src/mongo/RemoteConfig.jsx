@@ -3,12 +3,12 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { KeyValuesComp, KeyValues, SpinningCircle, RefreshIcon, EditableValueComp } from '@wwf971/react-comp-misc';
 import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import {
-  mongoRemoteConfigAtom,
-  mongoLocalConfigAtom,
-  mongoComputedConfigAtom,
+  mongoConfigRemoteAtom,
+  mongoConfigLocalAtom,
+  mongoConfigComputedAtom,
   fetchMongoRemoteConfig,
-  fetchMongoLocalConfig,
-  fetchMongoComputedConfig,
+  fetchMongoConfigLocal,
+  fetchMongoConfigComputed,
   updateMongoRemoteConfig,
   getBackendServerUrl
 } from '../remote/dataStore';
@@ -40,15 +40,15 @@ const RemoteConfig = () => {
   });
   
   // Get remote config from jotai
-  const remoteConfig = useAtomValue(mongoRemoteConfigAtom);
-  const setRemoteConfig = useSetAtom(mongoRemoteConfigAtom);
+  const remoteConfig = useAtomValue(mongoConfigRemoteAtom);
+  const setRemoteConfig = useSetAtom(mongoConfigRemoteAtom);
   
   // Watch local config for changes to remote settings
-  const localConfig = useAtomValue(mongoLocalConfigAtom);
+  const localConfig = useAtomValue(mongoConfigLocalAtom);
   
   // Get setters for all config layers
-  const setLocalConfig = useSetAtom(mongoLocalConfigAtom);
-  const setComputedConfig = useSetAtom(mongoComputedConfigAtom);
+  const setLocalConfig = useSetAtom(mongoConfigLocalAtom);
+  const setComputedConfig = useSetAtom(mongoConfigComputedAtom);
 
   useEffect(() => {
     loadSettings();
@@ -193,8 +193,8 @@ const RemoteConfig = () => {
       if (result.code === 0) {
         // Reload local config and computed config after successful update
         const [localResult, computedResult] = await Promise.all([
-          fetchMongoLocalConfig(),
-          fetchMongoComputedConfig()
+          fetchMongoConfigLocal(),
+          fetchMongoConfigComputed()
         ]);
         
         if (localResult.code === 0) setLocalConfig(localResult.data);
@@ -216,7 +216,7 @@ const RemoteConfig = () => {
       // Reload remote and computed config after successful update
       const [remoteResult, computedResult] = await Promise.all([
         fetchMongoRemoteConfig(),
-        fetchMongoComputedConfig()
+        fetchMongoConfigComputed()
       ]);
       
       if (remoteResult.code === 0) setRemoteConfig(remoteResult.data);

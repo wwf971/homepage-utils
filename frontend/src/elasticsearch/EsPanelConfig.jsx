@@ -8,9 +8,9 @@ import {
   esLocalConfigAtom,
   esComputedConfigAtom,
   esConfigErrorAtom,
-  fetchElasticsearchAppConfig,
-  fetchElasticsearchLocalConfig,
-  fetchElasticsearchComputedConfig,
+  fetchEsAppConfig,
+  fetchEsLocalConfig,
+  fetchEsComputedConfig,
   updateElasticsearchConfig
 } from '../remote/dataStore';
 import '../styles/common.css';
@@ -38,9 +38,9 @@ export const ConfigPanel = () => {
     setLoading(true);
     setConfigError(null);
     const [appResult, localResult, computedResult] = await Promise.all([
-      fetchElasticsearchAppConfig(),
-      fetchElasticsearchLocalConfig(),
-      fetchElasticsearchComputedConfig()
+      fetchEsAppConfig(),
+      fetchEsLocalConfig(),
+      fetchEsComputedConfig()
     ]);
     
     if (appResult.code === 0) {

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc';
 import { 
-  mongoDatabasesAtom, 
-  mongoSelectedDatabaseAtom,
+  mongoDbsAtom, 
+  mongoDbSelectedAtom,
   fetchMongoDatabases 
 } from '../remote/dataStore';
 import './mongo.css';
@@ -15,10 +15,10 @@ const DbListAll = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  const databases = useAtomValue(mongoDatabasesAtom);
-  const selectedDatabase = useAtomValue(mongoSelectedDatabaseAtom);
-  const setDatabases = useSetAtom(mongoDatabasesAtom);
-  const setSelectedDatabase = useSetAtom(mongoSelectedDatabaseAtom);
+  const databases = useAtomValue(mongoDbsAtom);
+  const selectedDatabase = useAtomValue(mongoDbSelectedAtom);
+  const setDatabases = useSetAtom(mongoDbsAtom);
+  const setSelectedDatabase = useSetAtom(mongoDbSelectedAtom);
 
   // Auto-fetch databases when test succeeds
   React.useEffect(() => {

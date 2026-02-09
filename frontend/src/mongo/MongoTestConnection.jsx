@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { KeyValues, SpinningCircle } from '@wwf971/react-comp-misc';
-import { mongoComputedConfigAtom, getBackendServerUrl } from '../remote/dataStore';
+import { mongoConfigComputedAtom, getBackendServerUrl } from '../remote/dataStore';
 import '../styles/common.css';
 
 /**
@@ -10,7 +10,7 @@ import '../styles/common.css';
 const MongoTestConnection = () => {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
-  const config = useAtomValue(mongoComputedConfigAtom);
+  const config = useAtomValue(mongoConfigComputedAtom);
   const abortControllerRef = useRef(null);
 
   const handleTest = async () => {

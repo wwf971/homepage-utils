@@ -1,10 +1,8 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
-import { useAtomValue } from 'jotai';
 import { RefreshIcon, SpinningCircle } from '@wwf971/react-comp-misc';
 import FileAccessPointCard from './FileAccessPointCard';
 import fileStore, { fetchFileAccessPoints } from './fileStore';
-import { mongoDocsAtom, extractDocId } from '../remote/dataStore';
 import './file.css';
 
 const FilePanel = observer(() => {
@@ -14,9 +12,6 @@ const FilePanel = observer(() => {
     fileAccessPointsLoading: loading,
     fileAccessPointsError: error
   } = fileStore;
-  
-  // Subscribe to mongoDocsAtom to get live updates from editing operations
-  const mongoDocs = useAtomValue(mongoDocsAtom);
 
   useEffect(() => {
     loadFileAccessPoints();
@@ -44,22 +39,9 @@ const FilePanel = observer(() => {
     await loadFileAccessPoints();
   };
 
-  // Merge live updates from mongoDocsAtom into fileAccessPoints
-  // This ensures immediate visual updates when editing fields
-  const displayedAccessPoints = useMemo(() => {
-    if (!fileAccessPoints || fileAccessPoints.length === 0) {
-      return fileAccessPoints;
-    }
-    
-    return fileAccessPoints.map(ap => {
-      const docId = extractDocId(ap);
-      if (!docId) return ap;
-      
-      // Find the updated version in mongoDocs
-      const updatedDoc = mongoDocs.find(d => extractDocId(d) === docId);
-      return updatedDoc || ap;
-    });
-  }, [fileAccessPoints, mongoDocs]);
+  // Note: Live updates are now handled by MobX observables in FileAccessPointCard
+  // No need to merge documents manually - MobX will trigger re-renders automatically
+  const displayedAccessPoints = fileAccessPoints;
 
   if (loading) {
     return (

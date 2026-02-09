@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from 'jotai';
-import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonComp, TabsOnTop } from '@wwf971/react-comp-misc';
+import { makeAutoObservable, isObservable, toJS } from 'mobx';
+import { observer } from 'mobx-react-lite';
+import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonCompMobx, TabsOnTop } from '@wwf971/react-comp-misc';
 import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import { getBackendServerUrl } from '../remote/dataStore';
 import { updateMongoIndex, deleteMongoIndex } from './mongoIndexStore';
-import { searchDatabases, searchCollections, useMongoDocEditor } from '../mongo/mongoStore';
+import { searchDatabases, searchCollections } from '../mongo/mongoStore';
+import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
 import MongoIndexDashboard from './MongoIndexDashBoard';
 import EsDocSearch from '../elasticsearch/EsDocSearch';
 import EsDocListAll from '../elasticsearch/EsDocListAll';
@@ -73,7 +76,7 @@ const SearchableAdapter = ({ data, onChangeAttempt, field, index, searchType, ed
 /**
  * MongoIndexCard - Display and edit a MongoDB-ES index
  */
-const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
+const MongoIndexCard = observer(({ index, onUpdate, onDelete, onJsonEdit }) => {
   const [isEditingCollections, setIsEditingCollections] = useState(false);
   const [editedCollections, setEditedCollections] = useState(null);
   const [isSavingCollections, setIsSavingCollections] = useState(false);
@@ -88,12 +91,20 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
   const getAtomValue = (atom) => store.get(atom);
   const setAtomValue = (atom, value) => store.set(atom, value);
   
-  // Use doc editor for this specific index document
+  // Convert index to observable for MobX
+  const observableIndex = useMemo(() => {
+    if (!index) return null;
+    // If already observable, convert to plain object first
+    const plainIndex = isObservable(index) ? toJS(index) : index;
+    return makeAutoObservable(plainIndex, {}, { deep: true });
+  }, [index]);
+  
+  // Use MobX-based doc editor for this specific index document
   // Note: mongo-index collection is stored in the main configured database (usually 'main'), not 'metadata'
-  const { handleChange: handleDocChange, isUpdating } = useMongoDocEditor(
+  const { handleChange: handleDocChange, isUpdating } = useMongoDocEditorMobx(
     'main',
     'mongo-index',
-    index
+    observableIndex || {}
   );
   
   // Wrap handleDocChange to notify parent of updates
@@ -442,8 +453,8 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
               </div>
             </div>
             <div className="doc-editor-content">
-              <JsonComp 
-                data={index} 
+              <JsonCompMobx 
+                data={observableIndex} 
                 isEditable={true}
                 isKeyEditable={true}
                 isValueEditable={true}
@@ -455,7 +466,9 @@ const MongoIndexCard = ({ index, onUpdate, onDelete, onJsonEdit }) => {
       )}
     </div>
   );
-};
+});
+
+MongoIndexCard.displayName = 'MongoIndexCard';
 
 export default MongoIndexCard;
 
