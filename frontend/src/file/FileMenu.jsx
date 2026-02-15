@@ -9,10 +9,11 @@ import { Menu } from '@wwf971/react-comp-misc';
  * @param {Function} onClose - Callback to close menu
  * @param {Function} onDownload - Callback for download action
  * @param {Function} onShow - Callback for show action
+ * @param {Function} onOpenInNewTab - Callback for open in new tab action
  * @param {Function} onRename - Callback for rename action
  * @param {Function} onContextMenu - Callback for right-click on backdrop (for repositioning)
  */
-const FileMenu = ({ file, position, onClose, onDownload, onShow, onRename, onContextMenu }) => {
+const FileMenu = ({ file, position, onClose, onDownload, onShow, onOpenInNewTab, onRename, onContextMenu }) => {
   const menuItems = [
     {
       type: 'item',
@@ -23,6 +24,11 @@ const FileMenu = ({ file, position, onClose, onDownload, onShow, onRename, onCon
       type: 'item',
       name: 'Show',
       data: { action: 'show', file }
+    },
+    {
+      type: 'item',
+      name: 'Open in New Tab',
+      data: { action: 'openInNewTab', file }
     },
     {
       type: 'item',
@@ -40,6 +46,9 @@ const FileMenu = ({ file, position, onClose, onDownload, onShow, onRename, onCon
         break;
       case 'show':
         onShow(file);
+        break;
+      case 'openInNewTab':
+        onOpenInNewTab(file);
         break;
       case 'rename':
         onRename(file);

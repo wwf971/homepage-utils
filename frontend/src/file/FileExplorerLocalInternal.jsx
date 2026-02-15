@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
 import { makeAutoObservable, runInAction } from 'mobx';
-import { FolderView } from '@wwf971/react-comp-misc';
-import fileStore, { fetchFileList } from './fileStore';
+import { FolderView, SpinningCircle } from '@wwf971/react-comp-misc';
+import fileStore, { fetchFileList, renameFile } from './fileStore';
 import { formatTimestamp, formatFileSize } from './fileUtils';
+import { getBackendServerUrl } from '../remote/backendServerStore';
 import FileView from './FileView';
 import FileMenu from './FileMenu';
 import './file.css';
@@ -23,16 +24,21 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     pageInput: '1',
     hasMore: true,
     totalCount: 0,
-    selectedFileId: null,
+    fileSelectedId: null,
     viewingFile: null,
-    menuFile: null,
+    menuRowId: null,
     menuPosition: { x: 0, y: 0 },
     columnsOrder: ['name', 'size', 'modified'],
     columnsSize: {
       name: { width: 400, minWidth: 200, resizable: true },
       size: { width: 120, minWidth: 80, resizable: true },
       modified: { width: 200, minWidth: 150, resizable: true }
-    }
+    },
+    // Rename state
+    renamingFileId: null,
+    isRenamingInProgress: false,
+    renameStatus: null,
+    renameInitialized: false
   }));
   const pageSize = 50;
 
@@ -101,8 +107,27 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
 
   // Handle row click (select file)
   const handleRowClick = (rowId) => {
+    // If currently renaming any row (including this one), blur it to submit/cancel the edit
+    if (explorerState.renamingFileId) {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.classList.contains('file-name-editable')) {
+        activeEl.blur();
+        // Wait for blur to process before selecting new row
+        setTimeout(() => {
+          runInAction(() => {
+            explorerState.fileSelectedId = rowId;
+          });
+        }, 0);
+        return;
+      }
+      // Recover from stale rename state only when user moved to a different row.
+      if (explorerState.renamingFileId !== rowId) {
+        handleRenameCancel();
+      }
+    }
+
     runInAction(() => {
-      explorerState.selectedFileId = rowId;
+      explorerState.fileSelectedId = rowId;
     });
   };
 
@@ -114,17 +139,29 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     const row = rows.find(r => r.id === rowId);
     if (!row) return;
 
-    // Close existing menu first
-    runInAction(() => {
-      explorerState.menuFile = null;
-    });
+    // If in rename mode, check if we need to exit it
+    if (explorerState.renamingFileId) {
+      const activeEl = document.activeElement;
+      const hasActiveEditable = activeEl && activeEl.classList.contains('file-name-editable');
+      
+      if (explorerState.renamingFileId !== rowId) {
+        // Different row - cancel rename
+        if (hasActiveEditable) {
+          activeEl.blur();
+        } else {
+          handleRenameCancel();
+        }
+      } else if (!hasActiveEditable) {
+        // Same row but no active editable - force cancel stale state
+        handleRenameCancel();
+      }
+    }
 
-    // Use requestAnimationFrame to ensure React completes unmount before remounting
-    requestAnimationFrame(() => {
-      runInAction(() => {
-        explorerState.menuFile = row.data.file;
-        explorerState.menuPosition = { x: event.clientX, y: event.clientY };
-      });
+    // Select the row and open menu atomically
+    runInAction(() => {
+      explorerState.fileSelectedId = rowId;
+      explorerState.menuRowId = rowId;
+      explorerState.menuPosition = { x: event.clientX, y: event.clientY };
     });
   };
 
@@ -139,60 +176,76 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     backdrop.style.pointerEvents = '';
     
     // Find the file row element
-    const rowElement = clickedElement?.closest('.folder-body-row');
+    const rowEl = clickedElement?.closest('[data-row-id]');
     
-    if (rowElement) {
-      // Get the row data
-      const rowCells = rowElement.querySelectorAll('.folder-body-cell');
-      if (rowCells.length > 0) {
-        // Find which row was clicked by matching the element
-        const clickedRow = rows.find((row) => {
-          // Check if any cell content matches
-          const nameCell = rowElement.querySelector('.file-explorer-file-name-cell');
-          return nameCell && nameCell.textContent.includes(row.data.name);
-        });
+    if (rowEl) {
+      const clickedRowId = rowEl.getAttribute('data-row-id');
+      const clickedRow = rows.find(r => String(r.id) === String(clickedRowId));
+      
+      if (clickedRow) {
         
-        if (clickedRow) {
-          // Close existing menu first
-          runInAction(() => {
-            explorerState.menuFile = null;
-          });
+        // If in rename mode, check if we need to exit it
+        if (explorerState.renamingFileId) {
+          const activeEl = document.activeElement;
+          const hasActiveEditable = activeEl && activeEl.classList.contains('file-name-editable');
           
-          // Use requestAnimationFrame to ensure React completes unmount before remounting
-          requestAnimationFrame(() => {
-            runInAction(() => {
-              explorerState.menuFile = clickedRow.data.file;
-              explorerState.menuPosition = { x: e.clientX, y: e.clientY };
-            });
-          });
-        } else {
-          // Clicked outside files - just close menu
-          runInAction(() => {
-            explorerState.menuFile = null;
-          });
+          if (explorerState.renamingFileId !== clickedRow.id) {
+            // Different row - cancel rename
+            if (hasActiveEditable) {
+              activeEl.blur();
+            } else {
+              handleRenameCancel();
+            }
+          } else if (!hasActiveEditable) {
+            // Same row but no active editable - force cancel stale state
+            handleRenameCancel();
+          }
         }
+        
+        // Select the row and open menu atomically
+        runInAction(() => {
+          explorerState.fileSelectedId = clickedRow.id;
+          explorerState.menuRowId = clickedRow.id;
+          explorerState.menuPosition = { x: e.clientX, y: e.clientY };
+        });
+      } else {
+        // Clicked outside files - just close menu
+        runInAction(() => {
+          explorerState.menuRowId = null;
+        });
       }
     } else {
       // Clicked outside files - just close menu
       runInAction(() => {
-        explorerState.menuFile = null;
+        explorerState.menuRowId = null;
       });
     }
   };
 
   // File operations
-  const handleDownload = (file) => {
+  const handleDownload = async (file) => {
     const fileId = file.id || file.path;
     const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
-    const url = `/file_access_point/${encodeURIComponent(fileAccessPoint.id)}/${encodedFileId}?action=download`;
+    const backendUrl = getBackendServerUrl();
+    const url = `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPoint.id)}/${encodedFileId}?action=download`;
     
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = file.name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL after a short delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
+      console.error('Failed to download file:', error);
+    }
   };
 
   const handleShow = (file) => {
@@ -201,9 +254,94 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     });
   };
 
+  const handleOpenInNewTab = (file) => {
+    const fileId = file.id || file.path;
+    const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    const backendUrl = getBackendServerUrl();
+    const url = `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPoint.id)}/${encodedFileId}`;
+    
+    window.open(url, '_blank');
+  };
+
   const handleRenameStart = (file) => {
-    // TODO: Implement inline rename or dialog
-    console.log('Rename:', file.name);
+    // Use the currently selected row ID instead of the file object's ID
+    // This ensures we rename the correct row even if there's a timing issue with menu updates
+    const fileId = explorerState.fileSelectedId;
+    
+    runInAction(() => {
+      explorerState.renamingFileId = fileId;
+      explorerState.renameStatus = null;
+      explorerState.renameInitialized = false;
+    });
+  };
+
+  const handleRenameSubmit = async (fileId, newName, originalName) => {
+    runInAction(() => {
+      explorerState.isRenamingInProgress = true;
+      explorerState.renameStatus = null;
+    });
+
+    try {
+      const result = await renameFile(fileAccessPoint.id, fileId, newName);
+      
+      if (result.code === 0) {
+        // Update file list with new name
+        runInAction(() => {
+          explorerState.files = explorerState.files.map(f => {
+            const fId = f.id || f.path;
+            return fId === fileId ? { ...f, name: newName } : f;
+          });
+          explorerState.renameStatus = { type: 'success', message: 'Renamed' };
+        });
+
+        // Clear status after 500ms
+        setTimeout(() => {
+          runInAction(() => {
+            explorerState.renamingFileId = null;
+            explorerState.renameStatus = null;
+            explorerState.renameInitialized = false;
+          });
+        }, 500);
+      } else {
+        // Show error
+        runInAction(() => {
+          explorerState.renameStatus = { type: 'error', message: result.message || 'Failed' };
+        });
+
+        // Clear error and reset after 500ms
+        setTimeout(() => {
+          runInAction(() => {
+            explorerState.renamingFileId = null;
+            explorerState.renameStatus = null;
+            explorerState.renameInitialized = false;
+          });
+        }, 500);
+      }
+    } catch (error) {
+      runInAction(() => {
+        explorerState.renameStatus = { type: 'error', message: 'Network error' };
+      });
+
+      setTimeout(() => {
+        runInAction(() => {
+          explorerState.renamingFileId = null;
+          explorerState.renameStatus = null;
+          explorerState.renameInitialized = false;
+        });
+      }, 500);
+    } finally {
+      runInAction(() => {
+        explorerState.isRenamingInProgress = false;
+      });
+    }
+  };
+
+  const handleRenameCancel = () => {
+    runInAction(() => {
+      explorerState.renamingFileId = null;
+      explorerState.renameStatus = null;
+      explorerState.renameInitialized = false;
+    });
   };
 
   const handleFileUpdate = (updatedFile) => {
@@ -222,13 +360,85 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     if (!row) return null;
 
     if (colId === 'name') {
+      const isRenaming = explorerState.renamingFileId === rowId;
+      
       return () => (
         <div 
           className="file-explorer-file-name-cell"
-          onContextMenu={(e) => handleRowRightClick(e, rowId)}
         >
           <span className="file-explorer-file-icon">📄</span>
-          <span>{row.data.name}</span>
+          {isRenaming ? (
+            <span className="file-name-rename-wrapper">
+              <span
+                className="file-name-editable"
+                contentEditable={!explorerState.isRenamingInProgress}
+                suppressContentEditableWarning
+                onBlur={(e) => {
+                  if (explorerState.isRenamingInProgress || explorerState.renameStatus) return;
+                  
+                  const newName = e.target.textContent?.trim() || '';
+                  if (newName && newName !== row.data.name) {
+                    handleRenameSubmit(rowId, newName, row.data.name);
+                  } else {
+                    handleRenameCancel();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (explorerState.isRenamingInProgress) {
+                    e.preventDefault();
+                    return;
+                  }
+                  
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    handleRenameCancel();
+                  }
+                }}
+                ref={(el) => {
+                  if (el && isRenaming && !explorerState.isRenamingInProgress && !explorerState.renameStatus && !explorerState.renameInitialized) {
+                    el.textContent = row.data.name;
+                    
+                    // Trigger a click to ensure browser sets up focus state properly
+                    el.click();
+                    
+                    // Select all text after click is processed
+                    requestAnimationFrame(() => {
+                      const range = document.createRange();
+                      const sel = window.getSelection();
+                      const textNode = el.firstChild;
+                      
+                      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                        range.selectNodeContents(el);
+                        sel?.removeAllRanges();
+                        sel?.addRange(range);
+                      }
+                    });
+                    
+                    runInAction(() => {
+                      explorerState.renameInitialized = true;
+                    });
+                  }
+                }}
+              >
+                {row.data.name}
+              </span>
+              {explorerState.isRenamingInProgress && (
+                <span className="file-rename-status">
+                  <SpinningCircle width={14} height={14} />
+                </span>
+              )}
+              {explorerState.renameStatus && (
+                <span className={`file-rename-status ${explorerState.renameStatus.type}`}>
+                  {explorerState.renameStatus.message}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span>{row.data.name}</span>
+          )}
         </div>
       );
     }
@@ -341,7 +551,8 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
         rows={rows}
         getBodyComponent={getBodyComponent}
         onRowClick={handleRowClick}
-        selectedRowId={explorerState.selectedFileId}
+        onRowContextMenu={handleRowRightClick}
+        selectedRowId={explorerState.fileSelectedId}
         allowColumnReorder={true}
         onDataChangeRequest={handleDataChangeRequest}
         showStatusBar={true}
@@ -351,17 +562,22 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
         bodyHeight={Math.min(rows.length * 32 + 40, 500)}
       />
 
-      {explorerState.menuFile && (
-        <FileMenu
-          file={explorerState.menuFile}
-          position={explorerState.menuPosition}
-          onClose={() => runInAction(() => explorerState.menuFile = null)}
-          onDownload={handleDownload}
-          onShow={handleShow}
-          onRename={handleRenameStart}
-          onContextMenu={handleBackdropContextMenu}
-        />
-      )}
+      {explorerState.menuRowId && (() => {
+        const menuRow = rows.find(r => r.id === explorerState.menuRowId);
+        if (!menuRow) return null;
+        return (
+          <FileMenu
+            file={menuRow.data.file}
+            position={explorerState.menuPosition}
+            onClose={() => runInAction(() => explorerState.menuRowId = null)}
+            onDownload={handleDownload}
+            onShow={handleShow}
+            onOpenInNewTab={handleOpenInNewTab}
+            onRename={handleRenameStart}
+            onContextMenu={handleBackdropContextMenu}
+          />
+        );
+      })()}
 
       {explorerState.viewingFile && (
         <FileView

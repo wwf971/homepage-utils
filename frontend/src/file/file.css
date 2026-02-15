@@ -6,6 +6,93 @@
   margin-bottom: 12px;
 }
 
+/* File Explorer Navigation Bar */
+.file-explorer-nav-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f9f9f9;
+}
+
+.file-explorer-nav-bar .pathbar-container {
+  flex: 1;
+}
+
+/* File/Folder Rename Styles */
+.file-name-rename-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.file-name-editable {
+  display: inline-block;
+  min-width: 40px;
+  outline: none;
+  border-bottom: 1px solid #0066cc;
+  background: #f0f8ff;
+  padding: 0 2px;
+  flex: 1;
+}
+
+.file-name-editable:focus {
+  background: #e6f2ff;
+}
+
+.file-name-editable[contenteditable="false"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.file-rename-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.file-rename-status.success {
+  color: #28a745;
+}
+
+.file-rename-status.error {
+  color: #dc3545;
+}
+
+.file-explorer-nav-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.file-explorer-nav-button {
+  height: 26px;
+  min-width: 26px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.file-explorer-nav-button:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.file-explorer-nav-button:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* File Explorer Pagination Bar */
 .file-explorer-pagination-bar {
   display: flex;
