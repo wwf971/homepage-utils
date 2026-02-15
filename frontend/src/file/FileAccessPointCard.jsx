@@ -1,6 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAtomValue } from 'jotai';
-import { makeAutoObservable, isObservable, toJS } from 'mobx';
 import { observer } from 'mobx-react-lite';
 import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, EditableValueComp, SelectableValueComp } from '@wwf971/react-comp-misc';
 import FileExplorerLocalInternal from './FileExplorerLocalInternal';
@@ -8,11 +7,12 @@ import FileExplorerLocalExternal from './FileExplorerLocalExternal';
 import FetchFile from './FetchFile';
 import { fetchFileAccessPoints, fetchComputedBaseDir } from './fileStore';
 import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
+import mongoDocStore from '../mongo/mongoDocStore';
 import { backendLocalConfigAtom } from '../remote/dataStore';
 import { formatTimestamp } from './fileUtils';
 import './file.css';
 
-const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, onUpdate, onOpenMongoDoc }) => {
+const FileAccessPointCard = observer(({ fileAccessPointId, database, collection, onUpdate, onOpenMongoDoc }) => {
   const [showJsonView, setShowJsonView] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -23,13 +23,9 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
   // Get backend local config for serverName
   const localConfig = useAtomValue(backendLocalConfigAtom);
   
-  // Convert fileAccessPoint to observable for MobX
-  const observableDoc = useMemo(() => {
-    if (!fileAccessPoint) return null;
-    // If already observable, convert to plain object first
-    const plainDoc = isObservable(fileAccessPoint) ? toJS(fileAccessPoint) : fileAccessPoint;
-    return makeAutoObservable(plainDoc, {}, { deep: true });
-  }, [fileAccessPoint]);
+  // Retrieve the observable document from mongoDocStore using the ID
+  // This creates a MobX reactive dependency only on THIS specific document
+  const observableDoc = mongoDocStore.getDoc(fileAccessPointId);
 
   // Use the MobX-based custom hook for document editing
   const { handleChange, isUpdating } = useMongoDocEditorMobx(
@@ -37,31 +33,7 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
     collection,
     observableDoc || {}
   );
-
-  // Early return after all hooks are called
-  if (!fileAccessPoint) {
-    return <div className="file-access-point-card">Loading...</div>;
-  }
-
-  // Handle field updates - use handleChange from useMongoDocEditorMobx which updates the MobX observable in-place
-  const handleFieldUpdate = async (fieldPath, newValue) => {
-    // Get the old value from the nested path
-    const pathParts = fieldPath.split('.');
-    let oldValue = fileAccessPoint;
-    for (const part of pathParts) {
-      oldValue = oldValue?.[part];
-    }
-    
-    // Use handleChange from the hook which properly updates mongoDocsAtom
-    // The 'new' value must be wrapped in an object with a 'value' property
-    const result = await handleChange(fieldPath, {
-      old: oldValue,
-      new: { value: newValue },
-      _action: null // Regular field update, not a special action
-    });
-    
-    return result;
-  };
+  
   // File access point type options
   const fileAccessPointTypeOptions = [
     {
@@ -85,13 +57,34 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
       description: 'External storage organized by ID - files grouped by unique identifiers within subdirectories'
     }
   ];
-
+  
   // Format setting type description
   const getTypeDescription = (type) => {
     const option = fileAccessPointTypeOptions.find(opt => opt.value === type);
     return option ? option.description : (type || 'Unknown');
   };
-
+  
+  // Handle field updates - use handleChange from useMongoDocEditorMobx which updates the MobX observable in-place
+  const handleFieldUpdate = async (fieldPath, newValue) => {
+    if (!observableDoc) return { code: -1, message: 'Document not loaded' };
+    
+    // Get the old value from the nested path using the observable doc from store
+    const pathParts = fieldPath.split('.');
+    let oldValue = observableDoc;
+    for (const part of pathParts) {
+      oldValue = oldValue?.[part];
+    }
+    
+    // Use handleChange from the hook which properly updates the store
+    // The 'new' value must be wrapped in an object with a 'value' property
+    const result = await handleChange(fieldPath, {
+      old: oldValue,
+      new: { value: newValue },
+      _action: null // Regular field update, not a special action
+    });
+    
+    return result;
+  };
 
   // Flatten nested object into dot-notation keys
   const flattenObject = (obj, prefix = '') => {
@@ -112,13 +105,15 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
 
   // Extract settingType for use in component
   const settingType = useMemo(() => {
-    const flattened = flattenObject(fileAccessPoint);
+    if (!observableDoc) return 'NOT SET';
+    const flattened = flattenObject(observableDoc);
     return flattened['content.setting.type'] || 'NOT SET';
-  }, [fileAccessPoint]);
+  }, [observableDoc]);
 
   // Prepare data for KeyValuesComp with editable fields
   const cardData = useMemo(() => {
-    const flattened = flattenObject(fileAccessPoint);
+    if (!observableDoc) return [];
+    const flattened = flattenObject(observableDoc);
     
     // Define recognized editable fields (key stays as-is, just add edit component)
     const editableFields = {
@@ -329,8 +324,12 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
     });
 
     return dataArray;
-  }, [fileAccessPoint, fileAccessPointTypeOptions, handleFieldUpdate, settingType, localConfig]);
+  }, [observableDoc, fileAccessPointTypeOptions, handleFieldUpdate, settingType, localConfig]);
 
+  // Early return after all hooks are called
+  if (!observableDoc) {
+    return <div className="file-access-point-card">Loading...</div>;
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -338,18 +337,13 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
       // Fetch fresh data from server
       const result = await fetchFileAccessPoints();
       if (result.code === 0 && result.data) {
-        // Find the updated access point
-        const updated = result.data.find(ap => {
-          const apId = extractDocId(ap);
-          const currentId = extractDocId(fileAccessPoint);
-          return apId === currentId;
-        });
+        // Find the updated access point (using custom id field only)
+        const currentId = observableDoc.id;
+        const updated = result.data.find(fap => fap.id === currentId);
         
         if (updated) {
-          // Update in the atom directly (don't call onUpdate to avoid full panel reload)
-          setDocs(prev => prev.map(d => 
-            extractDocId(d) === docId ? updated : d
-          ));
+          // Update in the MobX store
+          mongoDocStore.setDoc(updated);
         }
       }
     } catch (error) {
@@ -365,13 +359,13 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
     
     try {
       // Use the custom id field, not MongoDB _id
-      const apId = fileAccessPoint.id;
-      if (!apId) {
+      const fapId = observableDoc.id;
+      if (!fapId) {
         setComputedBaseDirError('File access point ID not found');
         return;
       }
       
-      const result = await fetchComputedBaseDir(apId);
+      const result = await fetchComputedBaseDir(fapId);
       
       if (result.code === 0) {
         setComputedBaseDir(result.data);
@@ -391,7 +385,7 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
       <div className="file-access-point-card">
         <div className="card-title">
           <span className="card-title-text">
-            {fileAccessPoint.content?.name || 'Unnamed Access Point'}
+            {observableDoc.content?.name || 'Unnamed Access Point'}
           </span>
         </div>
 
@@ -520,9 +514,9 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
           </TabsOnTop.Tab>
           <TabsOnTop.Tab label="Files">
             {settingType === 'local/external' ? (
-              <FileExplorerLocalExternal fileAccessPoint={fileAccessPoint} />
+              <FileExplorerLocalExternal fileAccessPoint={observableDoc} />
             ) : settingType === 'local/internal' ? (
-              <FileExplorerLocalInternal fileAccessPoint={fileAccessPoint} />
+              <FileExplorerLocalInternal fileAccessPoint={observableDoc} />
             ) : (
               <div className="file-explorer-coming-soon">
                 <div className="file-explorer-coming-soon-icon">🚧</div>
@@ -535,7 +529,7 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
           </TabsOnTop.Tab>
           {settingType === 'local/external' && (
             <TabsOnTop.Tab label="Fetch">
-              <FetchFile fileAccessPointId={fileAccessPoint.id} />
+              <FetchFile fileAccessPointId={observableDoc.id} />
             </TabsOnTop.Tab>
           )}
         </TabsOnTop>
@@ -546,14 +540,14 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
               <div>
-                <div className="panel-title">{fileAccessPoint.content?.name || 'File Access Point'}</div>
+                <div className="panel-title">{observableDoc.content?.name || 'File Access Point'}</div>
                 <div style={{ 
                   fontSize: '12px', 
                   color: '#666', 
                   marginTop: '4px',
                   fontFamily: 'monospace'
                 }}>
-                  mongo doc path: {database}/{collection}/id={fileAccessPoint.id}
+                  mongo doc path: {database}/{collection}/id={observableDoc.id}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -592,14 +586,14 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
           <div className="doc-editor-panel" onClick={(e) => e.stopPropagation()}>
             <div className="doc-editor-header">
               <div>
-                <div className="panel-title">Raw JSON - {fileAccessPoint.content?.name || 'File Access Point'}</div>
+                <div className="panel-title">Raw JSON - {observableDoc.content?.name || 'File Access Point'}</div>
                 <div style={{ 
                   fontSize: '12px', 
                   color: '#666', 
                   marginTop: '4px',
                   fontFamily: 'monospace'
                 }}>
-                  mongo doc path: {database}/{collection}/id={fileAccessPoint.id}
+                  mongo doc path: {database}/{collection}/id={observableDoc.id}
                 </div>
               </div>
               <button
@@ -622,7 +616,7 @@ const FileAccessPointCard = observer(({ fileAccessPoint, database, collection, o
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}>
-                {JSON.stringify(fileAccessPoint, null, 2)}
+                {JSON.stringify(observableDoc, null, 2)}
               </pre>
             </div>
           </div>

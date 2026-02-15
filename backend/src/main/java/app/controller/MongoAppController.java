@@ -140,7 +140,7 @@ public class MongoAppController {
     /**
      * Create a document
      * POST /mongo-app/{appId}/coll/{collectionName}/doc/create
-     * Body: { "docId": "doc1", "content": { "field1": "value1", ... } }
+     * Body: { "docId": "doc1", "content": { "field1": "value1", ... }, "shouldUpdateIndex": true }
      * 
      * @return { "code": 0, "message": "...", "data": { "docId": "...", "mongoId": "..." } }
      */
@@ -151,18 +151,20 @@ public class MongoAppController {
         String docId = (String) request.get("docId");
         @SuppressWarnings("unchecked")
         Map<String, Object> content = (Map<String, Object>) request.get("content");
+        Boolean shouldUpdateIndex = request.get("shouldUpdateIndex") != null ?
+            (Boolean) request.get("shouldUpdateIndex") : null;
         
         if (content == null) {
             content = new java.util.HashMap<>();
         }
         
-        return mongoAppService.createDoc(appId, collectionName, docId, content);
+        return mongoAppService.createDoc(appId, collectionName, docId, content, shouldUpdateIndex);
     }
 
     /**
      * Update a document
      * PUT /mongo-app/{appId}/coll/{collectionName}/doc/{docId}/update
-     * Body: { "updates": { "field1": "newValue", ... } }
+     * Body: { "updates": { "field1": "newValue", ... }, "shouldUpdateIndex": true }
      * 
      * @return { "code": 0, "message": "...", "data": { "docId": "...", "updateVersion": N } }
      */
@@ -173,12 +175,14 @@ public class MongoAppController {
                                          @RequestBody Map<String, Object> request) {
         @SuppressWarnings("unchecked")
         Map<String, Object> updates = (Map<String, Object>) request.get("updates");
+        Boolean shouldUpdateIndex = request.get("shouldUpdateIndex") != null ?
+            (Boolean) request.get("shouldUpdateIndex") : null;
         
         if (updates == null) {
             updates = new java.util.HashMap<>();
         }
         
-        return mongoAppService.updateDoc(appId, collectionName, docId, updates);
+        return mongoAppService.updateDoc(appId, collectionName, docId, updates, shouldUpdateIndex);
     }
 
     /**

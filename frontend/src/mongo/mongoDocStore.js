@@ -47,11 +47,16 @@ class MongoDocStore {
   /**
    * Add or update a document in the store
    * Converts plain object to observable if needed
+   * 
+   * Indexing strategy:
+   * - Prefer custom 'id' field if present (for file access points, mongo-app docs)
+   * - Fall back to MongoDB '_id' field
    */
   setDoc(doc) {
-    const docId = extractDocId(doc);
+    // Try custom id field first, then fall back to _id
+    const docId = doc.id || extractDocId(doc);
     if (!docId) {
-      console.error('Cannot add document without valid _id:', doc);
+      console.error('Cannot add document without valid id or _id:', doc);
       return;
     }
 

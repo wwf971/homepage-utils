@@ -1,33 +1,81 @@
-import { makeAutoObservable, runInAction } from 'mobx';
+import { makeAutoObservable, runInAction, action } from 'mobx';
+import mongoDocStore from '../mongo/mongoDocStore';
 import { updateDocField } from '../mongo/mongoStore';
 import { getBackendServerUrl } from '../remote/dataStore';
 
 /**
  * MobX store for file access points and file caching
+ * 
+ * Architecture:
+ * - File access point metadata (MongoDB documents) are stored in mongoDocStore
+ * - This store only keeps track of document IDs
+ * - File content cache (actual file data) is stored here
+ * 
+ * Data Flow:
+ * 1. fetchFileAccessPoints() fetches documents and stores them in mongoDocStore
+ * 2. This store keeps only the IDs in fileAccessPointIds[]
+ * 3. fileAccessPoints getter retrieves full documents from mongoDocStore by ID
+ * 4. All document editing goes through mongoEditMobx.js hooks
+ * 
+ * Single Source of Truth:
+ * - All MongoDB documents: mongoDocStore.docs Map
+ * - File access point IDs: fileStore.fileAccessPointIds
+ * - File content cache: fileStore.fileCache
  */
 class FileStore {
-  // File access points state
-  fileAccessPoints = [];
+  // File access points - only store IDs, actual documents are in mongoDocStore
+  fileAccessPointIds = [];
   fileAccessPointsMetadata = {
     database: 'note',
-    collection: 'note',
-    ids: []
+    collection: 'note'
   };
-  fileAccessPointsLoading = false;
+  fileAccessPointsIsLoading = false;
   fileAccessPointsError = null;
 
   // Unified file cache - stores all file information by composite key "fileAccessPointId:fileId"
   fileCache = {};
 
   constructor() {
-    makeAutoObservable(this);
+    makeAutoObservable(this, {
+      // Don't make fileAccessPoints a computed - it accesses another store
+      // which can cause infinite loops
+      fileAccessPoints: false,
+      getFileAccessPoints: false
+    });
   }
 
   /**
-   * Set file access points
+   * Set file access point IDs (actual documents are in mongoDocStore)
    */
-  setFileAccessPoints(accessPoints) {
-    this.fileAccessPoints = accessPoints;
+  setFileAccessPointIds(ids) {
+    this.fileAccessPointIds = ids;
+  }
+
+  /**
+   * Get file access point documents from mongoDocStore
+   * Note: Not a computed property to avoid MobX reaction cycles
+   */
+  getFileAccessPoints() {
+    const docs = this.fileAccessPointIds
+      .map(id => mongoDocStore.getDoc(id))
+      .filter(Boolean); // Filter out any null/undefined
+    
+    // Debug: log if we have IDs but no docs
+    if (this.fileAccessPointIds.length > 0 && docs.length === 0) {
+      console.warn('[fileStore] Have IDs but no documents found in mongoDocStore');
+      console.warn('[fileStore] IDs:', this.fileAccessPointIds);
+      console.warn('[fileStore] mongoDocStore keys:', Array.from(mongoDocStore.docs.keys()));
+    }
+    
+    return docs;
+  }
+  
+  /**
+   * Computed getter for backwards compatibility with existing code
+   * Uses toJS to break MobX reactivity and prevent infinite loops
+   */
+  get fileAccessPoints() {
+    return this.getFileAccessPoints();
   }
 
   /**
@@ -41,7 +89,7 @@ class FileStore {
    * Set loading state
    */
   setFileAccessPointsLoading(loading) {
-    this.fileAccessPointsLoading = loading;
+    this.fileAccessPointsIsLoading = loading;
   }
 
   /**
@@ -86,9 +134,15 @@ class FileStore {
   }
 
   /**
-   * Fetch file access points using MongoDB document API with query filter
+   * Fetch file access points using MongoDB document API
+   * Documents are stored in mongoDocStore, this store only keeps IDs
    */
   async fetchFileAccessPoints() {
+    runInAction(() => {
+      this.setFileAccessPointsLoading(true);
+      this.setFileAccessPointsError(null);
+    });
+
     try {
       const backendUrl = getBackendServerUrl();
       console.log('Fetching file access points from:', `${backendUrl}/file_access_point/mongo_docs/`);
@@ -107,6 +161,10 @@ class FileStore {
       const mongoDocsResult = await mongoDocsResponse.json();
       
       if (mongoDocsResult.code !== 0) {
+        runInAction(() => {
+          this.setFileAccessPointsLoading(false);
+          this.setFileAccessPointsError(mongoDocsResult.message || 'Failed to load mongo docs info');
+        });
         return { code: -1, message: mongoDocsResult.message || 'Failed to load mongo docs info' };
       }
       
@@ -120,15 +178,40 @@ class FileStore {
       );
       
       const documents = await Promise.all(fetchPromises);
-      const data = documents.filter(Boolean);
+      const validDocuments = documents.filter(Boolean);
+      
+      // Store documents in mongoDocStore (single source of truth)
+      // Extract custom id values for indexing (mongoDocStore now supports custom id field)
+      const docIds = [];
+      runInAction(() => {
+        validDocuments.forEach(doc => {
+          mongoDocStore.setDoc(doc);
+          // Use custom id field (mongoDocStore now indexes by custom id when present)
+          if (doc.id) {
+            docIds.push(doc.id);
+          }
+        });
+        
+        // Store custom id values (not MongoDB _id)
+        this.setFileAccessPointIds(docIds);
+        this.setFileAccessPointsMetadata({ database, collection });
+        this.setFileAccessPointsLoading(false);
+        
+        console.log(`[fileStore] Loaded ${validDocuments.length} file access points`);
+        console.log(`[fileStore] Stored custom id values:`, docIds);
+      });
       
       return { 
         code: 0, 
-        data: data,
+        data: validDocuments,
         metadata: { database, collection, ids }
       };
     } catch (error) {
       console.log('[ERROR] Failed to fetch file access points:', error);
+      runInAction(() => {
+        this.setFileAccessPointsLoading(false);
+        this.setFileAccessPointsError(error.message || 'Network error');
+      });
       return { code: -2, message: error.message || 'Network error' };
     }
   }
@@ -282,12 +365,19 @@ export default fileStore;
 
 /**
  * Update a file access point field using MongoDB document operations
+ * NOTE: This delegates to mongoStore, which updates the backend.
+ * The document is stored in mongoDocStore, not here.
  */
 export async function updateFileAccessPointField(database, collection, docId, fieldPath, value) {
   return await updateDocField(database, collection, docId, fieldPath, value);
 }
 
 // Export functions that components can use
+/**
+ * Fetch file access points
+ * NOTE: Documents are stored in mongoDocStore, not in fileStore.
+ * Use mongoDocStore.getDoc(id) to retrieve full documents.
+ */
 export const fetchFileAccessPoints = () => fileStore.fetchFileAccessPoints();
 export const fetchComputedBaseDir = (fileAccessPointId) => fileStore.fetchComputedBaseDir(fileAccessPointId);
 export const fetchFileList = (fileAccessPointId, path, page, pageSize) => fileStore.fetchFileList(fileAccessPointId, path, page, pageSize);

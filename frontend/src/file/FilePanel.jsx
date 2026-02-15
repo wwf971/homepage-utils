@@ -7,41 +7,26 @@ import './file.css';
 
 const FilePanel = observer(() => {
   const { 
-    fileAccessPoints, 
+    fileAccessPointIds,
     fileAccessPointsMetadata: metadata,
-    fileAccessPointsLoading: loading,
+    fileAccessPointsIsLoading: loading,
     fileAccessPointsError: error
   } = fileStore;
-
+  
   useEffect(() => {
     loadFileAccessPoints();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadFileAccessPoints = async () => {
-    fileStore.setFileAccessPointsLoading(true);
-    const result = await fetchFileAccessPoints();
-    
-    if (result.code === 0) {
-      fileStore.setFileAccessPoints(result.data);
-      if (result.metadata) {
-        fileStore.setFileAccessPointsMetadata(result.metadata);
-      }
-      fileStore.setFileAccessPointsError(null);
-    } else {
-      fileStore.setFileAccessPointsError(result.message);
-    }
-    fileStore.setFileAccessPointsLoading(false);
+    // fetchFileAccessPoints now handles all state updates internally
+    await fetchFileAccessPoints();
   };
 
   const handleRefresh = async () => {
     if (loading) return;
     await loadFileAccessPoints();
   };
-
-  // Note: Live updates are now handled by MobX observables in FileAccessPointCard
-  // No need to merge documents manually - MobX will trigger re-renders automatically
-  const displayedAccessPoints = fileAccessPoints;
 
   if (loading) {
     return (
@@ -73,16 +58,16 @@ const FilePanel = observer(() => {
         <div className="error-message">{error}</div>
       )}
 
-      {displayedAccessPoints.length === 0 ? (
+      {fileAccessPointIds.length === 0 ? (
         <div className="empty-message">
           No file access points configured
         </div>
       ) : (
         <div className="file-access-points-list">
-          {displayedAccessPoints.map((fileAccessPoint) => (
+          {fileAccessPointIds.map((id) => (
             <FileAccessPointCard 
-              key={fileAccessPoint.id} 
-              fileAccessPoint={fileAccessPoint}
+              key={id} 
+              fileAccessPointId={id}
               database={metadata.database}
               collection={metadata.collection}
               onUpdate={loadFileAccessPoints}

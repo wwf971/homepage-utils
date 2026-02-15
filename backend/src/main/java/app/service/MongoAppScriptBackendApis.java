@@ -61,7 +61,15 @@ public class MongoAppScriptBackendApis {
      * Create a new document with specified ID
      */
     public ApiResponse<Map<String, Object>> createDoc(String collName, String docId, Map<String, Object> content) {
-        return mongoAppService.createDoc(appId, collName, docId, content);
+        return mongoAppService.createDoc(appId, collName, docId, content, null);
+    }
+    
+    /**
+     * Create a new document with specified ID and control ES indexing
+     * @param shouldUpdateIndex Whether to update ES index (default: true)
+     */
+    public ApiResponse<Map<String, Object>> createDoc(String collName, String docId, Map<String, Object> content, Boolean shouldUpdateIndex) {
+        return mongoAppService.createDoc(appId, collName, docId, content, shouldUpdateIndex);
     }
     
     /**
@@ -75,7 +83,15 @@ public class MongoAppScriptBackendApis {
      * Update document fields
      */
     public ApiResponse<Map<String, Object>> updateDoc(String collName, String docId, Map<String, Object> updates) {
-        return mongoAppService.updateDoc(appId, collName, docId, updates);
+        return mongoAppService.updateDoc(appId, collName, docId, updates, null);
+    }
+    
+    /**
+     * Update document fields with control over ES indexing
+     * @param shouldUpdateIndex Whether to update ES index (default: true)
+     */
+    public ApiResponse<Map<String, Object>> updateDoc(String collName, String docId, Map<String, Object> updates, Boolean shouldUpdateIndex) {
+        return mongoAppService.updateDoc(appId, collName, docId, updates, shouldUpdateIndex);
     }
     
     /**

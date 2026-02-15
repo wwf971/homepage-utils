@@ -508,9 +508,10 @@ public class MongoAppService {
      * @param collectionName The collection name (without appId prefix)
      * @param docId Document ID
      * @param content Document content
+     * @param shouldUpdateIndex Whether to update ES index (default: true)
      * @return Result
      */
-    public ApiResponse<Map<String, Object>> createDoc(String appId, String collectionName, String docId, Map<String, Object> content) {
+    public ApiResponse<Map<String, Object>> createDoc(String appId, String collectionName, String docId, Map<String, Object> content, Boolean shouldUpdateIndex) {
         // Verify app and collection exist
         MongoCollection<Document> metadataCollection = getAppMetadataCollection();
         Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
@@ -575,16 +576,19 @@ public class MongoAppService {
         
         // Note: createdAt metadata is now stored only in __IndexQueue__, not in the document itself
         
+        // Default to true if not specified
+        boolean updateIndex = (shouldUpdateIndex != null) ? shouldUpdateIndex : true;
+        
         try {
             collection.insertOne(doc);
             
-            // Trigger indexing using MongoIndexService
+            // Trigger indexing using MongoIndexService (based on shouldUpdateIndex)
             // The IndexQueue will track createAt/createAtTimeZone metadata
             Object mongoId = doc.get("_id");
             Map<String, Object> updateDict = new HashMap<>(content);
             updateDict.put("id", docId);
             
-            mongoIndexService.updateDoc(appId, APP_DB_NAME, appCollNameFull, docId, updateDict, true);
+            mongoIndexService.updateDoc(appId, APP_DB_NAME, appCollNameFull, docId, updateDict, updateIndex);
             
             return ApiResponse.success(
                 Map.of(
@@ -605,9 +609,10 @@ public class MongoAppService {
      * @param collectionName The collection name (without appId prefix)
      * @param docId Document ID
      * @param updates Field updates
+     * @param shouldUpdateIndex Whether to update ES index (default: true)
      * @return Result
      */
-    public ApiResponse<Map<String, Object>> updateDoc(String appId, String collectionName, String docId, Map<String, Object> updates) {
+    public ApiResponse<Map<String, Object>> updateDoc(String appId, String collectionName, String docId, Map<String, Object> updates, Boolean shouldUpdateIndex) {
         MongoCollection<Document> metadataCollection = getAppMetadataCollection();
         Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
         if (appDoc == null) {
@@ -622,8 +627,11 @@ public class MongoAppService {
         
         String appCollNameFull = appId + "_" + collectionName;
         
-        // Use MongoIndexService for update (handles ES indexing)
-        Map<String, Object> result = mongoIndexService.updateDoc(appId, APP_DB_NAME, appCollNameFull, docId, updates, true);
+        // Default to true if not specified
+        boolean updateIndex = (shouldUpdateIndex != null) ? shouldUpdateIndex : true;
+        
+        // Use MongoIndexService for update (handles ES indexing based on shouldUpdateIndex)
+        Map<String, Object> result = mongoIndexService.updateDoc(appId, APP_DB_NAME, appCollNameFull, docId, updates, updateIndex);
         // Convert old format to ApiResponse
         Integer code = (Integer) result.get("code");
         if (code != null && code == 0) {

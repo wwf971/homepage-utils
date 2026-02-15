@@ -177,22 +177,22 @@ export function useMongoDocEditorMobx(database, collection, document) {
   const [isUpdating, setIsUpdating] = React.useState(false);
   
   // Extract document ID once and memoize it
-  const docId = React.useMemo(() => extractDocId(document), [document._id]);
+  // Prefer custom id field over _id for file access points and mongo-app docs
+  const docId = React.useMemo(() => {
+    return document?.id || extractDocId(document);
+  }, [document?.id, document?._id]);
 
   const handleChange = React.useCallback(async (path, changeData) => {
     const { old, new: newData, _action, _key } = changeData;
 
     if (!docId) {
-      console.error('Document _id not found or invalid:', document._id);
-      return { code: -1, message: 'Document _id not found' };
+      console.error('Document id not found or invalid:', document.id, document._id);
+      return { code: -1, message: 'Document id not found' };
     }
     
-    // Always get the latest document from the store to avoid stale closures
-    const latestDoc = mongoDocStore.getDoc(docId);
-    if (!latestDoc) {
-      console.error('Document not found in store:', docId);
-      return { code: -1, message: 'Document not found' };
-    }
+    // Use the document passed as prop (already observable from mongoDocStore)
+    // Don't retrieve it again to avoid infinite MobX loops
+    const latestDoc = document;
 
     // Prevent modification of _id field
     const isIdField = path === '_id' || path.startsWith('_id.');
