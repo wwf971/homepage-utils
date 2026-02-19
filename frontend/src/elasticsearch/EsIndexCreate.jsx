@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from 'jotai';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
 import { createEsIndex } from './EsStore';
-import './elasticsearch.css';
+import '@wwf971/homepage-utils-utils/elasticsearch.css';
 
 /**
  * EsIndexCreate - Panel component for creating a new Elasticsearch index

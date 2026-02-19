@@ -17,7 +17,8 @@
       "development": "./src/utils/utils.js",
       "import": "./dist/utils.js"
     },
-    "./dist/*.css": "./dist/*.css"
+    "./dist/*.css": "./dist/*.css",
+    "./elasticsearch.css": "./src/elasticsearch/elasticsearch.css"
   },
   "files": [
     "dist"
@@ -33,8 +34,7 @@
     "mobx-react-lite": "^4.1.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@wwf971/react-comp-misc": "workspace:*",
-    "@wwf971/homepage-utils-frontend": "workspace:*"
+    "@wwf971/react-comp-misc": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

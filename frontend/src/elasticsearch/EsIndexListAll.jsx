@@ -6,7 +6,7 @@ import {
 } from '../remote/dataStore';
 import { fetchAllEsIndices, esIndexNamesAtom } from './EsStore';
 import EsIndexCreate from './EsIndexCreate';
-import './elasticsearch.css';
+import '@wwf971/homepage-utils-utils/elasticsearch.css';
 
 /**
  * EsIndexListAll - Component for listing all indices in Elasticsearch

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { SpinningCircle, TabsOnTop } from '@wwf971/react-comp-misc';
 import './MongoAppConfig.css';
-import '@wwf971/homepage-utils-frontend/elasticsearch.css';
+import '../elasticsearch/elasticsearch.css';
 
 // Search result component
 const EsDocSearchResult = ({ doc, mergeMatchesForSameKey = true }) => {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
 import { searchEsDocs } from './EsStore';
 import EsDocSearchResult from './EsDocSearchResult';
-import './elasticsearch.css';
+import '@wwf971/homepage-utils-utils/elasticsearch.css';
 
 /**
  * EsDocSearch - Component for searching documents using character-level index

@@ -9,7 +9,7 @@ import {
   getIndexAtom
 } from './EsStore';
 import ConfirmDialog from '../components/ConfirmDialog';
-import './elasticsearch.css';
+import '@wwf971/homepage-utils-utils/elasticsearch.css';
 
 /**
  * IndexInfo - Component for displaying information about a selected Elasticsearch index

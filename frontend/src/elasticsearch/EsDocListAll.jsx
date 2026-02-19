@@ -18,7 +18,7 @@ import {
 } from './EditUtils';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EsDocCreate from './EsDocCreate';
-import './elasticsearch.css';
+import '@wwf971/homepage-utils-utils/elasticsearch.css';
 
 /**
  * DocListAll - Component for listing documents in a selected Elasticsearch index with pagination
