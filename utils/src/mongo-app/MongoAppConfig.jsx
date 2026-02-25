@@ -5,8 +5,8 @@ import { PanelToggle, SpinningCircle, RefreshIcon } from '@wwf971/react-comp-mis
 import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils'
 import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoAppStore.jsx'
 import TestConnection from './TestConnection.jsx'
-import MongoAppGroovyApi from './mongoAppGroovyApi.jsx'
-import MongoAppGroovyApiTest from './mongoAppGroovyApiTest.jsx'
+import MongoAppGroovyApi from './groovy-api/MongoAppGroovyApi.jsx'
+import MongoAppGroovyApiTest from './groovy-api/MongoAppGroovyApiTest.jsx'
 import MongoAppCollectionConfig from './MongoAppCollectionConfig.jsx'
 import MongoAppEsConfig from './MongoAppEsConfig.jsx'
 import './MongoAppConfig.css'
@@ -303,9 +303,7 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
         </PanelToggle>
       )}
       {panels_existence.showGroovyApi && (
-        <PanelToggle title="Groovy API Scripts" defaultExpanded={true}>
-          <MongoAppGroovyApi store={store} />
-        </PanelToggle>
+        <MongoAppGroovyApi store={store} />
       )}
       {panels_existence.showGroovyApiTest && (
         <PanelToggle title="Test MongoApp Groovy APIs" defaultExpanded={true}>

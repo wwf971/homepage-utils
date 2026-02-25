@@ -4,13 +4,45 @@
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/mongo-app/{appId}/api-config/create` | Create custom API script |
+| POST | `/mongo-app/{appId}/api-config/create` | Create custom API script (inline) |
+| POST | `/mongo-app/{appId}/api-config/create-from-file` | Create custom API script from file |
 | GET | `/mongo-app/{appId}/api-config/list` | List API scripts |
 | GET | `/mongo-app/{appId}/api-config/get/{scriptId}` | Get API script |
 | PUT | `/mongo-app/{appId}/api-config/update/{scriptId}` | Update API script |
+| POST | `/mongo-app/{appId}/api-config/{scriptId}/refresh` | Refresh file-based script from source |
 | DELETE | `/mongo-app/{appId}/api-config/delete/{scriptId}` | Delete API script |
 | POST | `/mongo-app/{appId}/api/{endpoint}` | Execute custom API (POST) |
 | GET | `/mongo-app/{appId}/api/{endpoint}` | Execute custom API (GET) |
+
+### Creating File-based API Scripts
+
+File-based scripts load their code from a file access point:
+
+```javascript
+POST /mongo-app/{appId}/api-config/create-from-file
+{
+  "endpoint": "my-api",
+  "fileAccessPointId": "fap123",
+  "specification": "single",        // "single" or "folder"
+  "path": "/api/my-script.groovy",
+  "description": "My API from file",
+  "timezone": 0
+}
+```
+
+**Parameters:**
+- `endpoint`: API endpoint name (without appId prefix)
+- `fileAccessPointId`: File access point ID (required)
+- `specification`: "single" for single file, "folder" for folder (future use)
+- `path`: File path relative to file access point
+- `description`: Optional description
+- `timezone`: Optional timezone offset
+
+**Refreshing:**
+```
+POST /mongo-app/{appId}/api-config/{scriptId}/refresh
+```
+Manually reloads the script from its source file.
 
 ## Available Script Parameters
 

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { PanelToggle, PlusIcon } from '@wwf971/react-comp-misc';
+import MongoAppGroovyApiCreate from './MongoAppGroovyApiCreate.jsx';
 
 const MongoAppGroovyApi = ({ store }) => {
   const [scripts, setScripts] = useState({});
@@ -8,10 +10,6 @@ const MongoAppGroovyApi = ({ store }) => {
   
   // Upload form state
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [uploadEndpoint, setUploadEndpoint] = useState('');
-  const [uploadDescription, setUploadDescription] = useState('');
-  const [uploadScriptSource, setUploadScriptSource] = useState('');
-  const [uploading, setUploading] = useState(false);
   
   // Edit state
   const [editingScriptId, setEditingScriptId] = useState(null);
@@ -48,46 +46,10 @@ const MongoAppGroovyApi = ({ store }) => {
     fetchScripts();
   }, [fetchScripts]);
 
-  const handleUpload = async () => {
-    if (!uploadEndpoint.trim() || !uploadScriptSource.trim()) {
-      setError('Endpoint and script source are required');
-      return;
-    }
-    
-    setUploading(true);
-    setError(null);
-    setMessage(null);
-    
-    try {
-      const timezone = -new Date().getTimezoneOffset() / 60;
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: uploadEndpoint,
-          scriptSource: uploadScriptSource,
-          description: uploadDescription,
-          timezone
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.code === 0) {
-        setMessage('Script created successfully');
-        setUploadEndpoint('');
-        setUploadDescription('');
-        setUploadScriptSource('');
-        setShowUploadForm(false);
-        fetchScripts();
-      } else {
-        setError(result.message || 'Failed to create script');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
-    }
+  const handleCreateSuccess = (successMessage) => {
+    setMessage(successMessage);
+    setShowUploadForm(false);
+    fetchScripts();
   };
 
   const handleUpdate = async (scriptId) => {
@@ -160,7 +122,7 @@ const MongoAppGroovyApi = ({ store }) => {
     setEditingScriptId(script.id);
     setEditEndpoint(script.apiPath || script.endpoint);
     setEditDescription(script.description || '');
-    setEditScriptSource(script.scriptSource);
+    setEditScriptSource(getScriptCode(script.scriptSource));
     setError(null);
     setMessage(null);
   };
@@ -170,6 +132,49 @@ const MongoAppGroovyApi = ({ store }) => {
     setEditEndpoint('');
     setEditDescription('');
     setEditScriptSource('');
+  };
+
+  const handleRefreshFromFile = async (scriptId) => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    
+    try {
+      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/${scriptId}/refresh`, {
+        method: 'POST'
+      });
+      
+      const result = await response.json();
+      
+      if (result.code === 0) {
+        setMessage('Script refreshed from file successfully');
+        fetchScripts();
+      } else {
+        setError(result.message || 'Failed to refresh script');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isFileBasedScript = (scriptSource) => {
+    return scriptSource && typeof scriptSource === 'object' && scriptSource.storageType === 'fileAccessPoint';
+  };
+
+  const getScriptCode = (scriptSource) => {
+    if (typeof scriptSource === 'string') {
+      return scriptSource; // Legacy format
+    }
+    if (scriptSource && typeof scriptSource === 'object') {
+      if (scriptSource.storageType === 'inline') {
+        return scriptSource.rawText;
+      } else if (scriptSource.storageType === 'fileAccessPoint') {
+        return scriptSource.cachedContent || '';
+      }
+    }
+    return '';
   };
 
   if (!appId) {
@@ -183,7 +188,40 @@ const MongoAppGroovyApi = ({ store }) => {
   const scriptsArray = Object.values(scripts);
 
   return (
-    <div style={{ padding: '8px 0' }}>
+    <div style={{ padding: '0px 0' }}>
+      {showUploadForm && (
+        <MongoAppGroovyApiCreate
+          appId={appId}
+          serverUrl={serverUrl}
+          onSuccess={handleCreateSuccess}
+          onCancel={() => setShowUploadForm(false)}
+        />
+      )}
+
+      <PanelToggle defaultExpanded={true}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>Groovy API Scripts</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowUploadForm(true);
+            }}
+            style={{
+              padding: '2px',
+              backgroundColor: 'transparent',
+              color: '#2196F3',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+            title="Create New Script"
+          >
+            <PlusIcon width={16} height={16} color="#2196F3" strokeWidth={2} />
+          </button>
+        </div>
+
+        <div>
           {error && (
             <div style={{ 
               padding: '8px', 
@@ -209,135 +247,6 @@ const MongoAppGroovyApi = ({ store }) => {
               color: '#060'
             }}>
               {message}
-            </div>
-          )}
-
-          {!showUploadForm && (
-            <button
-              onClick={() => setShowUploadForm(true)}
-              style={{
-                padding: '6px 12px',
-                marginBottom: '12px',
-                fontSize: '12px',
-                backgroundColor: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Create New Script
-            </button>
-          )}
-
-          {showUploadForm && (
-            <div style={{ 
-              marginBottom: '12px', 
-              padding: '12px', 
-              border: '1px solid #ddd', 
-              borderRadius: '4px',
-              backgroundColor: '#f9f9f9'
-            }}>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>
-                Create New Script
-              </div>
-              
-              <div style={{ marginBottom: '8px' }}>
-                <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
-                  Endpoint Name:
-                </label>
-                <input
-                  type="text"
-                  value={uploadEndpoint}
-                  onChange={(e) => setUploadEndpoint(e.target.value)}
-                  placeholder="my-endpoint"
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    fontSize: '12px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '8px' }}>
-                <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
-                  Description (optional):
-                </label>
-                <input
-                  type="text"
-                  value={uploadDescription}
-                  onChange={(e) => setUploadDescription(e.target.value)}
-                  placeholder="Description of this script"
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    fontSize: '12px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '8px' }}>
-                <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
-                  Script Source:
-                </label>
-                <textarea
-                  value={uploadScriptSource}
-                  onChange={(e) => setUploadScriptSource(e.target.value)}
-                  placeholder="return [code: 0, data: 'Hello World', message: null]"
-                  rows={10}
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    fontSize: '12px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontFamily: 'monospace'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: uploading ? 'not-allowed' : 'pointer',
-                    opacity: uploading ? 0.6 : 1
-                  }}
-                >
-                  {uploading ? 'Creating...' : 'Create'}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowUploadForm(false);
-                    setUploadEndpoint('');
-                    setUploadDescription('');
-                    setUploadScriptSource('');
-                  }}
-                  disabled={uploading}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    backgroundColor: '#999',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: uploading ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
           )}
 
@@ -473,15 +382,54 @@ const MongoAppGroovyApi = ({ store }) => {
                           <div style={{ fontSize: '12px' }}>
                             <span style={{ fontWeight: 'bold' }}>Endpoint:</span>{' '}
                             <span style={{ fontFamily: 'monospace' }}>/mongo-app/{appId}/api/{script.apiPath || script.endpoint}</span>
+                            {isFileBasedScript(script.scriptSource) && (
+                              <span style={{ 
+                                marginLeft: '8px', 
+                                padding: '2px 6px', 
+                                backgroundColor: '#e3f2fd', 
+                                color: '#1976d2',
+                                borderRadius: '3px',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                FILE
+                              </span>
+                            )}
                           </div>
                           {script.description && (
                             <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
                               <span style={{ fontWeight: 'bold' }}>Description:</span> {script.description}
                             </div>
                           )}
+                          {isFileBasedScript(script.scriptSource) && (
+                            <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                              <span style={{ fontWeight: 'bold' }}>File:</span> {script.scriptSource.fileAccessPointId}:{script.scriptSource.path}
+                              {script.scriptSource.lastSyncAt && (
+                                <span style={{ marginLeft: '8px', color: '#999' }}>
+                                  (synced: {new Date(script.scriptSource.lastSyncAt).toLocaleString()})
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
+                        {isFileBasedScript(script.scriptSource) && (
+                          <button
+                            onClick={() => handleRefreshFromFile(script.id)}
+                            style={{
+                              padding: '4px 12px',
+                              fontSize: '11px',
+                              backgroundColor: '#ff9800',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Refresh
+                          </button>
+                        )}
                         <button
                           onClick={() => startEdit(script)}
                           style={{
@@ -521,6 +469,8 @@ const MongoAppGroovyApi = ({ store }) => {
             ))}
           </div>
         </div>
+      </PanelToggle>
+    </div>
   );
 };
 

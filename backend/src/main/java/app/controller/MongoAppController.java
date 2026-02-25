@@ -291,6 +291,43 @@ public class MongoAppController {
     }
     
     /**
+     * Create a custom API script from file for a MongoApp
+     * POST /mongo-app/{appId}/api-config/create-from-file
+     * Body: { 
+     *   "endpoint": "my-api", 
+     *   "fileAccessPointId": "fap123", 
+     *   "specification": "single",
+     *   "path": "/api/script.groovy",
+     *   "description": "...", 
+     *   "timezone": 0 
+     * }
+     */
+    @PostMapping("/{appId}/api-config/create-from-file")
+    public ApiResponse<Map<String, Object>> createApiScriptFromFile(@PathVariable String appId,
+                                                                     @RequestBody Map<String, Object> request) {
+        String endpoint = (String) request.get("endpoint");
+        String fileAccessPointId = (String) request.get("fileAccessPointId");
+        String specification = (String) request.get("specification");
+        String path = (String) request.get("path");
+        String description = (String) request.get("description");
+        Integer timezone = request.get("timezone") != null ? 
+            ((Number) request.get("timezone")).intValue() : null;
+        
+        return mongoAppService.createApiScriptFromFile(appId, endpoint, fileAccessPointId, 
+                                                       specification, path, description, timezone);
+    }
+    
+    /**
+     * Refresh an API script from its source file
+     * POST /mongo-app/{appId}/api-config/{scriptId}/refresh
+     */
+    @PostMapping("/{appId}/api-config/{scriptId}/refresh")
+    public ApiResponse<Map<String, Object>> refreshApiScriptFromFile(@PathVariable String appId,
+                                                                      @PathVariable String scriptId) {
+        return mongoAppService.refreshApiScriptFromFile(appId, scriptId);
+    }
+    
+    /**
      * Execute a custom API script for a MongoApp
      * POST /mongo-app/{appId}/api/{endpoint}
      */

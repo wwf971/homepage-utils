@@ -878,7 +878,7 @@ public class MongoAppService {
     }
     
     /**
-     * Create a custom API script for a MongoApp
+     * Create a custom API script for a MongoApp (inline script)
      */
     public ApiResponse<Map<String, Object>> createApiScript(String appId, String endpoint, String scriptSource, String description, Integer timezone) {
         // Verify app exists
@@ -908,6 +908,114 @@ public class MongoAppService {
         data.put("description", script.getDescription());
         
         return ApiResponse.success(data, "API script created");
+    }
+
+    /**
+     * Create a custom API script from file for a MongoApp
+     * @param appId The app ID
+     * @param endpoint The endpoint name (without appId prefix)
+     * @param fileAccessPointId File access point ID
+     * @param specification "single" or "folder"
+     * @param path File path or folder path
+     * @param description Description
+     * @param timezone Timezone offset
+     * @return Created script info
+     */
+    public ApiResponse<Map<String, Object>> createApiScriptFromFile(
+            String appId, String endpoint, String fileAccessPointId, 
+            String specification, String path, String description, Integer timezone) {
+        
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Validate parameters
+        if (!"single".equals(specification) && !"folder".equals(specification)) {
+            return createErrorResult("Specification must be 'single' or 'folder'");
+        }
+        
+        // Transform endpoint name to {appId}_{endpoint}
+        String actualEndpoint = appId + "_" + endpoint;
+        
+        // Create scriptSource object for file-based script
+        Map<String, Object> scriptSource = new HashMap<>();
+        scriptSource.put("storageType", "fileAccessPoint");
+        scriptSource.put("fileAccessPointId", fileAccessPointId);
+        scriptSource.put("specification", specification);
+        scriptSource.put("path", path);
+        
+        // Create script with owner=appId and source=mongoApp
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.uploadScriptWithObject(
+            null, actualEndpoint, scriptSource, description, timezone, appId, "mongoApp"
+        );
+        
+        if (result.getCode() != 0) {
+            return createErrorResult(result.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript script = result.getData();
+        Map<String, Object> data = new HashMap<>();
+        data.put("scriptId", script.getId());
+        data.put("endpoint", script.getEndpoint());
+        data.put("apiPath", endpoint);
+        data.put("description", script.getDescription());
+        data.put("scriptSource", script.getScriptSource());
+        
+        return ApiResponse.success(data, "File-based API script created");
+    }
+
+    /**
+     * Refresh an API script from its source file
+     * @param appId The app ID
+     * @param scriptId The script ID
+     * @return Refreshed script info
+     */
+    public ApiResponse<Map<String, Object>> refreshApiScriptFromFile(String appId, String scriptId) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Verify script exists and belongs to this app
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> existingResult = groovyApiService.getScriptById(scriptId);
+        if (existingResult.getCode() != 0) {
+            return createErrorResult(existingResult.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript existing = existingResult.getData();
+        if (!appId.equals(existing.getOwner()) || !"mongoApp".equals(existing.getSource())) {
+            return createErrorResult("Script not found or does not belong to this app");
+        }
+        
+        // Refresh from file
+        app.pojo.ApiResponse<app.pojo.GroovyApiScript> result = groovyApiService.refreshScriptFromFile(scriptId);
+        if (result.getCode() != 0) {
+            return createErrorResult(result.getMessage());
+        }
+        
+        app.pojo.GroovyApiScript script = result.getData();
+        
+        // Strip appId prefix from endpoint to get apiPath
+        String endpoint = script.getEndpoint();
+        String apiPath = endpoint;
+        String prefix = appId + "_";
+        if (endpoint != null && endpoint.startsWith(prefix)) {
+            apiPath = endpoint.substring(prefix.length());
+        }
+        
+        Map<String, Object> data = new HashMap<>();
+        data.put("scriptId", script.getId());
+        data.put("endpoint", script.getEndpoint());
+        data.put("apiPath", apiPath);
+        data.put("description", script.getDescription());
+        data.put("scriptSource", script.getScriptSource());
+        
+        return ApiResponse.success(data, "Script refreshed from file");
     }
     
     /**

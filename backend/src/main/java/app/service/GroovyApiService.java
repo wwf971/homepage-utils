@@ -14,6 +14,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 
 import app.pojo.ApiResponse;
+import app.pojo.FileInfo;
 import app.pojo.GroovyApiScript;
 import app.util.TimeUtils;
 import groovy.lang.Binding;
@@ -33,6 +34,9 @@ public class GroovyApiService {
 
     @Autowired
     private IdService idService;
+
+    @Autowired
+    private FileAccessPointService fileAccessPointService;
 
     private static final String DB_NAME = "main";
     private static final String COLLECTION_NAME = "groovy-api";
@@ -68,6 +72,95 @@ public class GroovyApiService {
     }
 
     /**
+     * Extract executable script code from scriptSource
+     * Handles both legacy String format and new Object format
+     * 
+     * @param scriptSource Can be String (legacy) or Object (new format)
+     * @return The executable Groovy script code
+     */
+    private String extractScriptCode(Object scriptSource) {
+        if (scriptSource == null) {
+            return null;
+        }
+        
+        // Legacy format: scriptSource is a String
+        if (scriptSource instanceof String) {
+            return (String) scriptSource;
+        }
+        
+        // New format: scriptSource is an Object/Map
+        if (scriptSource instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sourceMap = (Map<String, Object>) scriptSource;
+            String storageType = (String) sourceMap.get("storageType");
+            
+            if ("inline".equals(storageType)) {
+                return (String) sourceMap.get("rawText");
+            } else if ("fileAccessPoint".equals(storageType)) {
+                return (String) sourceMap.get("cachedContent");
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Check if scriptSource is file-based
+     */
+    private boolean isFileBasedScript(Object scriptSource) {
+        if (scriptSource instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sourceMap = (Map<String, Object>) scriptSource;
+            return "fileAccessPoint".equals(sourceMap.get("storageType"));
+        }
+        return false;
+    }
+
+    /**
+     * Load script content from file access point
+     * Updates the scriptSource with fresh content from file
+     * 
+     * @param scriptSource The scriptSource map (must be file-based)
+     * @return Updated scriptSource map with fresh cachedContent
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> loadScriptFromFile(Map<String, Object> scriptSource) throws Exception {
+        String fileAccessPointId = (String) scriptSource.get("fileAccessPointId");
+        String path = (String) scriptSource.get("path");
+        
+        if (fileAccessPointId == null || path == null) {
+            throw new IllegalArgumentException("File-based script missing fileAccessPointId or path");
+        }
+        
+        // Load file content
+        FileInfo fileInfo = fileAccessPointService.getFileContent(fileAccessPointId, path);
+        if (fileInfo == null || fileInfo.getFileBytes() == null) {
+            throw new IllegalArgumentException("Failed to load script file: " + path);
+        }
+        
+        String scriptCode = new String(fileInfo.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        
+        // Update scriptSource with cached content
+        Map<String, Object> updated = new HashMap<>(scriptSource);
+        updated.put("cachedContent", scriptCode);
+        updated.put("lastSyncAt", TimeUtils.getCurrentTimestamp());
+        updated.put("lastSyncAtTimezone", TimeUtils.getCurrentTimezoneOffset() / 60);
+        
+        return updated;
+    }
+
+    /**
+     * Check if file-based script needs refresh
+     * For now, always returns false (manual refresh only)
+     * Could be enhanced to check file modification time
+     */
+    private boolean needsRefresh(Map<String, Object> scriptSource) {
+        // For now, don't auto-refresh (only manual refresh)
+        // Could add logic to check file mtime vs lastSyncAt
+        return false;
+    }
+
+    /**
      * Load all scripts from MongoDB on startup
      * Using lazy compilation: scripts are registered but not compiled until first execution
      */
@@ -98,14 +191,28 @@ public class GroovyApiService {
     }
 
     /**
-     * Upload or update a Groovy script
+     * Upload or update a Groovy script (legacy String format)
+     * Converts String to inline scriptSource format
      */
     public ApiResponse<GroovyApiScript> uploadScript(String id, String endpoint, String scriptSource, String description, Integer timezone, String owner, String source) {
+        // Convert legacy String format to new Object format
+        Map<String, Object> scriptSourceObj = new HashMap<>();
+        scriptSourceObj.put("storageType", "inline");
+        scriptSourceObj.put("rawText", scriptSource);
+        
+        return uploadScriptWithObject(id, endpoint, scriptSourceObj, description, timezone, owner, source);
+    }
+
+    /**
+     * Upload or update a Groovy script with Object scriptSource format
+     * Supports both inline and file-based scripts
+     */
+    public ApiResponse<GroovyApiScript> uploadScriptWithObject(String id, String endpoint, Object scriptSource, String description, Integer timezone, String owner, String source) {
         if (endpoint == null || endpoint.trim().isEmpty()) {
             return ApiResponse.error("Endpoint cannot be empty");
         }
 
-        if (scriptSource == null || scriptSource.trim().isEmpty()) {
+        if (scriptSource == null) {
             return ApiResponse.error("Script source cannot be empty");
         }
 
@@ -114,9 +221,26 @@ public class GroovyApiService {
             return ApiResponse.error("Endpoint must contain only alphanumeric characters, dashes, underscores, and slashes");
         }
 
+        // For file-based scripts, load content from file
+        if (isFileBasedScript(scriptSource)) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> scriptSourceMap = (Map<String, Object>) scriptSource;
+                scriptSource = loadScriptFromFile(scriptSourceMap);
+            } catch (Exception e) {
+                return ApiResponse.error("Failed to load script from file: " + e.getMessage());
+            }
+        }
+
+        // Extract actual script code for compilation
+        String scriptCode = extractScriptCode(scriptSource);
+        if (scriptCode == null || scriptCode.trim().isEmpty()) {
+            return ApiResponse.error("Script code cannot be empty");
+        }
+
         // Try to compile the script to validate it
         try {
-            compileAndCacheScript(endpoint, scriptSource);
+            compileAndCacheScript(endpoint, scriptCode);
         } catch (Exception e) {
             return ApiResponse.error("Failed to compile script: " + e.getMessage());
         }
@@ -139,6 +263,9 @@ public class GroovyApiService {
             }
         }
 
+        // Convert scriptSource to Document for MongoDB storage
+        Object scriptSourceForDb = convertScriptSourceForDb(scriptSource);
+
         if (isUpdate) {
             // Update existing script
             int tz = (timezone != null) ? timezone : 0;
@@ -146,7 +273,7 @@ public class GroovyApiService {
             Document doc = new Document();
             doc.append("id", id);
             doc.append("endpoint", endpoint);
-            doc.append("scriptSource", scriptSource);
+            doc.append("scriptSource", scriptSourceForDb);
             doc.append("description", description != null ? description : "");
             doc.append("owner", owner != null ? owner : existing.getString("owner"));
             doc.append("source", source != null ? source : existing.getString("source"));
@@ -188,7 +315,7 @@ public class GroovyApiService {
                 Document doc = new Document();
                 doc.append("id", newId);
                 doc.append("endpoint", endpoint);
-                doc.append("scriptSource", scriptSource);
+                doc.append("scriptSource", scriptSourceForDb);
                 doc.append("description", description != null ? description : "");
                 doc.append("owner", owner != null ? owner : "");
                 doc.append("source", source != null ? source : "");
@@ -219,6 +346,19 @@ public class GroovyApiService {
     }
 
     /**
+     * Convert scriptSource Object to format suitable for MongoDB storage
+     */
+    private Object convertScriptSourceForDb(Object scriptSource) {
+        if (scriptSource instanceof Map) {
+            // Already in Object format, convert to Document for MongoDB
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sourceMap = (Map<String, Object>) scriptSource;
+            return new Document(sourceMap);
+        }
+        return scriptSource; // String format (legacy)
+    }
+
+    /**
      * Get a script by ID
      */
     public ApiResponse<GroovyApiScript> getScriptById(String id) {
@@ -232,7 +372,11 @@ public class GroovyApiService {
         GroovyApiScript script = new GroovyApiScript();
         script.setId(doc.getString("id"));
         script.setEndpoint(doc.getString("endpoint"));
-        script.setScriptSource(doc.getString("scriptSource"));
+        
+        // scriptSource can be String (legacy) or Document (new format)
+        Object scriptSource = doc.get("scriptSource");
+        script.setScriptSource(scriptSource);
+        
         script.setDescription(doc.getString("description"));
         script.setOwner(doc.getString("owner"));
         script.setSource(doc.getString("source"));
@@ -263,7 +407,11 @@ public class GroovyApiService {
                 script.put("id", id);
                 script.put("endpoint", doc.getString("endpoint"));
                 script.put("description", doc.getString("description"));
-                script.put("scriptSource", doc.getString("scriptSource"));
+                
+                // scriptSource can be String (legacy) or Document (new format)
+                Object scriptSource = doc.get("scriptSource");
+                script.put("scriptSource", scriptSource);
+                
                 script.put("owner", doc.getString("owner"));
                 script.put("source", doc.getString("source"));
                 script.put("createdAt", doc.getLong("createdAt"));
@@ -304,6 +452,58 @@ public class GroovyApiService {
     }
 
     /**
+     * Manually refresh a file-based script from its source file
+     * @param scriptId The script ID
+     * @return Updated script
+     */
+    public ApiResponse<GroovyApiScript> refreshScriptFromFile(String scriptId) {
+        MongoCollection<Document> collection = getCollection();
+        Document doc = collection.find(Filters.eq("id", scriptId)).first();
+        
+        if (doc == null) {
+            return ApiResponse.error("Script not found: " + scriptId);
+        }
+        
+        Object scriptSource = doc.get("scriptSource");
+        
+        if (!isFileBasedScript(scriptSource)) {
+            return ApiResponse.error("Script is not file-based");
+        }
+        
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> scriptSourceMap = (Map<String, Object>) scriptSource;
+            
+            // Load fresh content from file
+            Map<String, Object> updated = loadScriptFromFile(scriptSourceMap);
+            
+            // Validate by compiling
+            String scriptCode = extractScriptCode(updated);
+            String endpoint = doc.getString("endpoint");
+            compileAndCacheScript(endpoint, scriptCode);
+            
+            // Update database
+            Document updateDoc = new Document("$set", new Document("scriptSource", new Document(updated)));
+            collection.updateOne(Filters.eq("id", scriptId), updateDoc);
+            
+            // Return updated script
+            GroovyApiScript result = new GroovyApiScript();
+            result.setId(scriptId);
+            result.setEndpoint(endpoint);
+            result.setScriptSource(updated);
+            result.setDescription(doc.getString("description"));
+            result.setOwner(doc.getString("owner"));
+            result.setSource(doc.getString("source"));
+            result.setCreatedAt(doc.getLong("createdAt"));
+            result.setUpdatedAt(doc.getLong("updatedAt"));
+            
+            return ApiResponse.success(result, "Script refreshed from file");
+        } catch (Exception e) {
+            return ApiResponse.error("Failed to refresh script: " + e.getMessage());
+        }
+    }
+
+    /**
      * Execute a script for a given endpoint
      * Returns a standardized response: {code: 0, data: xxx, message: xxx}
      * code = 0 means success, code < 0 means failure
@@ -331,9 +531,43 @@ public class GroovyApiService {
                 return error;
             }
 
-            String scriptSource = doc.getString("scriptSource");
+            Object scriptSource = doc.get("scriptSource");
+            
+            // For file-based scripts, check if needs refresh and reload
+            if (isFileBasedScript(scriptSource)) {
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> scriptSourceMap = (Map<String, Object>) scriptSource;
+                    
+                    // Reload from file to get latest content
+                    scriptSourceMap = loadScriptFromFile(scriptSourceMap);
+                    
+                    // Update database with fresh content
+                    Document update = new Document("$set", new Document("scriptSource", new Document(scriptSourceMap)));
+                    collection.updateOne(Filters.eq("endpoint", endpoint), update);
+                    
+                    scriptSource = scriptSourceMap;
+                } catch (Exception e) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("code", -2);
+                    error.put("message", "Failed to load script from file: " + e.getMessage());
+                    error.put("data", null);
+                    return error;
+                }
+            }
+            
+            // Extract actual script code
+            String scriptCode = extractScriptCode(scriptSource);
+            if (scriptCode == null || scriptCode.trim().isEmpty()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("code", -2);
+                error.put("message", "Script code is empty");
+                error.put("data", null);
+                return error;
+            }
+            
             try {
-                script = compileAndCacheScript(endpoint, scriptSource);
+                script = compileAndCacheScript(endpoint, scriptCode);
             } catch (Exception e) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", -2);

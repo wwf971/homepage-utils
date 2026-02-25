@@ -15,7 +15,17 @@ At frontend, scripts data are managed by mobx store. mobx store structure:
       id: "3xk9a",
       endpoint: "list-apps",
       description: "List all MongoDB apps",
-      scriptSource: "...",
+      scriptSource: {
+        storageType: "inline",        // or "fileAccessPoint"
+        rawText: "..."                // for inline scripts
+        // OR for file-based:
+        // fileAccessPointId: "fap123",
+        // specification: "single",
+        // path: "/api/script.groovy",
+        // cachedContent: "...",
+        // lastSyncAt: 1706789012345,
+        // lastSyncAtTimezone: 0
+      },
       owner: "mongo-app-system",      // Optional: identifies who owns this script
       source: "mongo-app-id-123",     // Optional: identifies source context
       createdAt: 1706789012345,
@@ -27,6 +37,34 @@ At frontend, scripts data are managed by mobx store. mobx store structure:
   },
   loading: false
 }
+```
+
+**scriptSource format:**
+
+Inline script:
+```javascript
+scriptSource: {
+  storageType: "inline",
+  rawText: "return [code: 0, data: 'Hello', message: null]"
+}
+```
+
+File-based script:
+```javascript
+scriptSource: {
+  storageType: "fileAccessPoint",
+  fileAccessPointId: "fap123",
+  specification: "single",          // "single" or "folder"
+  path: "/api/my-script.groovy",
+  cachedContent: "...",             // Cached script code from file
+  lastSyncAt: 1706789012345,
+  lastSyncAtTimezone: 0
+}
+```
+
+Legacy format (backward compatible):
+```javascript
+scriptSource: "return [code: 0, data: 'Hello', message: null]"  // String = inline
 ```
 
 
@@ -165,6 +203,7 @@ if (response.code == 0) {
 | GET | `/groovy-api/list` | List all scripts (returns map keyed by ID) |
 | GET | `/groovy-api/get/{id}` | Get script by ID |
 | DELETE | `/groovy-api/delete/{id}` | Delete script by ID |
+| POST | `/groovy-api/{id}/refresh` | Refresh file-based script from source file |
 | POST | `/groovy-api/reload` | Reload all scripts from DB |
 | POST | `/groovy-api/{endpoint}` | Execute script (with request body) |
 | GET | `/groovy-api/{endpoint}` | Execute script (with query params) |
@@ -172,9 +211,42 @@ if (response.code == 0) {
 ### Upload Parameters
 
 - `id` (optional): Script ID for updating existing script
-- `endpoint` (required): Endpoint name (alphanumeric, dash, underscore only)
-- `scriptSource` (required): Groovy script source code
+- `endpoint` (required): Endpoint name (alphanumeric, dash, underscore, slash only)
+- `scriptSource` (required): Groovy script source code (String for inline, or Object for file-based)
 - `description` (optional): Description of the script
 - `owner` (optional): Identifies who owns this script (e.g., "mongo-app-system")
 - `source` (optional): Identifies source context (e.g., "mongo-app-id-123")
 - `timezone` (optional): Timezone offset in hours (-12 to +12). Sets `createdAtTimezone` on creation, `updatedAtTimezone` on update
+
+### File-based Scripts
+
+File-based scripts load their code from a file access point instead of storing it inline.
+
+**Benefits:**
+- Edit scripts in your IDE with syntax highlighting
+- Version control with git
+- Share scripts across multiple apps
+- Automatic reload on execution (always uses latest file content)
+
+**Creating file-based script:**
+```javascript
+POST /groovy-api/upload
+{
+  "endpoint": "my-api",
+  "scriptSource": {
+    "storageType": "fileAccessPoint",
+    "fileAccessPointId": "fap123",
+    "specification": "single",
+    "path": "/api/my-script.groovy"
+  },
+  "description": "My API from file",
+  "owner": "my-app",
+  "source": "mongoApp"
+}
+```
+
+**Refreshing from file:**
+```
+POST /groovy-api/{scriptId}/refresh
+```
+This manually reloads the script from its source file and updates the cached content.

@@ -13,7 +13,7 @@ const PanelGroovyApi = () => {
   };
 
   return (
-    <div style={{ padding: '0px 12px' }}>
+    <div style={{ padding: '8px 6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <PanelToggle title="Upload Groovy Script" defaultExpanded={true}>
         <GroovyApiUpload onUploadSuccess={handleUploadSuccess} />
       </PanelToggle>
