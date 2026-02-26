@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PanelToggle, PlusIcon } from '@wwf971/react-comp-misc';
-import MongoAppGroovyApiCreate from './MongoAppGroovyApiCreate.jsx';
+import CreatePanel from './CreatePanel.jsx';
 
 const MongoAppGroovyApi = ({ store }) => {
   const [scripts, setScripts] = useState({});
@@ -190,7 +190,7 @@ const MongoAppGroovyApi = ({ store }) => {
   return (
     <div style={{ padding: '0px 0' }}>
       {showUploadForm && (
-        <MongoAppGroovyApiCreate
+        <CreatePanel
           appId={appId}
           serverUrl={serverUrl}
           onSuccess={handleCreateSuccess}

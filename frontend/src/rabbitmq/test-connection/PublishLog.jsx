@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatTimestamp } from '../../file/fileUtils';
+import { formatTimestamp } from '../../file-access-point/fileUtils';
 import '../rabbitmq.css';
 
 const PublishLog = ({ tasks }) => {

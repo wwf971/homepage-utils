@@ -31,7 +31,7 @@ const DocListAllTabWrapper = ({ tabsState, tabKey }) => {
 /**
  * Main MongoDB Panel component that includes test connection and database operations
  */
-const MongoPanel = () => {
+const PanelMongo = () => {
   const hasSelectedDb = useAtomValue(mongoDbSelectedAtom);
   const hasSelectedColl = useAtomValue(mongoCollSelectedAtom);
 
@@ -76,4 +76,4 @@ const MongoPanel = () => {
   );
 };
 
-export default MongoPanel;
+export default PanelMongo;

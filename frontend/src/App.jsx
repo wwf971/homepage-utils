@@ -8,8 +8,8 @@ import {
 } from '@wwf971/react-comp-misc';
 import JdbcConfigPanel from './jdbc/JdbcConfigPanel';
 import JdbcConnectionTest from './jdbc/JdbcConnectionTest';
-import MongoConfigPanel from './mongo/MongoConfigPanel';
-import MongoPanel from './mongo/MongoPanel';
+import PanelMongoConfig from './mongo/PanelMongoConfig';
+import PanelMongo from './mongo/PanelMongo';
 import MongoIndexPanel from './mongo-index/MongoIndexPanel';
 import EsPanelConfig from './elasticsearch/EsPanelConfig';
 import EsPanelData from './elasticsearch/EsPanelData';
@@ -20,7 +20,7 @@ import RabbitMQPanel from './rabbitmq/RabbitMQPanel';
 import IdConfigPanel from './id/IdConfigPanel';
 import IdDataPanel from './id/IdDataPanel';
 import BackendServerPanel from './remote/BackendServerPanel';
-import FilePanel from './file/FilePanel';
+import FilePanel from './file-access-point/FilePanel';
 import PanelMongoApp from './mongo-app/PanelMongApp';
 import PanelGroovyApi from './groovy-api/PanelGroovyApi';
 import './App.css';
@@ -62,13 +62,13 @@ function App() {
             <SubTab label="MongoDB">
               <SubTab label="Configuration">
                 <Panel>
-                  <MongoConfigPanel />
+                  <PanelMongoConfig />
                 </Panel>
               </SubTab>
               
               <SubTab label="Data">
                 <Panel>
-                  <MongoPanel />
+                  <PanelMongo />
                 </Panel>
               </SubTab>
               

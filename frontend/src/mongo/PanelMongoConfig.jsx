@@ -14,7 +14,7 @@ import {
 } from '../remote/dataStore';
 import '../styles/common.css';
 
-const MongoConfigPanel = () => {
+const PanelMongoConfig = () => {
   const appConfig = useAtomValue(mongoAppConfigAtom);
   const localConfig = useAtomValue(mongoConfigLocalAtom);
   const computedConfig = useAtomValue(mongoConfigComputedAtom);
@@ -277,5 +277,5 @@ const MongoConfigPanel = () => {
   );
 };
 
-export default MongoConfigPanel;
+export default PanelMongoConfig;
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import EndPointInput from './EndPointInput.jsx';
+import CreatePanelEndPointInput from './CreatePanelEndPoint.jsx';
+import CreatePanelFileAccessPoint from './CreatePanelFileAccessPoint.jsx';
 
-const MongoAppGroovyApiCreate = ({ 
+const CreatePanel = ({ 
   appId, 
   serverUrl, 
   onSuccess, 
@@ -12,31 +13,36 @@ const MongoAppGroovyApiCreate = ({
   const [uploadScriptSource, setUploadScriptSource] = useState('');
   const [uploadStorageType, setUploadStorageType] = useState('inline');
   const [uploadFileAccessPointId, setUploadFileAccessPointId] = useState('');
+  const [uploadFileAccessPointName, setUploadFileAccessPointName] = useState('');
   const [uploadFileSpecification, setUploadFileSpecification] = useState('single');
   const [uploadFilePath, setUploadFilePath] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [messageType, setMessageType] = useState('error'); // 'error', 'warning', 'success'
 
   const handleUpload = async () => {
     if (!uploadEndpoint.trim()) {
-      setError('Endpoint is required');
+      setMessage('Endpoint is required');
+      setMessageType('error');
       return;
     }
     
     if (uploadStorageType === 'inline' && !uploadScriptSource.trim()) {
-      setError('Script source is required for inline scripts');
+      setMessage('Script source is required for inline scripts');
+      setMessageType('error');
       return;
     }
     
     if (uploadStorageType === 'fileAccessPoint') {
       if (!uploadFileAccessPointId.trim() || !uploadFilePath.trim()) {
-        setError('File access point ID and path are required for file-based scripts');
+        setMessage('File access point ID and path are required for file-based scripts');
+        setMessageType('error');
         return;
       }
     }
     
     setUploading(true);
-    setError(null);
+    setMessage(null);
     
     try {
       const timezone = -new Date().getTimezoneOffset() / 60;
@@ -71,18 +77,31 @@ const MongoAppGroovyApiCreate = ({
       const result = await response.json();
       
       if (result.code === 0) {
-        setUploadEndpoint('');
-        setUploadDescription('');
-        setUploadScriptSource('');
-        setUploadFileAccessPointId('');
-        setUploadFilePath('');
-        setUploadStorageType('inline');
-        onSuccess?.('Script created successfully');
+        // Check if message contains "compilation errors" to show as warning
+        const hasWarning = result.message && result.message.includes('compilation errors');
+        
+        if (hasWarning) {
+          setMessage(result.message);
+          setMessageType('warning');
+          // Don't close the panel, let user see the warning
+        } else {
+          setUploadEndpoint('');
+          setUploadDescription('');
+          setUploadScriptSource('');
+          setUploadFileAccessPointId('');
+          setUploadFileAccessPointName('');
+          setUploadFilePath('');
+          setUploadStorageType('inline');
+          setMessage(null);
+          onSuccess?.(result.message || 'Script created successfully');
+        }
       } else {
-        setError(result.message || 'Failed to create script');
+        setMessage(result.message || 'Failed to create script');
+        setMessageType('error');
       }
     } catch (err) {
-      setError(err.message);
+      setMessage(err.message);
+      setMessageType('error');
     } finally {
       setUploading(false);
     }
@@ -112,23 +131,9 @@ const MongoAppGroovyApiCreate = ({
         height: '70vh'
       }}>
         <div style={{ padding: '16px 16px 12px 16px', flexShrink: 0 }}>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
             Create New Groovy API Script
           </div>
-
-          {error && (
-            <div style={{ 
-              padding: '8px', 
-              marginBottom: '0', 
-              backgroundColor: '#fee', 
-              border: '1px solid #fcc',
-              borderRadius: '4px',
-              fontSize: '12px',
-              color: '#c00'
-            }}>
-              {error}
-            </div>
-          )}
         </div>
 
         <div style={{
@@ -137,7 +142,7 @@ const MongoAppGroovyApiCreate = ({
           overflowY: 'auto',
           minHeight: 0
         }}>
-          <EndPointInput
+          <CreatePanelEndPointInput
             value={uploadEndpoint}
             onChange={(e) => setUploadEndpoint(e.target.value)}
             appId={appId}
@@ -212,117 +217,82 @@ const MongoAppGroovyApiCreate = ({
           )}
 
           {uploadStorageType === 'fileAccessPoint' && (
-            <>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
-                  File Access Point ID:
-                </label>
-                <input
-                  type="text"
-                  value={uploadFileAccessPointId}
-                  onChange={(e) => setUploadFileAccessPointId(e.target.value)}
-                  placeholder="fap123"
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    fontSize: '12px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
-                  Specification:
-                </label>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <input
-                      type="radio"
-                      value="single"
-                      checked={uploadFileSpecification === 'single'}
-                      onChange={(e) => setUploadFileSpecification(e.target.value)}
-                    />
-                    Single File
-                  </label>
-                  <label style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <input
-                      type="radio"
-                      value="folder"
-                      checked={uploadFileSpecification === 'folder'}
-                      onChange={(e) => setUploadFileSpecification(e.target.value)}
-                    />
-                    Folder
-                  </label>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
-                  File Path:
-                </label>
-                <input
-                  type="text"
-                  value={uploadFilePath}
-                  onChange={(e) => setUploadFilePath(e.target.value)}
-                  placeholder="/api/my-script.groovy"
-                  style={{
-                    width: '100%',
-                    padding: '6px',
-                    fontSize: '12px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px'
-                  }}
-                />
-              </div>
-            </>
+            <CreatePanelFileAccessPoint
+              fileAccessPointId={uploadFileAccessPointId}
+              fileAccessPointName={uploadFileAccessPointName}
+              onFileAccessPointChange={(id, name) => {
+                setUploadFileAccessPointId(id);
+                setUploadFileAccessPointName(name);
+              }}
+              specification={uploadFileSpecification}
+              onSpecificationChange={setUploadFileSpecification}
+              filePath={uploadFilePath}
+              onFilePathChange={setUploadFilePath}
+              serverUrl={serverUrl}
+            />
           )}
         </div>
 
         <div style={{ 
           padding: '12px 16px 16px 16px',
           borderTop: '1px solid #eee',
-          flexShrink: 0,
-          display: 'flex',
-          gap: '8px',
-          justifyContent: 'flex-end'
+          flexShrink: 0
         }}>
-          <button
-            onClick={onCancel}
-            disabled={uploading}
-            style={{
-              padding: '6px 16px',
-              fontSize: '12px',
-              backgroundColor: '#999',
-              color: 'white',
-              border: 'none',
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            justifyContent: 'flex-end',
+            marginBottom: message ? '12px' : '0'
+          }}>
+            <button
+              onClick={onCancel}
+              disabled={uploading}
+              style={{
+                padding: '6px 16px',
+                fontSize: '12px',
+                backgroundColor: '#999',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: uploading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpload}
+              disabled={uploading}
+              style={{
+                padding: '6px 16px',
+                fontSize: '12px',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: uploading ? 'not-allowed' : 'pointer',
+                opacity: uploading ? 0.6 : 1
+              }}
+            >
+              {uploading ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+
+          {message && (
+            <div style={{ 
+              padding: '8px', 
+              backgroundColor: messageType === 'error' ? '#fee' : messageType === 'warning' ? '#fffbf0' : '#f0f9ff', 
+              border: messageType === 'error' ? '1px solid #fcc' : messageType === 'warning' ? '1px solid #ffd966' : '1px solid #b3d9ff',
               borderRadius: '4px',
-              cursor: uploading ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={uploading}
-            style={{
-              padding: '6px 16px',
               fontSize: '12px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: uploading ? 'not-allowed' : 'pointer',
-              opacity: uploading ? 0.6 : 1
-            }}
-          >
-            {uploading ? 'Creating...' : 'Create'}
-          </button>
+              color: messageType === 'error' ? '#c00' : messageType === 'warning' ? '#996600' : '#004080'
+            }}>
+              {message}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default MongoAppGroovyApiCreate;
+export default CreatePanel;

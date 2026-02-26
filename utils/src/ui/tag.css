@@ -1,0 +1,40 @@
+/* Tag Component Styles */
+.mongo-tag {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  user-select: none;
+}
+
+.mongo-tag-clickable {
+  cursor: pointer;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  transition: all 0.2s;
+}
+
+.mongo-tag-clickable:hover {
+  background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.mongo-tag-selected {
+  background-color: #e3f2fd;
+  border: 1px solid #2196F3;
+}
+
+.mongo-tag-selected:hover {
+  background-color: #e3f2fd;
+  border-color: #2196F3;
+}
+
+.mongo-tag-static {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+}
+
+.mongo-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

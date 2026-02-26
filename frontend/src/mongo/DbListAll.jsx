@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { SpinningCircle, RefreshIcon } from '@wwf971/react-comp-misc';
+import { Tag } from '@wwf971/homepage-utils-utils';
 import { 
   mongoDbsAtom, 
   mongoDbSelectedAtom,
@@ -86,13 +87,14 @@ const DbListAll = () => {
           </h4>
           <div className="mongo-tags-container">
             {databases.map((db, index) => (
-              <span 
-                key={index} 
-                className={`mongo-tag mongo-tag-clickable ${selectedDatabase === db ? 'mongo-tag-selected' : ''}`}
+              <Tag
+                key={index}
+                isClickable
+                isSelected={selectedDatabase === db}
                 onClick={() => handleDatabaseClick(db)}
               >
                 {db}
-              </span>
+              </Tag>
             ))}
           </div>
         </div>

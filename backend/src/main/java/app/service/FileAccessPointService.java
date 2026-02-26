@@ -255,7 +255,7 @@ public class FileAccessPointService {
         String basePath = resolveAndExpandBasePath(accessPoint);
         Path fullPath = Paths.get(basePath, filePath);
         
-        if (!Files.exists(fullPath)) {
+        if (!pathExists(fullPath)) {
             throw new IOException("File not found: " + fullPath);
         }
 
@@ -277,6 +277,21 @@ public class FileAccessPointService {
             return System.getProperty("user.home") + path.substring(1);
         }
         return path;
+    }
+
+    /**
+     * Check if a path exists, using File.exists() as fallback for SMB mounts
+     * where Files.exists() may return false even when the path exists
+     */
+    private boolean pathExists(Path path) {
+        return Files.exists(path) || path.toFile().exists();
+    }
+
+    /**
+     * Check if a path is a directory, using File.isDirectory() as fallback
+     */
+    private boolean isDirectory(Path path) {
+        return Files.isDirectory(path) || path.toFile().isDirectory();
     }
 
     /**
@@ -597,7 +612,7 @@ public class FileAccessPointService {
         String basePath = resolveAndExpandBasePath(accessPoint);
         Path fullPath = Paths.get(basePath, relativePath);
         
-        if (!Files.exists(fullPath)) {
+        if (!pathExists(fullPath)) {
             throw new IOException("File not found: " + fullPath);
         }
 
@@ -744,11 +759,11 @@ public class FileAccessPointService {
         String basePath = resolveAndExpandBasePath(accessPoint);
         Path fullPath = Paths.get(basePath, relativePath);
         
-        if (!Files.exists(fullPath)) {
+        if (!pathExists(fullPath)) {
             throw new IOException("File not found: " + fullPath);
         }
         
-        if (Files.isDirectory(fullPath)) {
+        if (isDirectory(fullPath)) {
             throw new IllegalArgumentException("Cannot get content of a directory");
         }
 
@@ -879,7 +894,7 @@ public class FileAccessPointService {
     private FileInfo renameFileInFilesystem(FileAccessPoint accessPoint, String relativePath, String newName) throws Exception {
         String basePath = resolveAndExpandBasePath(accessPoint);
         Path oldFullPath = Paths.get(basePath, relativePath);
-        if (!Files.exists(oldFullPath)) {
+        if (!pathExists(oldFullPath)) {
             throw new IOException("File not found: " + oldFullPath);
         }
 
@@ -1023,11 +1038,12 @@ public class FileAccessPointService {
             ? Paths.get(basePath) 
             : Paths.get(basePath, subPath);
         
-        if (!Files.exists(dirPath)) {
+        // Use helper method that handles SMB mounts
+        if (!pathExists(dirPath)) {
             throw new IOException("Directory not found: " + dirPath);
         }
 
-        if (!Files.isDirectory(dirPath)) {
+        if (!isDirectory(dirPath)) {
             throw new IOException("Path is not a directory: " + dirPath);
         }
 
@@ -1037,9 +1053,16 @@ public class FileAccessPointService {
             for (Path entry : stream) {
                 FileInfo fileInfo = new FileInfo();
                 
-                String relativePath = subPath == null || subPath.isEmpty()
-                    ? entry.getFileName().toString()
-                    : subPath + "/" + entry.getFileName().toString();
+                // Normalize path to avoid double slashes
+                String relativePath;
+                if (subPath == null || subPath.isEmpty() || subPath.equals("/")) {
+                    relativePath = "/" + entry.getFileName().toString();
+                } else {
+                    // Ensure subPath starts with / and doesn't end with /
+                    String normalizedSubPath = subPath.startsWith("/") ? subPath : "/" + subPath;
+                    normalizedSubPath = normalizedSubPath.endsWith("/") ? normalizedSubPath.substring(0, normalizedSubPath.length() - 1) : normalizedSubPath;
+                    relativePath = normalizedSubPath + "/" + entry.getFileName().toString();
+                }
                 
                 fileInfo.setPath(relativePath);
                 fileInfo.setName(entry.getFileName().toString());

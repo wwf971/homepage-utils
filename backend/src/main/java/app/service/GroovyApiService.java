@@ -234,15 +234,17 @@ public class GroovyApiService {
 
         // Extract actual script code for compilation
         String scriptCode = extractScriptCode(scriptSource);
-        if (scriptCode == null || scriptCode.trim().isEmpty()) {
-            return ApiResponse.error("Script code cannot be empty");
-        }
-
-        // Try to compile the script to validate it
-        try {
-            compileAndCacheScript(endpoint, scriptCode);
-        } catch (Exception e) {
-            return ApiResponse.error("Failed to compile script: " + e.getMessage());
+        String compilationWarning = null;
+        
+        // Try to compile the script to validate it, but don't fail if it doesn't compile
+        // (user might want to create an empty script and edit it later)
+        if (scriptCode != null && !scriptCode.trim().isEmpty()) {
+            try {
+                compileAndCacheScript(endpoint, scriptCode);
+            } catch (Exception e) {
+                compilationWarning = "Script created but has compilation errors: " + e.getMessage();
+                System.out.println("Warning: " + compilationWarning);
+            }
         }
 
         MongoCollection<Document> collection = getCollection();
@@ -296,7 +298,8 @@ public class GroovyApiService {
 
             endpointToIdMap.put(endpoint, id);
 
-            return ApiResponse.success(result, "Script updated");
+            String message = compilationWarning != null ? compilationWarning : "Script updated";
+            return ApiResponse.success(result, message);
         } else {
             // Create new script with generated ID
             try {
@@ -338,7 +341,8 @@ public class GroovyApiService {
 
                 endpointToIdMap.put(endpoint, newId);
 
-                return ApiResponse.success(result, "Script created");
+                String message = compilationWarning != null ? compilationWarning : "Script created";
+                return ApiResponse.success(result, message);
             } catch (Exception e) {
                 return ApiResponse.error("Failed to create script: " + e.getMessage());
             }

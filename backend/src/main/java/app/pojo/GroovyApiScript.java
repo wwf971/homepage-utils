@@ -6,7 +6,7 @@ package app.pojo;
 public class GroovyApiScript {
     private String id;
     private String endpoint;
-    private String scriptSource;
+    private Object scriptSource; // Can be String (legacy) or Map/Document (new object format)
     private Long createdAt;
     private Long updatedAt;
     private String description;
@@ -32,11 +32,11 @@ public class GroovyApiScript {
         this.endpoint = endpoint;
     }
 
-    public String getScriptSource() {
+    public Object getScriptSource() {
         return scriptSource;
     }
 
-    public void setScriptSource(String scriptSource) {
+    public void setScriptSource(Object scriptSource) {
         this.scriptSource = scriptSource;
     }
 

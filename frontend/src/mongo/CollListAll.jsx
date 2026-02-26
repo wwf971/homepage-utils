@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { SpinningCircle, RefreshIcon, PlusIcon, Menu } from '@wwf971/react-comp-misc';
+import { Tag } from '@wwf971/homepage-utils-utils';
 import { 
   mongoDbSelectedAtom,
   mongoCollsAtom,
@@ -224,14 +225,15 @@ const CollListAll = () => {
           ) : (
             <div className="mongo-tags-container">
               {collections.map((collection, index) => (
-                <span 
-                  key={index} 
-                  className={`mongo-tag mongo-tag-clickable ${selectedCollection === collection ? 'mongo-tag-selected' : ''}`}
+                <Tag
+                  key={index}
+                  isClickable
+                  isSelected={selectedCollection === collection}
                   onClick={() => handleCollectionClick(collection)}
                   onContextMenu={(e) => handleCollectionContextMenu(e, collection)}
                 >
                   {collection}
-                </span>
+                </Tag>
               ))}
             </div>
           )}
