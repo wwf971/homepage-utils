@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PanelToggle, PlusIcon } from '@wwf971/react-comp-misc';
+import { PanelToggle, PlusIcon, PanelPopup } from '@wwf971/react-comp-misc';
 import CreatePanel from './CreatePanel.jsx';
 
 const MongoAppGroovyApi = ({ store }) => {
@@ -16,6 +16,9 @@ const MongoAppGroovyApi = ({ store }) => {
   const [editEndpoint, setEditEndpoint] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editScriptSource, setEditScriptSource] = useState('');
+  
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const appId = store?.appId;
   const serverUrl = store?.serverUrl;
@@ -91,31 +94,35 @@ const MongoAppGroovyApi = ({ store }) => {
     }
   };
 
-  const handleDelete = async (scriptId) => {
-    if (!confirm('Are you sure you want to delete this script?')) return;
-    
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-    
-    try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/delete/${scriptId}`, {
-        method: 'DELETE'
-      });
-      
-      const result = await response.json();
-      
-      if (result.code === 0) {
-        setMessage('Script deleted successfully');
-        fetchScripts();
-      } else {
-        setError(result.message || 'Failed to delete script');
+  const handleDelete = (scriptId) => {
+    setConfirmDialog({
+      message: 'Are you sure you want to delete this script?',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setLoading(true);
+        setError(null);
+        setMessage(null);
+        
+        try {
+          const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/delete/${scriptId}`, {
+            method: 'DELETE'
+          });
+          
+          const result = await response.json();
+          
+          if (result.code === 0) {
+            setMessage('Script deleted successfully');
+            fetchScripts();
+          } else {
+            setError(result.message || 'Failed to delete script');
+          }
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const startEdit = (script) => {
@@ -470,6 +477,19 @@ const MongoAppGroovyApi = ({ store }) => {
           </div>
         </div>
       </PanelToggle>
+
+      {confirmDialog && (
+        <PanelPopup
+          type="confirm"
+          title="Confirm Delete"
+          message={confirmDialog.message}
+          confirmText="Delete"
+          cancelText="Cancel"
+          danger={true}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   );
 };

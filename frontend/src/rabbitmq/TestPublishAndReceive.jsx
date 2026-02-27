@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { PanelPopup } from '@wwf971/react-comp-misc';
 import StompConnectionStatus from './test-connection/StompConnectionStatus';
 import PublishLog from './test-connection/PublishLog';
 import ReceiveLog from './test-connection/ReceiveLog';
@@ -9,6 +10,7 @@ const TestPublishAndReceive = () => {
   const [publishedTasks, setPublishedTasks] = useState([]);
   const [receivedMessages, setReceivedMessages] = useState([]);
   const [publishing, setPublishing] = useState(false);
+  const [errorDialog, setErrorDialog] = useState(null);
 
   const handleMessageReceived = useCallback((topic, message) => {
     console.log('Message received on topic:', topic, message);
@@ -47,11 +49,15 @@ const TestPublishAndReceive = () => {
         console.log('Task published successfully:', result.data);
       } else {
         console.error('Failed to publish task:', result.message);
-        alert('Failed to publish task: ' + result.message);
+        setErrorDialog({
+          message: 'Failed to publish task: ' + result.message
+        });
       }
     } catch (error) {
       console.error('Error publishing task:', error);
-      alert('Error publishing task: ' + error.message);
+      setErrorDialog({
+        message: 'Error publishing task: ' + error.message
+      });
     } finally {
       setPublishing(false);
     }
@@ -117,6 +123,16 @@ const TestPublishAndReceive = () => {
           <li>If working correctly, Published count should equal Received count</li>
         </ol>
       </div>
+
+      {errorDialog && (
+        <PanelPopup
+          type="alert"
+          title="Error"
+          message={errorDialog.message}
+          confirmText="OK"
+          onConfirm={() => setErrorDialog(null)}
+        />
+      )}
     </div>
   );
 };

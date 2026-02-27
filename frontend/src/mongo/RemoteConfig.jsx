@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { KeyValuesComp, KeyValues, SpinningCircle, RefreshIcon, EditableValueComp } from '@wwf971/react-comp-misc';
+import { KeyValuesComp, KeyValues, SpinningCircle, RefreshIcon, EditableValueComp, PanelPopup } from '@wwf971/react-comp-misc';
 import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import {
   mongoConfigRemoteAtom,
@@ -28,6 +28,7 @@ const RemoteConfig = () => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorDialog, setErrorDialog] = useState(null);
   const [hasFetched, setHasFetched] = useState(false);
   const [status, setStatus] = useState({
     checking: false,
@@ -171,11 +172,15 @@ const RemoteConfig = () => {
         // Re-check status after creation
         await checkStatus();
       } else {
-        alert(`Failed to create ${resourceType}: ${result.message}`);
+        setErrorDialog({
+          message: `Failed to create ${resourceType}: ${result.message}`
+        });
       }
     } catch (error) {
       console.error(`Failed to create ${resourceType}:`, error);
-      alert(`Failed to create ${resourceType}: ${error.message}`);
+      setErrorDialog({
+        message: `Failed to create ${resourceType}: ${error.message}`
+      });
     }
   };
 
@@ -508,6 +513,16 @@ const RemoteConfig = () => {
           />
         </div>
       </div>
+
+      {errorDialog && (
+        <PanelPopup
+          type="alert"
+          title="Error"
+          message={errorDialog.message}
+          confirmText="OK"
+          onConfirm={() => setErrorDialog(null)}
+        />
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useAtomValue } from 'jotai';
-import { JsonCompMobx, extractDocId } from '@wwf971/react-comp-misc';
+import { JsonCompMobx, extractDocId, PanelPopup } from '@wwf971/react-comp-misc';
 import { useMongoDocEditorMobx } from './mongoEditMobx';
 import { mongoDbSelectedAtom, mongoCollSelectedAtom } from '../remote/dataStore';
 import mongoDocStore from './mongoDocStore';
@@ -19,6 +19,7 @@ const DocCard = observer(({ doc, index, onDelete }) => {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   
   // Get selected database/collection from Jotai atoms (UI state)
   const selectedDatabase = useAtomValue(mongoDbSelectedAtom);
@@ -35,11 +36,12 @@ const DocCard = observer(({ doc, index, onDelete }) => {
     latestDoc
   );
 
-  const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this document?')) {
-      return;
-    }
+  const handleDeleteClick = () => {
+    setShowConfirm(true);
+  };
 
+  const handleDeleteConfirm = async () => {
+    setShowConfirm(false);
     setDeleting(true);
     setDeleteError(null);
 
@@ -118,7 +120,7 @@ const DocCard = observer(({ doc, index, onDelete }) => {
             </button>
             <button
               className="mongo-doc-card-delete-button"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               disabled={deleting}
               title="Delete this document"
             >
@@ -192,6 +194,19 @@ const DocCard = observer(({ doc, index, onDelete }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {showConfirm && (
+        <PanelPopup
+          type="confirm"
+          title="Confirm Delete"
+          message="Are you sure you want to delete this document?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          danger={true}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowConfirm(false)}
+        />
       )}
     </>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
+import { PanelPopup } from '@wwf971/react-comp-misc';
 import groovyApiStore from './groovyApiStore';
 import { formatTimestamp } from '@wwf971/homepage-utils-utils/utils';
 import './groovyApi.css';
@@ -8,11 +9,14 @@ const GroovyApiCard = observer(({ script, index, onDelete }) => {
   const [showJsonView, setShowJsonView] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this script?')) {
-      return;
-    }
+  const handleDeleteClick = () => {
+    setShowConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setShowConfirm(false);
 
     setDeleting(true);
     setDeleteError(null);
@@ -53,7 +57,7 @@ const GroovyApiCard = observer(({ script, index, onDelete }) => {
             </button>
             <button
               className="groovy-api-card-delete-button"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               disabled={deleting}
               title="Delete this script"
             >
@@ -116,6 +120,19 @@ const GroovyApiCard = observer(({ script, index, onDelete }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {showConfirm && (
+        <PanelPopup
+          type="confirm"
+          title="Confirm Delete"
+          message="Are you sure you want to delete this script?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          danger={true}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowConfirm(false)}
+        />
       )}
     </>
   );

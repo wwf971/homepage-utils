@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PanelPopup } from '@wwf971/react-comp-misc';
 import { getIdByValue, listIds, searchIds, convertId, searchIdsBySubstring, deleteId } from '../remote/dataStore';
 import { formatTimestamp, extractTimestampMs } from './idUtils';
 import '../styles/common.css';
@@ -16,6 +17,8 @@ const IdSearch = () => {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [errorDialog, setErrorDialog] = useState(null);
 
   const handleSearch = async () => {
     setSearching(true);
@@ -138,29 +141,35 @@ const IdSearch = () => {
     }
   };
 
-  const handleDelete = async (idValue) => {
-    if (!window.confirm('Are you sure you want to delete this ID?')) {
-      return;
-    }
-
-    setDeletingId(idValue);
-    try {
-      const response = await deleteId(idValue);
-      if (response.code === 0) {
-        // Remove the deleted ID from results
-        setResults(prev => ({
-          ...prev,
-          ids: prev.ids.filter(id => id.value !== idValue),
-          totalCount: prev.totalCount - 1
-        }));
-      } else {
-        alert('Failed to delete ID: ' + (response.message || 'Unknown error'));
+  const handleDelete = (idValue) => {
+    setConfirmDialog({
+      message: 'Are you sure you want to delete this ID?',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setDeletingId(idValue);
+        try {
+          const response = await deleteId(idValue);
+          if (response.code === 0) {
+            // Remove the deleted ID from results
+            setResults(prev => ({
+              ...prev,
+              ids: prev.ids.filter(id => id.value !== idValue),
+              totalCount: prev.totalCount - 1
+            }));
+          } else {
+            setErrorDialog({
+              message: 'Failed to delete ID: ' + (response.message || 'Unknown error')
+            });
+          }
+        } catch (err) {
+          setErrorDialog({
+            message: 'Failed to delete ID: ' + (err.message || 'Unknown error')
+          });
+        } finally {
+          setDeletingId(null);
+        }
       }
-    } catch (err) {
-      alert('Failed to delete ID: ' + (err.message || 'Unknown error'));
-    } finally {
-      setDeletingId(null);
-    }
+    });
   };
 
   const renderIdRow = (id) => {
@@ -421,6 +430,29 @@ const IdSearch = () => {
             </div>
           )}
         </div>
+      )}
+
+      {confirmDialog && (
+        <PanelPopup
+          type="confirm"
+          title="Confirm Delete"
+          message={confirmDialog.message}
+          confirmText="Delete"
+          cancelText="Cancel"
+          danger={true}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {errorDialog && (
+        <PanelPopup
+          type="alert"
+          title="Error"
+          message={errorDialog.message}
+          confirmText="OK"
+          onConfirm={() => setErrorDialog(null)}
+        />
       )}
     </div>
   );
