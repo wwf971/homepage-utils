@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useAtomValue } from 'jotai';
 import { observer } from 'mobx-react-lite';
 import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, EditableValueComp, SelectableValueComp } from '@wwf971/react-comp-misc';
@@ -11,6 +11,25 @@ import mongoDocStore from '../mongo/mongoDocStore';
 import { backendLocalConfigAtom } from '../remote/dataStore';
 import { formatTimestamp } from './fileUtils';
 import './file.css';
+
+// File access point type options - defined outside component to avoid recreation
+const fileAccessPointTypeOptions = [
+  {
+    value: 'local/internal',
+    label: 'local/internal',
+    description: 'Internal storage - files stored directly in the specified directory'
+  },
+  {
+    value: 'local/external',
+    label: 'local/external',
+    description: 'External storage - files organized in subdirectories within the specified path'
+  },
+  {
+    value: 'local/external/time',
+    label: 'local/external/time',
+    description: 'Time-based external storage - files organized by timestamp in subdirectories'
+  }
+];
 
 const FileAccessPointCard = observer(({ fileAccessPointId, database, collection, onUpdate, onOpenMongoDoc }) => {
   const [showJsonView, setShowJsonView] = useState(false);
@@ -34,30 +53,6 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     observableDoc || {}
   );
   
-  // File access point type options
-  const fileAccessPointTypeOptions = [
-    {
-      value: 'local/internal',
-      label: 'local/internal',
-      description: 'Internal storage - files stored directly in the specified directory'
-    },
-    {
-      value: 'local/external',
-      label: 'local/external',
-      description: 'External storage - files organized in subdirectories within the specified path'
-    },
-    {
-      value: 'local/external/time',
-      label: 'local/external/time',
-      description: 'External storage organized by timestamp - files grouped by date/time within subdirectories'
-    },
-    {
-      value: 'local/external/id',
-      label: 'local/external/id',
-      description: 'External storage organized by ID - files grouped by unique identifiers within subdirectories'
-    }
-  ];
-  
   // Format setting type description
   const getTypeDescription = (type) => {
     const option = fileAccessPointTypeOptions.find(opt => opt.value === type);
@@ -65,7 +60,7 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
   };
   
   // Handle field updates - use handleChange from useMongoDocEditorMobx which updates the MobX observable in-place
-  const handleFieldUpdate = async (fieldPath, newValue) => {
+  const handleFieldUpdate = useCallback(async (fieldPath, newValue) => {
     if (!observableDoc) return { code: -1, message: 'Document not loaded' };
     
     // Get the old value from the nested path using the observable doc from store
@@ -84,7 +79,7 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     });
     
     return result;
-  };
+  }, [observableDoc, handleChange]);
 
   // Flatten nested object into dot-notation keys
   const flattenObject = (obj, prefix = '') => {
@@ -324,7 +319,7 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     });
 
     return dataArray;
-  }, [observableDoc, fileAccessPointTypeOptions, handleFieldUpdate, settingType, localConfig]);
+  }, [observableDoc, handleFieldUpdate, settingType, localConfig]);
 
   // Early return after all hooks are called
   if (!observableDoc) {

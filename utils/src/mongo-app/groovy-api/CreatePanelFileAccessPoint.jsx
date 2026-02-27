@@ -63,9 +63,11 @@ const CreatePanelFileAccessPoint = ({
         <div style={{ marginBottom: '12px' }}>
           <FileAccessPointSelector
             serverUrl={serverUrl}
-            selectedId={fileAccessPointId}
-            onSelect={(fap) => {
-              onFileAccessPointChange(fap.id, fap.name);
+            title="Select One File Access Point"
+            showActions={true}
+            onConfirm={(fap) => {
+              const name = fap.content?.name || fap.name || 'Unnamed';
+              onFileAccessPointChange(fap.id, name);
               setShowFapSelector(false);
             }}
             onCancel={() => setShowFapSelector(false)}

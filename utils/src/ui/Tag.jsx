@@ -5,9 +5,14 @@ import './tag.css';
 /**
  * A reusable tag component that matches the mongo tag styling.
  * 
+ * Two modes:
+ * 1. Text mode (default): Pass children as text, optionally with secondary text
+ * 2. Component mode: Pass contentComponent for full custom rendering
+ * 
  * @param {Object} props
- * @param {string} props.children - Main text content of the tag
- * @param {string} [props.secondary] - Secondary text (shown in grey, typically in parentheses)
+ * @param {string|ReactNode} [props.children] - Main text content of the tag (text mode)
+ * @param {string} [props.secondary] - Secondary text (shown in grey, typically in parentheses) (text mode)
+ * @param {ReactNode} [props.contentComponent] - Custom component for tag content (component mode)
  * @param {boolean} [props.isClickable=false] - Whether the tag is clickable (shows hover effect)
  * @param {boolean} [props.isSelected=false] - Whether the tag is selected (blue background)
  * @param {boolean} [props.isClosable=false] - Whether to show a cross button at top-right corner
@@ -20,6 +25,7 @@ import './tag.css';
 const Tag = ({ 
   children, 
   secondary, 
+  contentComponent,
   isClickable = false, 
   isSelected = false, 
   isClosable = false,
@@ -53,11 +59,19 @@ const Tag = ({
         ...style 
       }}
     >
-      {children}
-      {secondary && (
-        <span style={{ marginLeft: '6px', color: '#999' }}>
-          ({secondary})
-        </span>
+      {/* Component mode: render custom component */}
+      {contentComponent ? (
+        contentComponent
+      ) : (
+        /* Text mode: render children with optional secondary text */
+        <>
+          {children}
+          {secondary && (
+            <span style={{ marginLeft: '6px', color: '#999' }}>
+              ({secondary})
+            </span>
+          )}
+        </>
       )}
       {isClosable && (
         <span
