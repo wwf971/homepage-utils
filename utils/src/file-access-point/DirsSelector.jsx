@@ -59,6 +59,7 @@ const DirsSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, on
         onConfirm={onConfirm}
         onCancel={onCancel}
         height={height}
+        showTitle={false}
       />
     </div>
   );

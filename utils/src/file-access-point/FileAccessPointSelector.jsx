@@ -48,19 +48,22 @@ const FileAccessPointSelector = observer(({
     },
     
     get filteredFileAccessPoints() {
+      // First filter out system FAPs
+      const nonSystemFaps = this.fileAccessPoints.filter(fap => !fap.content?.systemRole);
+      
       if (!this.searchQuery.trim()) {
-        return this.fileAccessPoints;
+        return nonSystemFaps;
       }
       
       const query = this.searchQuery.toLowerCase();
-      return this.fileAccessPoints.filter(fap => {
+      return nonSystemFaps.filter(fap => {
         const name = (fap.content?.name || fap.name || '').toLowerCase();
         const id = (fap.id || '').toLowerCase();
         return name.includes(query) || id.includes(query);
       });
     },
     
-    async fetchFileAccessPoints(url) {
+    async fetchFap(url) {
       this.loading = true;
       this.error = null;
       
@@ -115,7 +118,7 @@ const FileAccessPointSelector = observer(({
   // Fetch data if serverUrl is provided and no prop data
   useEffect(() => {
     if (serverUrl && !propFileAccessPoints) {
-      store.fetchFileAccessPoints(serverUrl);
+      store.fetchFap(serverUrl);
     }
   }, [serverUrl, propFileAccessPoints]);
   

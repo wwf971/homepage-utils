@@ -65,6 +65,7 @@ const FileSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, on
         onConfirm={handleConfirm}
         onCancel={onCancel}
         height={height}
+        showTitle={false}
       />
     </div>
   );

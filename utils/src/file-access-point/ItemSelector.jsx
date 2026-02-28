@@ -1,7 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { observer } from 'mobx-react-lite';
 import { makeAutoObservable, runInAction } from 'mobx';
-import { FolderView, PathBar, FolderIcon } from '@wwf971/react-comp-misc';
+import { FolderView, PathBar, FolderIcon, UpIcon } from '@wwf971/react-comp-misc';
 
 /**
  * ItemSelector - File/folder selector component using FolderView
@@ -18,6 +18,7 @@ import { FolderView, PathBar, FolderIcon } from '@wwf971/react-comp-misc';
  * - onConfirm: (selectedItems) => void - Called with array of selected items
  * - onCancel: () => void
  * - height: number - Fixed height for FolderView body (default: 400)
+ * - showTitle: boolean - Whether to show the default title (default: true)
  */
 const ItemSelector = observer(forwardRef(({ 
   serverUrl,
@@ -26,7 +27,8 @@ const ItemSelector = observer(forwardRef(({
   selectionConfig = { mode: 'single', allowedTypes: ['file', 'folder'], allowMixed: false },
   onConfirm,
   onCancel,
-  height = 400
+  height = 400,
+  showTitle = true
 }, ref) => {
   const [store] = useState(() => makeAutoObservable({
     // Navigation
@@ -40,6 +42,11 @@ const ItemSelector = observer(forwardRef(({
     
     // Selection
     selectedRowIds: [],
+    
+    // Double-click detection
+    lastClickRowId: null,
+    lastClickTime: 0,
+    doubleClickThreshold: 400, // 800ms for longer double-click window
     
     // Columns config
     columnsOrder: ['name', 'size', 'modified'],
@@ -139,16 +146,36 @@ const ItemSelector = observer(forwardRef(({
       if (!item) return;
       
       if (type === 'double-click') {
-        // Navigate into folder
+        // Native double-click event - also navigate into folder
         if (item.type === 'folder') {
           this.navigateToPath(item.path);
-          // Clear selection when navigating
           this.selectedRowIds = [];
         }
         return;
       }
       
       if (type === 'click') {
+        // Custom double-click detection with longer threshold
+        const now = Date.now();
+        const isDoubleClick = 
+          this.lastClickRowId === rowId && 
+          (now - this.lastClickTime) <= this.doubleClickThreshold;
+        
+        if (isDoubleClick) {
+          // Double-click detected - navigate into folder
+          if (item.type === 'folder') {
+            this.navigateToPath(item.path);
+            this.selectedRowIds = [];
+          }
+          // Reset double-click tracking
+          this.lastClickRowId = null;
+          this.lastClickTime = 0;
+          return;
+        }
+        
+        // Record this click for double-click detection
+        this.lastClickRowId = rowId;
+        this.lastClickTime = now;
         // Selection validation
         if (!selectionConfig.allowedTypes.includes(item.type)) {
           console.log(`Cannot select ${item.type}, only ${selectionConfig.allowedTypes.join(', ')} allowed`);
@@ -292,9 +319,11 @@ const ItemSelector = observer(forwardRef(({
       backgroundColor: '#fff'
     }}>
       {/* Title */}
-      <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
-        Select {selectionConfig.allowedTypes.join('/')}
-      </div>
+      {showTitle && (
+        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
+          Select {selectionConfig.allowedTypes.join('/')}
+        </div>
+      )}
       
       {/* Path navigation */}
       <div style={{ 
@@ -309,15 +338,19 @@ const ItemSelector = observer(forwardRef(({
           onClick={() => store.navigateUp()}
           disabled={store.currentPath === '/' || store.loading}
           style={{
-            padding: '4px 8px',
+            padding: '4px 6px 4px 4px',
             fontSize: '12px',
             backgroundColor: store.currentPath === '/' ? '#e0e0e0' : '#fff',
             border: '1px solid #ddd',
             borderRadius: '4px',
-            cursor: store.currentPath === '/' || store.loading ? 'not-allowed' : 'pointer'
+            cursor: store.currentPath === '/' || store.loading ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px'
           }}
         >
-          ⬆ Up
+          <UpIcon width={16} height={16} />
+          Up
         </button>
         <div style={{ fontSize: '12px', color: '#666' }}>
           <span style={{ fontWeight: 'bold' }}>Path:</span>{' '}

@@ -1,21 +1,29 @@
 package app.controller;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import app.pojo.ApiResponse;
 import app.pojo.FileAccessPoint;
 import app.pojo.FileInfo;
 import app.service.FileAccessPointService;
 import app.service.LocalConfigService;
 import app.util.FileUtils;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/file_access_point/")
@@ -297,6 +305,72 @@ public class FileAccessPointController {
         } catch (Exception e) {
             System.err.println("Failed to rename file: " + e.getMessage());
             return new ApiResponse<>(-1, null, "Failed to rename file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get or create a special file access point by role
+     * POST /file_access_point/special/
+     * Body: { "role": "root-browser" }
+     * 
+     * Returns existing special FAP if it exists, creates it if not
+     * Special FAPs are marked with systemRole field in content
+     */
+    @PostMapping("special/")
+    public ApiResponse<Map<String, Object>> getOrCreateSpecialFileAccessPoint(@RequestBody Map<String, String> request) {
+        try {
+            String role = request.get("role");
+            
+            if (role == null || role.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "Role is required");
+            }
+            
+            FileAccessPoint specialFap = fileAccessPointService.getOrCreateSpecialFileAccessPoint(role);
+            
+            // Return just ID and name (don't expose all details)
+            Map<String, Object> result = new java.util.HashMap<>();
+            result.put("id", specialFap.getId());
+            result.put("name", specialFap.getName());
+            result.put("role", role);
+            
+            return new ApiResponse<>(0, result, "Special file access point retrieved");
+        } catch (Exception e) {
+            System.err.println("Failed to get/create special file access point: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to get/create special file access point: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Create a new file access point
+     * POST /file_access_point/create/
+     * Body: { "name": "My FAP", "type": "local/internal", "baseDir": "/path/to/dir" }
+     * 
+     * Note: ID is automatically generated using IdService
+     */
+    @PostMapping("create/")
+    public ApiResponse<FileAccessPoint> createFileAccessPoint(@RequestBody Map<String, String> request) {
+        try {
+            String name = request.get("name");
+            String type = request.get("type");
+            String baseDir = request.get("baseDir");
+            
+            if (name == null || name.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "Name is required");
+            }
+            if (type == null || type.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "Type is required");
+            }
+            if (baseDir == null || baseDir.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "Base directory is required");
+            }
+            
+            FileAccessPoint createdFap = fileAccessPointService.createFileAccessPoint(name, type, baseDir);
+            return new ApiResponse<>(0, createdFap, "File access point created successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to create file access point: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to create file access point: " + e.getMessage());
         }
     }
 }

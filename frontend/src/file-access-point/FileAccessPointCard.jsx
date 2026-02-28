@@ -5,7 +5,7 @@ import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, EditableValueComp,
 import FileExplorerLocalInternal from './FileExplorerLocalInternal';
 import FileExplorerLocalExternal from './FileExplorerLocalExternal';
 import FetchFile from './FetchFile';
-import { fetchFileAccessPoints, fetchComputedBaseDir } from './fileStore';
+import { fetchFap, fetchComputedBaseDir } from './fileStore';
 import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
 import mongoDocStore from '../mongo/mongoDocStore';
 import { backendLocalConfigAtom } from '../remote/dataStore';
@@ -330,7 +330,7 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     setRefreshing(true);
     try {
       // Fetch fresh data from server
-      const result = await fetchFileAccessPoints();
+      const result = await fetchFap();
       if (result.code === 0 && result.data) {
         // Find the updated access point (using custom id field only)
         const currentId = observableDoc.id;

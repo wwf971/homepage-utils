@@ -1,8 +1,3 @@
-import { makeAutoObservable, runInAction, action } from 'mobx';
-import mongoDocStore from '../mongo/mongoDocStore';
-import { updateDocField } from '../mongo/mongoStore';
-import { getBackendServerUrl } from '../remote/dataStore';
-
 /**
  * MobX store for file access points and file caching
  * 
@@ -12,20 +7,31 @@ import { getBackendServerUrl } from '../remote/dataStore';
  * - File content cache (actual file data) is stored here
  * 
  * Data Flow:
- * 1. fetchFileAccessPoints() fetches documents and stores them in mongoDocStore
- * 2. This store keeps only the IDs in fileAccessPointIds[]
+ * 1. fetchFap() fetches documents and stores them in mongoDocStore
+ * 2. This store keeps only the IDs in fapIds[]
  * 3. fileAccessPoints getter retrieves full documents from mongoDocStore by ID
  * 4. All document editing goes through mongoEditMobx.js hooks
  * 
  * Single Source of Truth:
  * - All MongoDB documents: mongoDocStore.docs Map
- * - File access point IDs: fileStore.fileAccessPointIds
+ * - File access point IDs: fileStore.fapIds
  * - File content cache: fileStore.fileCache
+ * 
+ * Abbreviations:
+  * file access point --> fap
  */
+
+import { makeAutoObservable, runInAction, action } from 'mobx';
+import mongoDocStore from '../mongo/mongoDocStore';
+import { updateDocField } from '../mongo/mongoStore';
+import { getBackendServerUrl } from '../remote/dataStore';
+
 class FileStore {
   // File access points - only store IDs, actual documents are in mongoDocStore
-  fileAccessPointIds = [];
-  fileAccessPointsMetadata = {
+  fapIds = [];
+
+  // Locationof the file access point metadata in mongodb
+  fapMetadataLoc = {
     database: 'note',
     collection: 'note'
   };
@@ -40,30 +46,30 @@ class FileStore {
       // Don't make fileAccessPoints a computed - it accesses another store
       // which can cause infinite loops
       fileAccessPoints: false,
-      getFileAccessPoints: false
+      getAllFap: false
     });
   }
 
   /**
    * Set file access point IDs (actual documents are in mongoDocStore)
    */
-  setFileAccessPointIds(ids) {
-    this.fileAccessPointIds = ids;
+  setFapIds(ids) {
+    this.fapIds = ids;
   }
 
   /**
    * Get file access point documents from mongoDocStore
    * Note: Not a computed property to avoid MobX reaction cycles
    */
-  getFileAccessPoints() {
-    const docs = this.fileAccessPointIds
+  getAllFap() {
+    const docs = this.fapIds
       .map(id => mongoDocStore.getDoc(id))
       .filter(Boolean); // Filter out any null/undefined
     
     // Debug: log if we have IDs but no docs
-    if (this.fileAccessPointIds.length > 0 && docs.length === 0) {
+    if (this.fapIds.length > 0 && docs.length === 0) {
       console.warn('[fileStore] Have IDs but no documents found in mongoDocStore');
-      console.warn('[fileStore] IDs:', this.fileAccessPointIds);
+      console.warn('[fileStore] IDs:', this.fapIds);
       console.warn('[fileStore] mongoDocStore keys:', Array.from(mongoDocStore.docs.keys()));
     }
     
@@ -75,14 +81,14 @@ class FileStore {
    * Uses toJS to break MobX reactivity and prevent infinite loops
    */
   get fileAccessPoints() {
-    return this.getFileAccessPoints();
+    return this.getAllFap();
   }
 
   /**
    * Set file access points metadata
    */
   setFileAccessPointsMetadata(metadata) {
-    this.fileAccessPointsMetadata = metadata;
+    this.fapMetadataLoc = metadata;
   }
 
   /**
@@ -95,7 +101,7 @@ class FileStore {
   /**
    * Set error state
    */
-  setFileAccessPointsError(error) {
+  setFapError(error) {
     this.fileAccessPointsError = error;
   }
 
@@ -137,10 +143,10 @@ class FileStore {
    * Fetch file access points using MongoDB document API
    * Documents are stored in mongoDocStore, this store only keeps IDs
    */
-  async fetchFileAccessPoints() {
+  async fetchFap() {
     runInAction(() => {
       this.setFileAccessPointsLoading(true);
-      this.setFileAccessPointsError(null);
+      this.setFapError(null);
     });
 
     try {
@@ -163,7 +169,7 @@ class FileStore {
       if (mongoDocsResult.code !== 0) {
         runInAction(() => {
           this.setFileAccessPointsLoading(false);
-          this.setFileAccessPointsError(mongoDocsResult.message || 'Failed to load mongo docs info');
+          this.setFapError(mongoDocsResult.message || 'Failed to load mongo docs info');
         });
         return { code: -1, message: mongoDocsResult.message || 'Failed to load mongo docs info' };
       }
@@ -193,7 +199,7 @@ class FileStore {
         });
         
         // Store custom id values (not MongoDB _id)
-        this.setFileAccessPointIds(docIds);
+        this.setFapIds(docIds);
         this.setFileAccessPointsMetadata({ database, collection });
         this.setFileAccessPointsLoading(false);
         
@@ -210,7 +216,7 @@ class FileStore {
       console.log('[ERROR] Failed to fetch file access points:', error);
       runInAction(() => {
         this.setFileAccessPointsLoading(false);
-        this.setFileAccessPointsError(error.message || 'Network error');
+        this.setFapError(error.message || 'Network error');
       });
       return { code: -2, message: error.message || 'Network error' };
     }
@@ -368,7 +374,7 @@ export default fileStore;
  * NOTE: This delegates to mongoStore, which updates the backend.
  * The document is stored in mongoDocStore, not here.
  */
-export async function updateFileAccessPointField(database, collection, docId, fieldPath, value) {
+export async function updateFapField(database, collection, docId, fieldPath, value) {
   return await updateDocField(database, collection, docId, fieldPath, value);
 }
 
@@ -378,7 +384,7 @@ export async function updateFileAccessPointField(database, collection, docId, fi
  * NOTE: Documents are stored in mongoDocStore, not in fileStore.
  * Use mongoDocStore.getDoc(id) to retrieve full documents.
  */
-export const fetchFileAccessPoints = () => fileStore.fetchFileAccessPoints();
+export const fetchFap = () => fileStore.fetchFap();
 export const fetchComputedBaseDir = (fileAccessPointId) => fileStore.fetchComputedBaseDir(fileAccessPointId);
 export const fetchFileList = (fileAccessPointId, path, page, pageSize) => fileStore.fetchFileList(fileAccessPointId, path, page, pageSize);
 export const fetchFileData = (fileAccessPointId, fileId) => fileStore.fetchFileData(fileAccessPointId, fileId);

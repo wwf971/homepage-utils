@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -25,10 +26,13 @@ public class FileAccessPointService {
     private final Map<String, FileAccessPoint> cachedFileAccessPoints = new ConcurrentHashMap<>();
     private final MongoService mongoService;
     private final LocalConfigService localConfigService;
+    private final IdService idService;
 
-    public FileAccessPointService(MongoService mongoService, LocalConfigService localConfigService) {
+    @Autowired
+    public FileAccessPointService(MongoService mongoService, LocalConfigService localConfigService, IdService idService) {
         this.mongoService = mongoService;
         this.localConfigService = localConfigService;
+        this.idService = idService;
         System.out.println("FileAccessPointService initialized (lazy loading - will connect on first use)");
     }
 
@@ -456,6 +460,208 @@ public class FileAccessPointService {
         
         cachedFileAccessPoints.clear();
         loadFileAccessPoints();
+    }
+
+    /**
+     * Get or create a special file access point by role
+     * Special file access points are marked with systemRole field in content
+     * 
+     * @param role The system role (e.g., "root-browser")
+     * @return The special FileAccessPoint (creates if doesn't exist)
+     */
+    public FileAccessPoint getOrCreateSpecialFileAccessPoint(String role) throws Exception {
+        MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
+        if (mongoTemplate == null) {
+            throw new Exception("MongoDB not connected");
+        }
+        
+        // Query for existing special FAP by systemRole field
+        Query query = new Query(
+            Criteria.where("type").is("file_access_point")
+                .and("content.systemRole").is(role)
+        );
+        
+        org.bson.Document existingDoc = mongoTemplate.findOne(query, org.bson.Document.class, "note");
+        
+        if (existingDoc != null) {
+            // Found existing special FAP, return it
+            String id = existingDoc.getString("id");
+            FileAccessPoint cached = cachedFileAccessPoints.get(id);
+            if (cached == null) {
+                // Load it from document
+                @SuppressWarnings("unchecked")
+                Map<String, Object> content = (Map<String, Object>) existingDoc.get("content");
+                cached = convertToFileAccessPoint(content);
+                if (cached != null) {
+                    cached.setId(id);
+                    cached.setTimeCreate(existingDoc.getLong("time_create"));
+                    cached.setNoIndex(existingDoc.getBoolean("no_index", true));
+                    cached.setServerId(existingDoc.getString("server_id"));
+                    cachedFileAccessPoints.put(id, cached);
+                }
+            }
+            System.out.println("Found existing special FAP with role '" + role + "': " + id);
+            return cached;
+        }
+        
+        // Doesn't exist, create it based on role
+        String name;
+        String type;
+        String baseDir;
+        
+        switch (role) {
+            case "root-browser":
+                name = "System Root";
+                type = "local/external";
+                baseDir = "/"; // Root of filesystem
+                break;
+            default:
+                throw new Exception("Unknown special file access point role: " + role);
+        }
+        
+        // Generate ID
+        app.pojo.IdIssueRequest idRequest = new app.pojo.IdIssueRequest();
+        idRequest.setType("file-access-point-special");
+        idRequest.setMetadata("systemRole: " + role);
+        
+        app.pojo.ApiResponse<app.pojo.IdEntity> idResponse = idService.issueRandomId(idRequest);
+        if (idResponse.getCode() != 0) {
+            throw new Exception("Failed to generate ID for special FAP: " + idResponse.getMessage());
+        }
+        
+        String id = app.util.IdFormatConverter.longToBase36(idResponse.getData().getValue());
+        System.out.println("Generated special FAP ID for role '" + role + "': " + id);
+        
+        // Get server name
+        String serverName = getServerName();
+        
+        // Build document
+        org.bson.Document doc = new org.bson.Document();
+        doc.put("id", id);
+        doc.put("type", "file_access_point");
+        doc.put("time_create", System.currentTimeMillis());
+        doc.put("no_index", true);
+        if (serverName != null) {
+            doc.put("server_id", serverName);
+        }
+        
+        // Build content with systemRole marker
+        org.bson.Document content = new org.bson.Document();
+        content.put("id", id);
+        content.put("name", name);
+        content.put("type", "file_access_point");
+        content.put("systemRole", role); // Special marker
+        
+        org.bson.Document setting = new org.bson.Document();
+        setting.put("type", type);
+        setting.put("dir_path_base", baseDir);
+        
+        content.put("setting", setting);
+        doc.put("content", content);
+        
+        // Insert into database
+        mongoTemplate.insert(doc, "note");
+        
+        // Create and cache FileAccessPoint object
+        FileAccessPoint accessPoint = new FileAccessPoint();
+        accessPoint.setId(id);
+        accessPoint.setName(name);
+        accessPoint.setType("file_access_point");
+        accessPoint.setTimeCreate(doc.getLong("time_create"));
+        accessPoint.setNoIndex(true);
+        if (serverName != null) {
+            accessPoint.setServerId(serverName);
+        }
+        
+        Map<String, Object> settingMap = new java.util.HashMap<>();
+        settingMap.put("type", type);
+        settingMap.put("dir_path_base", baseDir);
+        accessPoint.setSetting(settingMap);
+        
+        cachedFileAccessPoints.put(id, accessPoint);
+        
+        System.out.println("Created special file access point with role '" + role + "': " + id + " (" + name + ")");
+        return accessPoint;
+    }
+
+    /**
+     * Create a new file access point
+     * 
+     * @param name File access point name
+     * @param type File access point type (local/internal, local/external, local/external/time)
+     * @param baseDir Base directory path
+     * @return Created FileAccessPoint object
+     */
+    public FileAccessPoint createFileAccessPoint(String name, String type, String baseDir) throws Exception {
+        MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
+        if (mongoTemplate == null) {
+            throw new Exception("MongoDB not connected");
+        }
+        
+        // Generate a new ID using IdService
+        app.pojo.IdIssueRequest idRequest = new app.pojo.IdIssueRequest();
+        idRequest.setType("file-access-point");
+        idRequest.setMetadata("name: " + name);
+        
+        app.pojo.ApiResponse<app.pojo.IdEntity> idResponse = idService.issueRandomId(idRequest);
+        if (idResponse.getCode() != 0) {
+            throw new Exception("Failed to generate ID: " + idResponse.getMessage());
+        }
+        
+        String id = app.util.IdFormatConverter.longToBase36(idResponse.getData().getValue());
+        System.out.println("Generated file access point ID: " + id + " (decimal: " + idResponse.getData().getValue() + ")");
+        
+        // Get server name
+        String serverName = getServerName();
+        
+        // Build the document structure
+        org.bson.Document doc = new org.bson.Document();
+        doc.put("id", id);
+        doc.put("type", "file_access_point");
+        doc.put("time_create", System.currentTimeMillis());
+        doc.put("no_index", true);
+        if (serverName != null) {
+            doc.put("server_id", serverName);
+        }
+        
+        // Build content structure
+        org.bson.Document content = new org.bson.Document();
+        content.put("id", id);
+        content.put("name", name);
+        content.put("type", "file_access_point");
+        
+        // Build setting
+        org.bson.Document setting = new org.bson.Document();
+        setting.put("type", type);
+        setting.put("dir_path_base", baseDir);
+        
+        content.put("setting", setting);
+        doc.put("content", content);
+        
+        // Insert into database
+        mongoTemplate.insert(doc, "note");
+        
+        // Create FileAccessPoint object
+        FileAccessPoint accessPoint = new FileAccessPoint();
+        accessPoint.setId(id);
+        accessPoint.setName(name);
+        accessPoint.setType("file_access_point");
+        accessPoint.setTimeCreate(doc.getLong("time_create"));
+        accessPoint.setNoIndex(true);
+        if (serverName != null) {
+            accessPoint.setServerId(serverName);
+        }
+        
+        Map<String, Object> settingMap = new java.util.HashMap<>();
+        settingMap.put("type", type);
+        settingMap.put("dir_path_base", baseDir);
+        accessPoint.setSetting(settingMap);
+        
+        // Cache it
+        cachedFileAccessPoints.put(id, accessPoint);
+        
+        System.out.println("Created file access point: " + id + " (" + name + ")");
+        return accessPoint;
     }
 
     /**
