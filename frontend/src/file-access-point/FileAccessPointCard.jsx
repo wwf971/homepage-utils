@@ -1,11 +1,16 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useAtomValue } from 'jotai';
 import { observer } from 'mobx-react-lite';
-import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, EditableValueComp, SelectableValueComp } from '@wwf971/react-comp-misc';
+import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, DeleteIcon, EditableValueComp, SelectableValueComp, PanelPopup } from '@wwf971/react-comp-misc';
 import FileExplorerLocalInternal from './FileExplorerLocalInternal';
 import FileExplorerLocalExternal from './FileExplorerLocalExternal';
 import FetchFile from './FetchFile';
-import { fetchFap, fetchComputedBaseDir } from './fileStore';
+import './initFileStore'; // Initialize fileStore with dependencies
+import { fileStore } from '@wwf971/homepage-utils-utils';
+
+const fetchFap = () => fileStore.fetchFap();
+const fetchComputedBaseDir = (fapId) => fileStore.fetchComputedBaseDir(fapId);
+const deleteFap = (id) => fileStore.deleteFap(id);
 import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
 import mongoDocStore from '../mongo/mongoDocStore';
 import { backendLocalConfigAtom } from '../remote/dataStore';
@@ -31,13 +36,15 @@ const fileAccessPointTypeOptions = [
   }
 ];
 
-const FileAccessPointCard = observer(({ fileAccessPointId, database, collection, onUpdate, onOpenMongoDoc }) => {
+const FileAccessPointCard = observer(({ fileAccessPointId, database, collection, onUpdate, onOpenMongoDoc, onDeleted }) => {
   const [showJsonView, setShowJsonView] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [computedBaseDir, setComputedBaseDir] = useState(null);
   const [computedBaseDirLoading, setComputedBaseDirLoading] = useState(false);
   const [computedBaseDirError, setComputedBaseDirError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   // Get backend local config for serverName
   const localConfig = useAtomValue(backendLocalConfigAtom);
@@ -321,6 +328,12 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     return dataArray;
   }, [observableDoc, handleFieldUpdate, settingType, localConfig]);
 
+  // Check if this is a system FAP (cannot be deleted)
+  // Must be before early return to follow rules of hooks
+  const isSystemFap = useMemo(() => {
+    return observableDoc?.content?.systemRole != null;
+  }, [observableDoc]);
+
   // Early return after all hooks are called
   if (!observableDoc) {
     return <div className="file-access-point-card">Loading...</div>;
@@ -375,6 +388,38 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    
+    const fapId = observableDoc.id;
+    if (!fapId) {
+      console.error('File access point ID not found');
+      setDeleting(false);
+      return;
+    }
+    
+    // Notify parent component BEFORE deletion to unmount this component first
+    // This prevents re-render issues when the store is updated
+    // After this call, the component will be unmounted, so we don't update state anymore
+    if (onDeleted) {
+      onDeleted(fapId);
+    }
+    
+    // Continue deletion in background (component is now unmounted)
+    try {
+      const result = await deleteFap(fapId);
+      
+      if (result.code === 0) {
+        console.log('File access point deleted successfully');
+      } else {
+        console.error('Failed to delete file access point:', result.message);
+      }
+    } catch (error) {
+      console.error('Error deleting file access point:', error);
+    }
+    // Note: Don't call setDeleting(false) as component is already unmounted
+  };
+
   return (
     <>
       <div className="file-access-point-card">
@@ -388,6 +433,20 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
           <TabsOnTop.Tab label="Config">
             <div className="tab-content-padding">
               <div className="config-tab-header">
+                {!isSystemFap && (
+                  <button
+                    className="refresh-button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={deleting}
+                    title="Delete this file access point"
+                    style={{
+                      color: '#dc3545',
+                      marginRight: '4px'
+                    }}
+                  >
+                    <DeleteIcon width={16} height={16} />
+                  </button>
+                )}
                 <button
                   className="refresh-button"
                   onClick={handleRefresh}
@@ -616,6 +675,20 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
             </div>
           </div>
         </div>
+      )}
+
+      {showDeleteConfirm && (
+        <PanelPopup
+          type="confirm"
+          title="Delete File Access Point"
+          message={`Are you sure you want to delete "${observableDoc.content?.name || 'this file access point'}"? This action cannot be undone.`}
+          confirmText={deleting ? "Deleting..." : "Delete"}
+          cancelText="Cancel"
+          danger={true}
+          disabled={deleting}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
       )}
     </>
   );

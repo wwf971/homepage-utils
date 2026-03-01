@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { SpinningCircle, EditableValueComp, KeyValuesComp } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
-import fileStore, { fetchFileData, renameFile } from './fileStore';
+import './initFileStore'; // Initialize fileStore with dependencies
+import { fileStore } from '@wwf971/homepage-utils-utils';
+
+const fetchFileData = (fapId, fileId) => fileStore.fetchFileData(fapId, fileId);
+const renameFile = (fapId, fileId, newName) => fileStore.renameFile(fapId, fileId, newName);
 import './file.css';
 
 /**

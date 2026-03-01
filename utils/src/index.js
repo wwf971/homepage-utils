@@ -1,14 +1,16 @@
 export { default as MongoAppConfig } from './mongo-app/MongoAppConfig'
 export { formatTimestamp, getTimezoneInt } from './utils/utils'
 
-// File Access Point Selectors
+// File Access Point Selectors and Store
 export { 
   ItemSelector, 
   FileSelector, 
   FilesSelector, 
   DirSelector, 
   DirsSelector,
-  FileAccessPointSelector 
+  FileAccessPointSelector,
+  fileStore,
+  initFileStore
 } from './file-access-point'
 
 // UI Components

@@ -1,21 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { makeAutoObservable, runInAction } from 'mobx';
-import { CrossIcon } from '@wwf971/react-comp-misc';
+import { makeAutoObservable } from 'mobx';
 import Tag from '../ui/Tag.jsx';
+import fileStore from './fileStore.js';
 
 /**
  * FileAccessPointSelector - Select a file access point from list
  * 
- * Props (two modes):
- * 
- * Mode 1 - Controlled (data passed in):
- * - fileAccessPoints: array - Array of file access point objects
- * 
- * Mode 2 - Fetch from server:
- * - serverUrl: string - Backend server URL (will fetch from /file_access_point/mongo_docs/)
- * 
- * Common props:
+ * Props:
  * - title: string - Custom title text (optional, if empty/null/undefined, no title shown)
  * - viewMode: 'list' | 'tags' - Display as vertical list or horizontal tags (default: 'list')
  * - showActions: boolean - Whether to show Confirm/Cancel buttons (default: false)
@@ -23,10 +15,10 @@ import Tag from '../ui/Tag.jsx';
  * - onCancel: () => void - Called when Cancel button is clicked (requires showActions=true)
  * - onSelect: (fileAccessPoint) => void - Called when a file access point is clicked (immediate selection without confirm)
  * - selectedId: string - Currently selected file access point ID (optional)
+ * 
+ * Data source: Automatically fetches from fileStore.getAllFap()
  */
 const FileAccessPointSelector = observer(({ 
-  fileAccessPoints: propFileAccessPoints,
-  serverUrl,
   title,
   viewMode = 'tags',
   showActions = false,
@@ -35,76 +27,12 @@ const FileAccessPointSelector = observer(({
   onSelect, 
   selectedId
 }) => {
+  // Get file access points from store
+  const fileAccessPoints = fileStore.getAllFap();
+  // Local UI state (not data state - that comes from props)
   const [store] = useState(() => makeAutoObservable({
     searchQuery: '',
-    fetchedFileAccessPoints: [],
-    loading: false,
-    error: null,
     currentViewMode: viewMode,
-    
-    get fileAccessPoints() {
-      // Use prop data if provided, otherwise use fetched data
-      return propFileAccessPoints || this.fetchedFileAccessPoints;
-    },
-    
-    get filteredFileAccessPoints() {
-      // First filter out system FAPs
-      const nonSystemFaps = this.fileAccessPoints.filter(fap => !fap.content?.systemRole);
-      
-      if (!this.searchQuery.trim()) {
-        return nonSystemFaps;
-      }
-      
-      const query = this.searchQuery.toLowerCase();
-      return nonSystemFaps.filter(fap => {
-        const name = (fap.content?.name || fap.name || '').toLowerCase();
-        const id = (fap.id || '').toLowerCase();
-        return name.includes(query) || id.includes(query);
-      });
-    },
-    
-    async fetchFap(url) {
-      this.loading = true;
-      this.error = null;
-      
-      try {
-        // First fetch the mongo docs metadata
-        const mongoDocsResponse = await fetch(`${url}/file_access_point/mongo_docs/`);
-        
-        const contentType = mongoDocsResponse.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Server returned non-JSON response');
-        }
-        
-        const mongoDocsResult = await mongoDocsResponse.json();
-        
-        if (mongoDocsResult.code !== 0) {
-          throw new Error(mongoDocsResult.message || 'Failed to load file access points');
-        }
-        
-        const { database, collection, ids } = mongoDocsResult.data;
-        
-        // Fetch each document by ID
-        const fetchPromises = ids.map(id => 
-          fetch(`${url}/mongo/db/${encodeURIComponent(database)}/coll/${encodeURIComponent(collection)}/doc/query?id=${encodeURIComponent(id)}`)
-            .then(res => res.json())
-            .then(result => result.code === 0 ? result.data : null)
-        );
-        
-        const documents = await Promise.all(fetchPromises);
-        const validDocuments = documents.filter(Boolean);
-        
-        runInAction(() => {
-          this.fetchedFileAccessPoints = validDocuments;
-          this.loading = false;
-        });
-      } catch (err) {
-        runInAction(() => {
-          this.error = err.message || 'Network error';
-          this.loading = false;
-        });
-      }
-    },
     
     setSearchQuery(query) {
       this.searchQuery = query;
@@ -115,12 +43,23 @@ const FileAccessPointSelector = observer(({
     }
   }));
   
-  // Fetch data if serverUrl is provided and no prop data
-  useEffect(() => {
-    if (serverUrl && !propFileAccessPoints) {
-      store.fetchFap(serverUrl);
+  // Compute filtered list based on search query
+  // This is computed locally but uses data from props (which should be observable from parent)
+  const filteredFaps = (() => {
+    // Filter out system FAPs
+    const nonSystemFaps = (fileAccessPoints || []).filter(fap => !fap.content?.systemRole);
+    
+    if (!store.searchQuery.trim()) {
+      return nonSystemFaps;
     }
-  }, [serverUrl, propFileAccessPoints]);
+    
+    const query = store.searchQuery.toLowerCase();
+    return nonSystemFaps.filter(fap => {
+      const name = (fap.content?.name || fap.name || '').toLowerCase();
+      const id = (fap.id || '').toLowerCase();
+      return name.includes(query) || id.includes(query);
+    });
+  })();
   
   const [tempSelectedFap, setTempSelectedFap] = useState(null);
   
@@ -269,37 +208,8 @@ const FileAccessPointSelector = observer(({
         display: 'flex',
         flexDirection: 'column'
       }}>
-        {/* Error display */}
-        {store.error && (
-          <div style={{
-            padding: '8px',
-            marginBottom: '12px',
-            backgroundColor: '#fee',
-            border: '1px solid #fcc',
-            borderRadius: '4px',
-            fontSize: '12px',
-            color: '#c00',
-            flexShrink: 0
-          }}>
-            {store.error}
-          </div>
-        )}
-        
-        {/* Loading indicator */}
-        {store.loading && (
-          <div style={{
-            padding: '20px',
-            textAlign: 'center',
-            fontSize: '12px',
-            color: '#666',
-            flexShrink: 0
-          }}>
-            Loading file access points...
-          </div>
-        )}
-        
         {/* List of file access points */}
-        {!store.loading && (
+        {(
           <div style={{
             border: '1px solid #e0e0e0',
             borderRadius: '4px',
@@ -309,7 +219,7 @@ const FileAccessPointSelector = observer(({
             minHeight: 0,
             overflowY: 'auto'
           }}>
-          {store.filteredFileAccessPoints.length === 0 ? (
+          {filteredFaps.length === 0 ? (
             <div style={{
               padding: '20px',
               textAlign: 'center',
@@ -321,7 +231,7 @@ const FileAccessPointSelector = observer(({
           ) : store.currentViewMode === 'tags' ? (
             /* Tags view - horizontal wrap layout */
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {store.filteredFileAccessPoints.map((fap) => {
+              {filteredFaps.map((fap) => {
                 const displayName = fap.content?.name || fap.name || 'Unnamed';
                 const displayType = fap.content?.setting?.type || fap.type;
                 
@@ -353,7 +263,7 @@ const FileAccessPointSelector = observer(({
           ) : (
             /* List view - vertical stack layout */
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {store.filteredFileAccessPoints.map((fap) => {
+              {filteredFaps.map((fap) => {
                 const displayName = fap.content?.name || fap.name || 'Unnamed';
                 const displayType = fap.content?.setting?.type || fap.type;
                 

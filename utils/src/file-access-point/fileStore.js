@@ -22,9 +22,21 @@
  */
 
 import { makeAutoObservable, runInAction, action } from 'mobx';
-import mongoDocStore from '../mongo/mongoDocStore';
-import { updateDocField } from '../mongo/mongoStore';
-import { getBackendServerUrl } from '../remote/dataStore';
+
+// Dependencies - must be initialized via initFileStore()
+let mongoDocStore = null;
+let updateDocField = null;
+let getBackendServerUrl = null;
+
+/**
+ * Initialize fileStore with required dependencies
+ * Must be called from frontend before using the store
+ */
+export function initFileStore(dependencies) {
+  mongoDocStore = dependencies.mongoDocStore;
+  updateDocField = dependencies.updateDocField;
+  getBackendServerUrl = dependencies.getBackendServerUrl;
+}
 
 class FileStore {
   // File access points - only store IDs, actual documents are in mongoDocStore
@@ -362,6 +374,44 @@ class FileStore {
       return { code: -2, message: error.message || 'Network error' };
     }
   }
+
+  /**
+   * Delete a file access point
+   * @param id The file access point ID to delete
+   * @returns {code: 0 | -1 | -2, message: string}
+   */
+  async deleteFap(id) {
+    try {
+      const backendUrl = getBackendServerUrl();
+      const response = await fetch(
+        `${backendUrl}/file_access_point/delete/${encodeURIComponent(id)}/`,
+        {
+          method: 'DELETE'
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.code === 0) {
+        // Remove from local cache
+        runInAction(() => {
+          // Remove from fapIds array
+          this.fapIds = this.fapIds.filter(fapId => fapId !== id);
+          
+          // Remove from mongoDocStore (if it's there)
+          mongoDocStore.removeDoc(id);
+        });
+        
+        console.log(`[fileStore] Deleted file access point: ${id}`);
+        return { code: 0, message: result.message || 'Success' };
+      } else {
+        return { code: -1, message: result.message || 'Failed to delete file access point' };
+      }
+    } catch (error) {
+      console.log('[ERROR] Failed to delete file access point:', error);
+      return { code: -2, message: error.message || 'Network error' };
+    }
+  }
 }
 
 // Create singleton instance
@@ -389,6 +439,7 @@ export const fetchComputedBaseDir = (fileAccessPointId) => fileStore.fetchComput
 export const fetchFileList = (fileAccessPointId, path, page, pageSize) => fileStore.fetchFileList(fileAccessPointId, path, page, pageSize);
 export const fetchFileData = (fileAccessPointId, fileId) => fileStore.fetchFileData(fileAccessPointId, fileId);
 export const renameFile = (fileAccessPointId, fileId, newName) => fileStore.renameFile(fileAccessPointId, fileId, newName);
+export const deleteFap = (id) => fileStore.deleteFap(id);
 export const getCachedFile = (cache, fileAccessPointId, fileId) => {
   // For backwards compatibility, ignore cache param and use store
   return fileStore.getCachedFile(fileAccessPointId, fileId);

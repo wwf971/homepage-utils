@@ -62,7 +62,6 @@ const CreatePanelFileAccessPoint = ({
       {showFapSelector && (
         <div style={{ marginBottom: '12px' }}>
           <FileAccessPointSelector
-            serverUrl={serverUrl}
             title="Select One File Access Point"
             showActions={true}
             onConfirm={(fap) => {

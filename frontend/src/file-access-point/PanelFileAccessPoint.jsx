@@ -5,7 +5,11 @@ import { RefreshIcon, SpinningCircle, PanelToggle } from '@wwf971/react-comp-mis
 import { FileAccessPointSelector } from '@wwf971/homepage-utils-utils';
 import FileAccessPointCard from './FileAccessPointCard';
 import FileAccessPointCreate from './FileAccessPointCreate';
-import fileStore, { fetchFap } from './fileStore';
+import './initFileStore'; // Initialize fileStore with dependencies
+import { fileStore } from '@wwf971/homepage-utils-utils';
+
+// fetchFap needs to be called from fileStore
+const fetchFap = () => fileStore.fetchFap();
 import { backendLocalConfigAtom } from '../remote/dataStore';
 import './file.css';
 
@@ -22,9 +26,8 @@ const PanelFileAccessPoint = observer(() => {
   const [selectedFileAccessPointId, setSelectedFileAccessPointId] = useState(null);
   
   // Get full file access point documents from mongoDocStore, filter out system FAPs
-  const fileAccessPoints = fapIds
-    .map(id => fileStore.getAllFap().find(fap => fap.id === id))
-    .filter(Boolean)
+  // getAllFap() already returns FAPs for current fapIds, so we just need to filter
+  const fileAccessPoints = fileStore.getAllFap()
     .filter(fap => !fap.content?.systemRole); // Hide system file access points
   
   useEffect(() => {
@@ -51,6 +54,15 @@ const PanelFileAccessPoint = observer(() => {
 
   const handleSelectFileAccessPoint = (fap) => {
     setSelectedFileAccessPointId(fap.id);
+  };
+
+  const handleFileAccessPointDeleted = (deletedId) => {
+    // Clear selection if the deleted FAP was selected
+    // This will unmount the FileAccessPointCard component immediately
+    if (selectedFileAccessPointId === deletedId) {
+      setSelectedFileAccessPointId(null);
+    }
+    // Note: No need to reload - deleteFap already updates the local cache via MobX
   };
 
   if (loading) {
@@ -102,11 +114,10 @@ const PanelFileAccessPoint = observer(() => {
               <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: '#333' }}>
                 Select One File Access Point
               </div>
-              <FileAccessPointSelector
-                fileAccessPoints={fileAccessPoints}
-                selectedId={selectedFileAccessPointId}
-                onSelect={handleSelectFileAccessPoint}
-              />
+            <FileAccessPointSelector
+              selectedId={selectedFileAccessPointId}
+              onSelect={handleSelectFileAccessPoint}
+            />
             </div>
 
             {/* Selected File Access Point Details */}
@@ -120,6 +131,7 @@ const PanelFileAccessPoint = observer(() => {
                   database={metadata.database}
                   collection={metadata.collection}
                   onUpdate={loadFileAccessPoints}
+                  onDeleted={handleFileAccessPointDeleted}
                 />
               </div>
             ) : (

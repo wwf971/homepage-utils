@@ -51,8 +51,8 @@ const MongoAppGroovyApi = ({ store }) => {
 
   const handleCreateSuccess = (successMessage) => {
     setMessage(successMessage);
-    setShowUploadForm(false);
-    fetchScripts();
+        setShowUploadForm(false);
+        fetchScripts();
   };
 
   const handleUpdate = async (scriptId) => {
@@ -99,28 +99,28 @@ const MongoAppGroovyApi = ({ store }) => {
       message: 'Are you sure you want to delete this script?',
       onConfirm: async () => {
         setConfirmDialog(null);
-        setLoading(true);
-        setError(null);
-        setMessage(null);
-        
-        try {
-          const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/delete/${scriptId}`, {
-            method: 'DELETE'
-          });
-          
-          const result = await response.json();
-          
-          if (result.code === 0) {
-            setMessage('Script deleted successfully');
-            fetchScripts();
-          } else {
-            setError(result.message || 'Failed to delete script');
-          }
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    
+    try {
+      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/delete/${scriptId}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.code === 0) {
+        setMessage('Script deleted successfully');
+        fetchScripts();
+      } else {
+        setError(result.message || 'Failed to delete script');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
       }
     });
   };
@@ -208,24 +208,24 @@ const MongoAppGroovyApi = ({ store }) => {
       <PanelToggle defaultExpanded={true}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span>Groovy API Scripts</span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowUploadForm(true);
-            }}
-            style={{
-              padding: '2px',
-              backgroundColor: 'transparent',
-              color: '#2196F3',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-            title="Create New Script"
-          >
-            <PlusIcon width={16} height={16} color="#2196F3" strokeWidth={2} />
-          </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowUploadForm(true);
+              }}
+              style={{
+                padding: '2px',
+                backgroundColor: 'transparent',
+                color: '#2196F3',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              title="Create New Script"
+            >
+              <PlusIcon width={16} height={16} color="#2196F3" strokeWidth={2} />
+            </button>
         </div>
 
         <div>

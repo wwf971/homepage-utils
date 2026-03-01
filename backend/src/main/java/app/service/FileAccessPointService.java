@@ -665,6 +665,49 @@ public class FileAccessPointService {
     }
 
     /**
+     * Delete a file access point
+     * @param id The file access point ID
+     * @throws Exception if deletion fails or trying to delete a system FAP
+     */
+    public void deleteFileAccessPoint(String id) throws Exception {
+        MongoTemplate mongoTemplate = mongoService.getMongoTemplate();
+        if (mongoTemplate == null) {
+            throw new Exception("MongoDB not connected");
+        }
+        
+        // First, check if this is a system FAP (has systemRole field)
+        Query checkQuery = new Query(
+            Criteria.where("type").is("file_access_point")
+                .and("id").is(id)
+        );
+        org.bson.Document doc = mongoTemplate.findOne(checkQuery, org.bson.Document.class, "note");
+        
+        if (doc == null) {
+            throw new Exception("File access point not found: " + id);
+        }
+        
+        // Check if it's a system FAP
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) doc.get("content");
+        if (content != null && content.containsKey("systemRole")) {
+            String systemRole = (String) content.get("systemRole");
+            throw new Exception("Cannot delete system file access point with role: " + systemRole);
+        }
+        
+        // Delete from MongoDB
+        Query deleteQuery = new Query(
+            Criteria.where("type").is("file_access_point")
+                .and("id").is(id)
+        );
+        mongoTemplate.remove(deleteQuery, "note");
+        
+        // Remove from cache
+        cachedFileAccessPoints.remove(id);
+        
+        System.out.println("Deleted file access point: " + id);
+    }
+
+    /**
      * Get file content by file ID
      * @param fileAccessPointId The file access point ID or name
      * @param fileId The custom id field of the file (for local/internal) or relative path (for local/external)

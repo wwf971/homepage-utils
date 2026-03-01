@@ -3,7 +3,11 @@ import { observer } from 'mobx-react-lite';
 import { makeAutoObservable, isObservable, toJS } from 'mobx';
 import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonCompMobx } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
-import fileStore, { fetchFileData, renameFile } from './fileStore';
+import './initFileStore'; // Initialize fileStore with dependencies
+import { fileStore } from '@wwf971/homepage-utils-utils';
+
+const fetchFileData = (fapId, fileId) => fileStore.fetchFileData(fapId, fileId);
+const renameFile = (fapId, fileId, newName) => fileStore.renameFile(fapId, fileId, newName);
 import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
 import { getBackendServerUrl } from '../remote/dataStore';
 import './file.css';

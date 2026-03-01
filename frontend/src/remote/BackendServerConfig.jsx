@@ -28,7 +28,9 @@ import {
   rabbitMQLocalConfigAtom,
   rabbitMQComputedConfigAtom
 } from './dataStore';
-import fileStore, { clearFileCache } from '../file-access-point/fileStore';
+import '../file-access-point/initFileStore'; // Initialize fileStore with dependencies
+import { fileStore } from '@wwf971/homepage-utils-utils';
+const clearFileCache = () => fileStore.clearFileCache();
 import '../styles/common.css';
 import './backendServer.css';
 

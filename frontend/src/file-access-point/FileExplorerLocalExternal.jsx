@@ -2,7 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { makeAutoObservable, runInAction } from 'mobx';
 import { FolderView, PathBar, UpIcon, SpinningCircle } from '@wwf971/react-comp-misc';
-import fileStore, { fetchFileList, renameFile } from './fileStore';
+import './initFileStore'; // Initialize fileStore with dependencies
+import { fileStore } from '@wwf971/homepage-utils-utils';
+
+const fetchFileList = (fapId, path, page, pageSize) => fileStore.fetchFileList(fapId, path, page, pageSize);
+const renameFile = (fapId, fileId, newName) => fileStore.renameFile(fapId, fileId, newName);
 import { formatTimestamp, formatFileSize } from './fileUtils';
 import { getBackendServerUrl } from '../remote/backendServerStore';
 import FileView from './FileView';

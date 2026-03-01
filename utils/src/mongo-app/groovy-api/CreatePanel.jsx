@@ -85,13 +85,13 @@ const CreatePanel = ({
           setMessageType('warning');
           // Don't close the panel, let user see the warning
         } else {
-          setUploadEndpoint('');
-          setUploadDescription('');
-          setUploadScriptSource('');
-          setUploadFileAccessPointId('');
+        setUploadEndpoint('');
+        setUploadDescription('');
+        setUploadScriptSource('');
+        setUploadFileAccessPointId('');
           setUploadFileAccessPointName('');
-          setUploadFilePath('');
-          setUploadStorageType('inline');
+        setUploadFilePath('');
+        setUploadStorageType('inline');
           setMessage(null);
           onSuccess?.(result.message || 'Script created successfully');
         }
@@ -229,7 +229,7 @@ const CreatePanel = ({
               filePath={uploadFilePath}
               onFilePathChange={setUploadFilePath}
               serverUrl={serverUrl}
-            />
+                />
           )}
         </div>
 
@@ -239,42 +239,42 @@ const CreatePanel = ({
           flexShrink: 0
         }}>
           <div style={{
-            display: 'flex',
-            gap: '8px',
+          display: 'flex',
+          gap: '8px',
             justifyContent: 'flex-end',
             marginBottom: message ? '12px' : '0'
-          }}>
-            <button
-              onClick={onCancel}
-              disabled={uploading}
-              style={{
-                padding: '6px 16px',
-                fontSize: '12px',
-                backgroundColor: '#999',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: uploading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleUpload}
-              disabled={uploading}
-              style={{
-                padding: '6px 16px',
-                fontSize: '12px',
-                backgroundColor: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: uploading ? 'not-allowed' : 'pointer',
-                opacity: uploading ? 0.6 : 1
-              }}
-            >
-              {uploading ? 'Creating...' : 'Create'}
-            </button>
+        }}>
+          <button
+            onClick={onCancel}
+            disabled={uploading}
+            style={{
+              padding: '6px 16px',
+              fontSize: '12px',
+              backgroundColor: '#999',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: uploading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            style={{
+              padding: '6px 16px',
+              fontSize: '12px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: uploading ? 'not-allowed' : 'pointer',
+              opacity: uploading ? 0.6 : 1
+            }}
+          >
+            {uploading ? 'Creating...' : 'Create'}
+          </button>
           </div>
 
           {message && (

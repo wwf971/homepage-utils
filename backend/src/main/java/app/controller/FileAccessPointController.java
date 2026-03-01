@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -371,6 +372,28 @@ public class FileAccessPointController {
             System.err.println("Failed to create file access point: " + e.getMessage());
             e.printStackTrace();
             return new ApiResponse<>(-1, null, "Failed to create file access point: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Delete a file access point
+     * DELETE /file_access_point/delete/{id}/
+     * 
+     * Note: System file access points (with systemRole field) cannot be deleted
+     */
+    @DeleteMapping("delete/{id}/")
+    public ApiResponse<String> deleteFileAccessPoint(@PathVariable String id) {
+        try {
+            if (id == null || id.trim().isEmpty()) {
+                return new ApiResponse<>(-1, null, "ID is required");
+            }
+            
+            fileAccessPointService.deleteFileAccessPoint(id);
+            return new ApiResponse<>(0, "Deleted", "File access point deleted successfully");
+        } catch (Exception e) {
+            System.err.println("Failed to delete file access point: " + e.getMessage());
+            e.printStackTrace();
+            return new ApiResponse<>(-1, null, "Failed to delete file access point: " + e.getMessage());
         }
     }
 }
