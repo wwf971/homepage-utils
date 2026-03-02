@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileAccessPointSelector, Tag } from '@wwf971/homepage-utils-utils';
+import { FileAccessPointSelector, Tag, fileStore } from '@wwf971/homepage-utils-utils';
 import { FileSelector } from '../../file-access-point/index.js';
 
 const CreatePanelFileAccessPoint = ({ 
@@ -62,6 +62,8 @@ const CreatePanelFileAccessPoint = ({
       {showFapSelector && (
         <div style={{ marginBottom: '12px' }}>
           <FileAccessPointSelector
+            fileAccessPoints={fileStore.getAllFap()}
+            isLoading={fileStore.fileAccessPointsIsLoading}
             title="Select One File Access Point"
             showActions={true}
             onConfirm={(fap) => {
@@ -70,6 +72,7 @@ const CreatePanelFileAccessPoint = ({
               setShowFapSelector(false);
             }}
             onCancel={() => setShowFapSelector(false)}
+            onRefresh={() => fileStore.refreshFap()}
           />
         </div>
       )}
@@ -120,7 +123,7 @@ const CreatePanelFileAccessPoint = ({
       </div>
 
       {showFileSelector && fileAccessPointId && (
-        <div style={{ marginBottom: '12px' }}>
+      <div style={{ marginBottom: '12px' }}>
           <FileSelector
             serverUrl={serverUrl}
             fileAccessPointId={fileAccessPointId}
@@ -131,8 +134,8 @@ const CreatePanelFileAccessPoint = ({
               setShowFileSelector(false);
             }}
             onCancel={() => setShowFileSelector(false)}
-          />
-        </div>
+        />
+      </div>
       )}
     </>
   );

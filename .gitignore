@@ -16,3 +16,5 @@ node_modules/
 *.sqlite
 config.0.js
 setup.sh
+
+/example*

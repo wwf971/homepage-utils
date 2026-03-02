@@ -13,5 +13,8 @@ export {
   initFileStore
 } from './file-access-point'
 
+// Groovy API Store
+export { groovyApiStore } from './mongo-app/groovy-api'
+
 // UI Components
 export { default as Tag } from './ui/Tag'

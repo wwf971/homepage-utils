@@ -152,6 +152,21 @@ class FileStore {
   }
 
   /**
+   * Refresh file access points - clears cache and re-fetches from server
+   */
+  async refreshFap() {
+    console.log('[fileStore] Refreshing file access points...');
+    
+    // Clear the current FAP IDs
+    runInAction(() => {
+      this.fapIds = [];
+    });
+    
+    // Re-fetch from server
+    return this.fetchFap();
+  }
+
+  /**
    * Fetch file access points using MongoDB document API
    * Documents are stored in mongoDocStore, this store only keeps IDs
    */
@@ -435,6 +450,7 @@ export async function updateFapField(database, collection, docId, fieldPath, val
  * Use mongoDocStore.getDoc(id) to retrieve full documents.
  */
 export const fetchFap = () => fileStore.fetchFap();
+export const refreshFap = () => fileStore.refreshFap();
 export const fetchComputedBaseDir = (fileAccessPointId) => fileStore.fetchComputedBaseDir(fileAccessPointId);
 export const fetchFileList = (fileAccessPointId, path, page, pageSize) => fileStore.fetchFileList(fileAccessPointId, path, page, pageSize);
 export const fetchFileData = (fileAccessPointId, fileId) => fileStore.fetchFileData(fileAccessPointId, fileId);

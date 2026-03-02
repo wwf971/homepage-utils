@@ -241,7 +241,7 @@ public class GroovyApiService {
         if (scriptCode != null && !scriptCode.trim().isEmpty()) {
             try {
                 compileAndCacheScript(endpoint, scriptCode);
-            } catch (Exception e) {
+        } catch (Exception e) {
                 compilationWarning = "Script created but has compilation errors: " + e.getMessage();
                 System.out.println("Warning: " + compilationWarning);
             }

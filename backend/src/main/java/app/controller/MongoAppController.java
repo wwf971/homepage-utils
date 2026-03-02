@@ -350,4 +350,84 @@ public class MongoAppController {
                                                     @RequestHeader Map<String, String> headers) {
         return mongoAppService.executeApiScript(appId, endpoint, params, headers);
     }
+    
+    /**
+     * Add a groovy script folder for auto-loading
+     * POST /mongo-app/{appId}/api-folders/add
+     * Body: { "fileAccessPointId": "fap-id", "path": "scripts/apis" }
+     */
+    @PostMapping("/{appId}/api-folders/add")
+    public ApiResponse<Map<String, Object>> addGroovyScriptFolder(@PathVariable String appId,
+                                                                   @RequestBody Map<String, String> request) {
+        String fileAccessPointId = request.get("fileAccessPointId");
+        String path = request.get("path");
+        
+        if (fileAccessPointId == null || fileAccessPointId.trim().isEmpty()) {
+            return ApiResponse.error("File access point ID is required");
+        }
+        if (path == null) {
+            return ApiResponse.error("Path is required");
+        }
+        
+        return mongoAppService.addGroovyScriptFolder(appId, fileAccessPointId, path);
+    }
+    
+    /**
+     * Remove a groovy script folder
+     * POST /mongo-app/{appId}/api-folders/remove
+     * Body: { "fileAccessPointId": "fap-id", "path": "scripts/apis" }
+     */
+    @PostMapping("/{appId}/api-folders/remove")
+    public ApiResponse<Map<String, Object>> removeGroovyScriptFolder(@PathVariable String appId,
+                                                                      @RequestBody Map<String, String> request) {
+        String fileAccessPointId = request.get("fileAccessPointId");
+        String path = request.get("path");
+        
+        if (fileAccessPointId == null || fileAccessPointId.trim().isEmpty()) {
+            return ApiResponse.error("File access point ID is required");
+        }
+        if (path == null) {
+            return ApiResponse.error("Path is required");
+        }
+        
+        return mongoAppService.removeGroovyScriptFolder(appId, fileAccessPointId, path);
+    }
+    
+    /**
+     * List groovy script folders
+     * GET /mongo-app/{appId}/api-folders/list
+     */
+    @GetMapping("/{appId}/api-folders/list")
+    public ApiResponse<List<Map<String, Object>>> listGroovyScriptFolders(@PathVariable String appId) {
+        return mongoAppService.listGroovyScriptFolders(appId);
+    }
+    
+    /**
+     * Scan and load groovy scripts from configured folders
+     * POST /mongo-app/{appId}/api-folders/scan
+     */
+    @PostMapping("/{appId}/api-folders/scan")
+    public ApiResponse<Map<String, Object>> scanAndLoadGroovyScripts(@PathVariable String appId) {
+        return mongoAppService.scanAndLoadGroovyScripts(appId);
+    }
+    
+    /**
+     * Scan and load groovy scripts from a specific folder
+     * POST /mongo-app/{appId}/api-folders/scan-one
+     */
+    @PostMapping("/{appId}/api-folders/scan-one")
+    public ApiResponse<Map<String, Object>> scanAndLoadGroovyScriptsFromFolder(@PathVariable String appId,
+                                                                                @RequestBody Map<String, String> request) {
+        String fileAccessPointId = request.get("fileAccessPointId");
+        String path = request.get("path");
+        
+        if (fileAccessPointId == null || fileAccessPointId.trim().isEmpty()) {
+            return ApiResponse.error("File access point ID is required");
+        }
+        if (path == null) {
+            return ApiResponse.error("Path is required");
+        }
+        
+        return mongoAppService.scanAndLoadGroovyScriptsFromFolder(appId, fileAccessPointId, path);
+    }
 }

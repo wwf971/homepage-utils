@@ -1,4 +1,4 @@
-# File Access Point
+# File Access Point(FAP)
 
 File access points provide a unified interface for accessing files stored in different locations (internal MongoDB storage, external filesystem).
 
@@ -8,6 +8,7 @@ File access points provide a unified interface for accessing files stored in dif
 |--------|----------|-------------|
 | POST | `/file_access_point/special/` | Get or create special file access point by role (body: { "role": "root-browser" }) |
 | POST | `/file_access_point/create/` | Create new file access point (auto-generates ID) |
+| DELETE | `/file_access_point/delete/{id}/` | Delete file access point (cannot delete system FAPs) |
 | GET | `/file_access_point/list/` | List all file access points |
 | GET | `/file_access_point/mongo_docs/` | Get MongoDB document metadata for all access points |
 | GET | `/file_access_point/get/{id}/` | Get specific file access point by ID |
@@ -38,11 +39,14 @@ File access points are stored in the MongoDB `note` collection with:
 
 Special file access points are system-managed FAPs with specific roles:
 - **`root-browser`**: Provides access to the server's root filesystem (`/`) for browsing directories when creating new file access points
-- Auto-created on first request via `/file_access_point/special/` endpoint
-- Marked with `content.systemRole` field
-- Hidden from normal UI listings
+- Auto-created on first request via `/file_access_point/special/` endpoint (body: `{ "role": "root-browser" }`)
+- Marked with `content.systemRole` field in MongoDB document
+- Hidden from normal UI listings (filtered by `!fap.content?.systemRole`)
+- Protected from deletion (backend checks `systemRole` field and rejects DELETE requests)
 - Uses auto-generated ID like regular FAPs
 
+
+## Frontend
 
 ┌─────────────────────────────────────────────────────┐
 │                  mongoDocStore                      │
@@ -58,10 +62,12 @@ Special file access points are system-managed FAPs with specific roles:
 ┌─────────────────────────────────────────────────────┐
 │                    fileStore                        │
 │  ┌────────────────────────────────────────────┐     │
-│  │ fapIds: ['id1', 'id2', ...]    │     │
+│  │ fapIds: ['id1', 'id2', ...]                │     │
 │  │ fileCache: { 'apId:fileId': fileData }     │     │
 │  └────────────────────────────────────────────┘     │
 │  get fileAccessPoints() {                           │
 │    return ids.map(id => mongoDocStore.getDoc(id))   │
 │  }                                                  │
 └─────────────────────────────────────────────────────┘
+
+

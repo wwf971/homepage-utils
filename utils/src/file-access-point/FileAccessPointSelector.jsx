@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { observer } from 'mobx-react-lite';
 import { makeAutoObservable } from 'mobx';
 import Tag from '../ui/Tag.jsx';
-import fileStore from './fileStore.js';
+import { RefreshIcon, SpinningCircle } from '@wwf971/react-comp-misc';
 
 /**
  * FileAccessPointSelector - Select a file access point from list
  * 
  * Props:
+ * - fileAccessPoints: array - Array of file access point objects (REQUIRED)
  * - title: string - Custom title text (optional, if empty/null/undefined, no title shown)
  * - viewMode: 'list' | 'tags' - Display as vertical list or horizontal tags (default: 'list')
  * - showActions: boolean - Whether to show Confirm/Cancel buttons (default: false)
@@ -15,20 +15,21 @@ import fileStore from './fileStore.js';
  * - onCancel: () => void - Called when Cancel button is clicked (requires showActions=true)
  * - onSelect: (fileAccessPoint) => void - Called when a file access point is clicked (immediate selection without confirm)
  * - selectedId: string - Currently selected file access point ID (optional)
- * 
- * Data source: Automatically fetches from fileStore.getAllFap()
+ * - onRefresh: () => void - Called when refresh button is clicked (optional)
+ * - isLoading: boolean - Whether data is loading (optional)
  */
-const FileAccessPointSelector = observer(({ 
+const FileAccessPointSelector = ({ 
+  fileAccessPoints = [],
   title,
   viewMode = 'tags',
   showActions = false,
   onConfirm,
   onCancel,
   onSelect, 
-  selectedId
+  selectedId,
+  onRefresh,
+  isLoading = false
 }) => {
-  // Get file access points from store
-  const fileAccessPoints = fileStore.getAllFap();
   // Local UI state (not data state - that comes from props)
   const [store] = useState(() => makeAutoObservable({
     searchQuery: '',
@@ -85,6 +86,16 @@ const FileAccessPointSelector = observer(({
     setTempSelectedFap(null);
     if (onCancel) {
       onCancel();
+    }
+  };
+  
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      try {
+        await onRefresh();
+      } catch (error) {
+        console.error('[FileAccessPointSelector] Error refreshing file access points:', error);
+      }
     }
   };
   
@@ -208,8 +219,25 @@ const FileAccessPointSelector = observer(({
         display: 'flex',
         flexDirection: 'column'
       }}>
-        {/* List of file access points */}
-        {(
+        {/* Loading state */}
+        {isLoading ? (
+          <div style={{
+            border: '1px solid #e0e0e0',
+            borderRadius: '4px',
+            backgroundColor: '#fafafa',
+            padding: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            fontSize: '12px',
+            color: '#666'
+          }}>
+            <SpinningCircle width={16} height={16} color="#666" />
+            <span>Loading...</span>
+          </div>
+        ) : (
+          /* List of file access points */
           <div style={{
             border: '1px solid #e0e0e0',
             borderRadius: '4px',
@@ -231,6 +259,37 @@ const FileAccessPointSelector = observer(({
           ) : store.currentViewMode === 'tags' ? (
             /* Tags view - horizontal wrap layout */
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {/* Refresh Button - First item in tags view */}
+              <div
+                onClick={handleRefresh}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  backgroundColor: '#f5f5f5',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.6 : 1,
+                  fontSize: '12px',
+                  color: '#666',
+                  transition: 'background-color 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.backgroundColor = '#e8e8e8';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                }}
+                title="Refresh file access points"
+              >
+                <RefreshIcon width={14} height={14} />
+              </div>
+              
               {filteredFaps.map((fap) => {
                 const displayName = fap.content?.name || fap.name || 'Unnamed';
                 const displayType = fap.content?.setting?.type || fap.type;
@@ -263,6 +322,34 @@ const FileAccessPointSelector = observer(({
           ) : (
             /* List view - vertical stack layout */
             <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* Refresh Button - First row in list view */}
+              <div
+                onClick={handleRefresh}
+                style={{
+                  padding: '8px 12px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  borderBottom: '1px solid #e8e8e8',
+                  backgroundColor: '#f5f5f5',
+                  transition: 'background-color 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: isLoading ? 0.6 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.backgroundColor = '#e8e8e8';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                }}
+                title="Refresh file access points"
+              >
+                <RefreshIcon width={14} height={14} />
+                <span style={{ fontSize: '13px', color: '#666' }}>Refresh</span>
+              </div>
+              
               {filteredFaps.map((fap) => {
                 const displayName = fap.content?.name || fap.name || 'Unnamed';
                 const displayType = fap.content?.setting?.type || fap.type;
@@ -310,6 +397,6 @@ const FileAccessPointSelector = observer(({
       </div>
     </div>
   );
-});
+};
 
 export default FileAccessPointSelector;

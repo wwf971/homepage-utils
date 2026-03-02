@@ -16,8 +16,10 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Updates;
 
 import app.pojo.ApiResponse;
+import app.pojo.FileInfo;
 import app.util.TimeUtils;
 
 /**
@@ -45,6 +47,9 @@ public class MongoAppService {
     @Autowired
     @org.springframework.context.annotation.Lazy
     private GroovyApiService groovyApiService;
+    
+    @Autowired
+    private FileAccessPointService fileAccessPointService;
     
     private static final String APP_DB_NAME = "mongo-app";
     private static final String APP_METADATA_COLL_NAME = "__app__";
@@ -1240,6 +1245,340 @@ public class MongoAppService {
         
         // Execute the script with the scoped backend APIs
         return groovyApiService.executeScript(matchingEndpoint, params, headers, backendApis);
+    }
+    
+    /**
+     * Add a groovy script folder to auto-load scripts from
+     * @param appId The app ID
+     * @param fileAccessPointId The file access point ID
+     * @param folderPath The folder path (relative path for local/external type)
+     * @return Result with success or error message
+     */
+    public ApiResponse<Map<String, Object>> addGroovyScriptFolder(String appId, String fileAccessPointId, String folderPath) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Get or create groovyScriptFolders array
+        @SuppressWarnings("unchecked")
+        List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+        if (scriptFolders == null) {
+            scriptFolders = new ArrayList<>();
+        }
+        
+        // Check if folder already exists
+        for (Document folder : scriptFolders) {
+            String fapId = folder.getString("fileAccessPointId");
+            String path = folder.getString("path");
+            if (fileAccessPointId.equals(fapId) && folderPath.equals(path)) {
+                return createErrorResult("Folder already registered: " + folderPath);
+            }
+        }
+        
+        // Add new folder
+        Document newFolder = new Document();
+        newFolder.put("fileAccessPointId", fileAccessPointId);
+        newFolder.put("path", folderPath);
+        newFolder.put("addedAt", System.currentTimeMillis());
+        scriptFolders.add(newFolder);
+        
+        // Update app document
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            Updates.set("groovyScriptFolders", scriptFolders)
+        );
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("fileAccessPointId", fileAccessPointId);
+        result.put("path", folderPath);
+        return ApiResponse.success(result, "Groovy script folder added successfully");
+    }
+    
+    /**
+     * Remove a groovy script folder
+     * @param appId The app ID
+     * @param fileAccessPointId The file access point ID
+     * @param folderPath The folder path
+     * @return Result with success or error message
+     */
+    public ApiResponse<Map<String, Object>> removeGroovyScriptFolder(String appId, String fileAccessPointId, String folderPath) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Get groovyScriptFolders array
+        @SuppressWarnings("unchecked")
+        List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+        if (scriptFolders == null || scriptFolders.isEmpty()) {
+            return createErrorResult("No groovy script folders configured");
+        }
+        
+        // Remove matching folder
+        boolean removed = scriptFolders.removeIf(folder -> {
+            String fapId = folder.getString("fileAccessPointId");
+            String path = folder.getString("path");
+            return fileAccessPointId.equals(fapId) && folderPath.equals(path);
+        });
+        
+        if (!removed) {
+            return createErrorResult("Folder not found: " + folderPath);
+        }
+        
+        // Update app document
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            Updates.set("groovyScriptFolders", scriptFolders)
+        );
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("fileAccessPointId", fileAccessPointId);
+        result.put("path", folderPath);
+        return ApiResponse.success(result, "Groovy script folder removed successfully");
+    }
+    
+    /**
+     * List groovy script folders for an app
+     * @param appId The app ID
+     * @return List of script folders
+     */
+    public ApiResponse<List<Map<String, Object>>> listGroovyScriptFolders(String appId) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return ApiResponse.error("App not found: " + appId);
+        }
+        
+        // Get groovyScriptFolders array
+        @SuppressWarnings("unchecked")
+        List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+        if (scriptFolders == null) {
+            scriptFolders = new ArrayList<>();
+        }
+        
+        // Convert to list of maps
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Document folder : scriptFolders) {
+            Map<String, Object> folderMap = new HashMap<>();
+            folderMap.put("fileAccessPointId", folder.getString("fileAccessPointId"));
+            folderMap.put("path", folder.getString("path"));
+            folderMap.put("addedAt", folder.getLong("addedAt"));
+            result.add(folderMap);
+        }
+        
+        return ApiResponse.success(result, "Groovy script folders retrieved successfully");
+    }
+    
+    /**
+     * Scan groovy script folders and auto-load scripts
+     * Scans from last folder to first, so first folder takes priority
+     * @param appId The app ID
+     * @return Result with loaded scripts count and details
+     */
+    public ApiResponse<Map<String, Object>> scanAndLoadGroovyScripts(String appId) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Get groovyScriptFolders array
+        @SuppressWarnings("unchecked")
+        List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+        if (scriptFolders == null || scriptFolders.isEmpty()) {
+            return createErrorResult("No groovy script folders configured");
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        List<Map<String, Object>> loadedScripts = new ArrayList<>();
+        List<Map<String, Object>> skippedScripts = new ArrayList<>();
+        Map<String, String> endpointRegistry = new HashMap<>(); // endpoint -> source folder
+        
+        // Scan from last to first, so first folder wins in case of duplicate
+        for (int i = scriptFolders.size() - 1; i >= 0; i--) {
+            Document folder = scriptFolders.get(i);
+            String fileAccessPointId = folder.getString("fileAccessPointId");
+            String folderPath = folder.getString("path");
+            
+            try {
+                // List files in folder
+                List<FileInfo> files = fileAccessPointService.listFiles(fileAccessPointId, folderPath, 0, 1000);
+                
+                for (FileInfo file : files) {
+                    // Only process .groovy files
+                    if (!file.getName().endsWith(".groovy") || file.isDirectory()) {
+                        continue;
+                    }
+                    
+                    // Extract endpoint name (filename without .groovy)
+                    String endpoint = file.getName().substring(0, file.getName().length() - ".groovy".length());
+                    
+                    // Check if endpoint already registered (from higher priority folder)
+                    if (endpointRegistry.containsKey(endpoint)) {
+                        Map<String, Object> skipped = new HashMap<>();
+                        skipped.put("endpoint", endpoint);
+                        skipped.put("file", file.getPath());
+                        skipped.put("reason", "Endpoint already registered from: " + endpointRegistry.get(endpoint));
+                        skippedScripts.add(skipped);
+                        continue;
+                    }
+                    
+                    // Load script content
+                    String filePath = folderPath.isEmpty() ? file.getName() : folderPath + "/" + file.getName();
+                    FileInfo fileContent = fileAccessPointService.getFileContent(fileAccessPointId, filePath);
+                    String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    
+                    // Create script source object for file-based script
+                    Map<String, Object> scriptSource = new HashMap<>();
+                    scriptSource.put("storageType", "fileAccessPoint");
+                    scriptSource.put("fileAccessPointId", fileAccessPointId);
+                    scriptSource.put("path", filePath);
+                    
+                    // Register script
+                    app.pojo.ApiResponse<app.pojo.GroovyApiScript> uploadResult = groovyApiService.uploadScriptWithObject(
+                        null, // scriptId - null for new script
+                        appId + "_" + endpoint, // actual endpoint with appId prefix
+                        scriptSource,
+                        "Auto-loaded from " + fileAccessPointId + ":" + filePath,
+                        null, // timezone
+                        appId, // owner
+                        "mongoApp" // source
+                    );
+                    
+                    if (uploadResult.getCode() == 0) {
+                        endpointRegistry.put(endpoint, fileAccessPointId + ":" + folderPath);
+                        
+                        Map<String, Object> loaded = new HashMap<>();
+                        loaded.put("endpoint", endpoint);
+                        loaded.put("file", filePath);
+                        loaded.put("fileAccessPointId", fileAccessPointId);
+                        loadedScripts.add(loaded);
+                    } else {
+                        Map<String, Object> skipped = new HashMap<>();
+                        skipped.put("endpoint", endpoint);
+                        skipped.put("file", filePath);
+                        skipped.put("reason", "Failed to register: " + uploadResult.getMessage());
+                        skippedScripts.add(skipped);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Error scanning folder " + folderPath + ": " + e.getMessage());
+                e.printStackTrace();
+                // Continue with next folder
+            }
+        }
+        
+        result.put("loadedCount", loadedScripts.size());
+        result.put("skippedCount", skippedScripts.size());
+        result.put("loadedScripts", loadedScripts);
+        result.put("skippedScripts", skippedScripts);
+        
+        return ApiResponse.success(result, "Scanned " + scriptFolders.size() + " folders, loaded " + loadedScripts.size() + " scripts");
+    }
+    
+    /**
+     * Scan and load groovy scripts from a specific folder
+     */
+    public ApiResponse<Map<String, Object>> scanAndLoadGroovyScriptsFromFolder(String appId, String fileAccessPointId, String folderPath) {
+        // Verify app exists
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Verify folder is configured
+        @SuppressWarnings("unchecked")
+        List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+        if (scriptFolders == null || scriptFolders.isEmpty()) {
+            return createErrorResult("No groovy script folders configured");
+        }
+        
+        boolean folderFound = false;
+        for (Document folder : scriptFolders) {
+            if (fileAccessPointId.equals(folder.getString("fileAccessPointId")) 
+                && folderPath.equals(folder.getString("path"))) {
+                folderFound = true;
+                break;
+            }
+        }
+        
+        if (!folderFound) {
+            return createErrorResult("Folder not configured: " + fileAccessPointId + ":" + folderPath);
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        List<Map<String, Object>> loadedScripts = new ArrayList<>();
+        List<Map<String, Object>> skippedScripts = new ArrayList<>();
+        
+        try {
+            // List files in folder
+            List<FileInfo> files = fileAccessPointService.listFiles(fileAccessPointId, folderPath, 0, 1000);
+            
+            for (FileInfo file : files) {
+                // Only process .groovy files
+                if (!file.getName().endsWith(".groovy") || file.isDirectory()) {
+                    continue;
+                }
+                
+                // Extract endpoint name (filename without .groovy)
+                String endpoint = file.getName().substring(0, file.getName().length() - ".groovy".length());
+                
+                // Load script content
+                String filePath = folderPath.isEmpty() ? file.getName() : folderPath + "/" + file.getName();
+                FileInfo fileContent = fileAccessPointService.getFileContent(fileAccessPointId, filePath);
+                String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                
+                // Create script source object for file-based script
+                Map<String, Object> scriptSource = new HashMap<>();
+                scriptSource.put("storageType", "fileAccessPoint");
+                scriptSource.put("fileAccessPointId", fileAccessPointId);
+                scriptSource.put("path", filePath);
+                
+                // Register script (will update if already exists)
+                app.pojo.ApiResponse<app.pojo.GroovyApiScript> uploadResult = groovyApiService.uploadScriptWithObject(
+                    null, // scriptId - null for new script
+                    appId + "_" + endpoint, // actual endpoint with appId prefix
+                    scriptSource,
+                    "Auto-loaded from " + fileAccessPointId + ":" + filePath,
+                    null, // timezone
+                    appId, // owner
+                    "mongoApp" // source
+                );
+                
+                if (uploadResult.getCode() == 0) {
+                    Map<String, Object> loaded = new HashMap<>();
+                    loaded.put("endpoint", endpoint);
+                    loaded.put("file", filePath);
+                    loaded.put("fileAccessPointId", fileAccessPointId);
+                    loadedScripts.add(loaded);
+                } else {
+                    Map<String, Object> skipped = new HashMap<>();
+                    skipped.put("endpoint", endpoint);
+                    skipped.put("file", filePath);
+                    skipped.put("reason", "Failed to register: " + uploadResult.getMessage());
+                    skippedScripts.add(skipped);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error scanning folder " + folderPath + ": " + e.getMessage());
+            e.printStackTrace();
+            return createErrorResult("Error scanning folder: " + e.getMessage());
+        }
+        
+        result.put("loadedCount", loadedScripts.size());
+        result.put("skippedCount", skippedScripts.size());
+        result.put("loadedScripts", loadedScripts);
+        result.put("skippedScripts", skippedScripts);
+        
+        return ApiResponse.success(result, "Scanned folder, loaded " + loadedScripts.size() + " scripts");
     }
     
     /**

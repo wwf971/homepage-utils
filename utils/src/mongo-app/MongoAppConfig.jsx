@@ -136,51 +136,6 @@ const AppMetadataPanel = observer(() => {
   )
 })
 
-
-// Collections Status Panel
-const CollectionsPanel = observer(({ collections }) => {
-  const store = useMongoAppStore()
-  if (!store.isConfigured) return null
-  
-  return (
-    <div className="config-panel-content">
-      {store.isCheckingCollections ? (
-        <div className="config-loading">Checking collections...</div>
-      ) : (
-        <div className="config-collections">
-          {collections.map((collName) => {
-            const exists = store.collectionStatus[collName]
-            return (
-              <div key={collName} className="config-collection-item">
-                <div className="config-collection-name">{collName}</div>
-                <div className="config-collection-status">
-                  {exists ? (
-                    <span className="config-status-ok">Exists</span>
-                  ) : (
-                    <button
-                      className="config-button-small config-button-small-primary"
-                      onClick={() => store.createCollection(collName)}
-                    >
-                      Create
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {store.collectionError && (
-        <div className="config-message-box config-message-error-box">
-          <strong>Error</strong>
-          <div className="config-message-error-text">{store.collectionError}</div>
-        </div>
-      )}
-    </div>
-  )
-})
-
 const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_existence }) => {
   const store = useMongoAppStore()
   const hasInitialized = useRef(false)
@@ -303,7 +258,9 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
         </PanelToggle>
       )}
       {panels_existence.showGroovyApi && (
-        <MongoAppGroovyApi store={store} />
+        <PanelToggle title="Groovy API Scripts" defaultExpanded={true}>
+          <MongoAppGroovyApi store={store} />
+        </PanelToggle>
       )}
       {panels_existence.showGroovyApiTest && (
         <PanelToggle title="Test MongoApp Groovy APIs" defaultExpanded={true}>

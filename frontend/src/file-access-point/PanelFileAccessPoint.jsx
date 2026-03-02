@@ -35,10 +35,15 @@ const PanelFileAccessPoint = observer(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-select first file access point when list loads
+  // Auto-select first non-system file access point when list loads
   useEffect(() => {
-    if (fapIds.length > 0 && !selectedFileAccessPointId) {
-      setSelectedFileAccessPointId(fapIds[0]);
+    if (!selectedFileAccessPointId && fapIds.length > 0) {
+      // Find first non-system FAP
+      const allFaps = fileStore.getAllFap();
+      const firstNonSystemFap = allFaps.find(fap => !fap.content?.systemRole);
+      if (firstNonSystemFap) {
+        setSelectedFileAccessPointId(firstNonSystemFap.id);
+      }
     }
   }, [fapIds, selectedFileAccessPointId]);
 
@@ -83,31 +88,31 @@ const PanelFileAccessPoint = observer(() => {
         />
       </PanelToggle>
       <PanelToggle title="View File Access Points" defaultExpanded={true}>
-        <div className="file-panel-header">
-          <div className="panel-title">File Access Points</div>
-          <button
-            className="refresh-button"
-            onClick={handleRefresh}
-            disabled={loading}
-            title="Retry / Refresh file access points"
-          >
-            {loading ? (
-              <SpinningCircle width={16} height={16} color="#666" />
-            ) : (
-              <RefreshIcon width={16} height={16} />
-            )}
-          </button>
-        </div>
-        
-        {error && (
-          <div className="error-message">{error}</div>
-        )}
+      <div className="file-panel-header">
+        <div className="panel-title">File Access Points</div>
+        <button
+          className="refresh-button"
+          onClick={handleRefresh}
+          disabled={loading}
+          title="Retry / Refresh file access points"
+        >
+          {loading ? (
+            <SpinningCircle width={16} height={16} color="#666" />
+          ) : (
+            <RefreshIcon width={16} height={16} />
+          )}
+        </button>
+      </div>
+      
+      {error && (
+        <div className="error-message">{error}</div>
+      )}
 
-        {fapIds.length === 0 ? (
-          <div className="empty-message">
-            No file access points configured
-          </div>
-        ) : (
+        {fileAccessPoints.length === 0 ? (
+        <div className="empty-message">
+          No file access points configured
+        </div>
+      ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* File Access Point Selector */}
             <div>
@@ -115,22 +120,23 @@ const PanelFileAccessPoint = observer(() => {
                 Select One File Access Point
               </div>
             <FileAccessPointSelector
+              fileAccessPoints={fileAccessPoints}
               selectedId={selectedFileAccessPointId}
               onSelect={handleSelectFileAccessPoint}
             />
             </div>
 
             {/* Selected File Access Point Details */}
-            {selectedFileAccessPointId && fileAccessPoints.length > 0 ? (
+            {selectedFileAccessPointId && fileAccessPoints.some(fap => fap.id === selectedFileAccessPointId) ? (
               <div>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', color: '#333' }}>
                   Selected File Access Point
                 </div>
-                <FileAccessPointCard 
+            <FileAccessPointCard 
                   fileAccessPointId={selectedFileAccessPointId}
-                  database={metadata.database}
-                  collection={metadata.collection}
-                  onUpdate={loadFileAccessPoints}
+              database={metadata.database}
+              collection={metadata.collection}
+              onUpdate={loadFileAccessPoints}
                   onDeleted={handleFileAccessPointDeleted}
                 />
               </div>
@@ -147,8 +153,8 @@ const PanelFileAccessPoint = observer(() => {
                 No file access point is selected
               </div>
             )}
-          </div>
-        )}
+        </div>
+      )}
       </PanelToggle>
     </div>
 
