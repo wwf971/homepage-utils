@@ -14,9 +14,9 @@ const SearchPanel = observer(({ esIndexName, store }) => {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPageIndex, setCurrentPageIndex] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPageNum, setTotalPageNum] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
   const [mergeMatches, setMergeMatches] = useState(true);
 
@@ -28,7 +28,7 @@ const SearchPanel = observer(({ esIndexName, store }) => {
     setHasSearched(true);
     if (page === 1) {
       setResults([]);
-      setCurrentPage(1);
+      setCurrentPageIndex(1);
     }
 
     try {
@@ -49,8 +49,8 @@ const SearchPanel = observer(({ esIndexName, store }) => {
       if (result.code === 0) {
         setResults(result.data.results || []);
         setTotalResults(result.data.total || 0);
-        setTotalPages(result.data.total_pages || 0);
-        setCurrentPage(page);
+        setTotalPageNum(result.data.total_pages || 0);
+        setCurrentPageIndex(page);
       } else {
         setError(result.message);
       }
@@ -140,9 +140,9 @@ const SearchPanel = observer(({ esIndexName, store }) => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px' }}>
                 Found {totalResults} doc{totalResults !== 1 ? 's' : ''} with matches
-                {totalPages > 1 && (
+                {totalPageNum > 1 && (
                   <span style={{ marginLeft: '8px', color: '#666' }}>
-                    (Page {currentPage}/{totalPages})
+                    (Page {currentPageIndex}/{totalPageNum})
                   </span>
                 )}
               </span>
@@ -151,43 +151,43 @@ const SearchPanel = observer(({ esIndexName, store }) => {
                   setResults([]);
                   setHasSearched(false);
                   setTotalResults(0);
-                  setTotalPages(0);
-                  setCurrentPage(1);
+                  setTotalPageNum(0);
+                  setCurrentPageIndex(1);
                 }}
                 className="es-button-clear-search-results"
               >
                 Clear Results
               </button>
             </div>
-            {totalPages > 1 && (
+            {totalPageNum > 1 && (
               <div className="es-pagination">
                 <button
                   onClick={() => handleSearch(1)}
-                  disabled={currentPage === 1 || searching}
+                  disabled={currentPageIndex === 1 || searching}
                   className="es-button-secondary"
                 >
                   First
                 </button>
                 <button
-                  onClick={() => handleSearch(currentPage - 1)}
-                  disabled={currentPage === 1 || searching}
+                  onClick={() => handleSearch(currentPageIndex - 1)}
+                  disabled={currentPageIndex === 1 || searching}
                   className="es-button-secondary"
                 >
                   Previous
                 </button>
                 <span style={{ margin: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
+                  Page {currentPageIndex} of {totalPageNum}
                 </span>
                 <button
-                  onClick={() => handleSearch(currentPage + 1)}
-                  disabled={currentPage === totalPages || searching}
+                  onClick={() => handleSearch(currentPageIndex + 1)}
+                  disabled={currentPageIndex === totalPageNum || searching}
                   className="es-button-secondary"
                 >
                   Next
                 </button>
                 <button
-                  onClick={() => handleSearch(totalPages)}
-                  disabled={currentPage === totalPages || searching}
+                  onClick={() => handleSearch(totalPageNum)}
+                  disabled={currentPageIndex === totalPageNum || searching}
                   className="es-button-secondary"
                 >
                   Last

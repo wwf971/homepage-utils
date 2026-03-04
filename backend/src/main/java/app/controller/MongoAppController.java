@@ -430,4 +430,13 @@ public class MongoAppController {
         
         return mongoAppService.scanAndLoadGroovyScriptsFromFolder(appId, fileAccessPointId, path);
     }
+    
+    /**
+     * Get folder-scanned scripts (in-memory, non-persistent)
+     * GET /mongo-app/{appId}/api-folders/scripts
+     */
+    @GetMapping("/{appId}/api-folders/scripts")
+    public ApiResponse<List<Map<String, Object>>> getScriptScannedFromFolders(@PathVariable String appId) {
+        return mongoAppService.getScriptScannedFromFolders(appId);
+    }
 }

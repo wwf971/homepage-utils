@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { PanelPopup } from '@wwf971/react-comp-misc';
+import { PanelPopup, CrossIcon } from '@wwf971/react-comp-misc';
 import groovyApiStore from './groovyApiStore';
 import { formatTimestamp } from '@wwf971/homepage-utils-utils/utils';
 import './groovyApi.css';
@@ -99,8 +99,14 @@ const GroovyApiCard = observer(({ script, index, onDelete }) => {
                 <button
                   className="groovy-api-editor-close-button"
                   onClick={() => setShowJsonView(false)}
+                  style={{
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                 >
-                  ✕
+                  <CrossIcon width={16} height={16} />
                 </button>
               </div>
             </div>

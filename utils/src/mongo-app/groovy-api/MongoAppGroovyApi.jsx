@@ -131,10 +131,39 @@ const MongoAppGroovyApi = observer(({ store }) => {
     setError(null);
     setMessage(null);
     
+    // Check if this is a folder-scanned script (ID format: "folder-scanned:endpoint")
+    if (scriptId && scriptId.startsWith('folder-scanned:')) {
+      // For folder-scanned scripts, just re-fetch to get fresh file content
+      const result = await groovyApiStore.fetchFolderScannedScripts(serverUrl, appId);
+      if (result.code === 0) {
+        setMessage('Folder-scanned script refreshed from file successfully');
+        
+        // If currently editing this script, update edit state with fresh content
+        if (editingScriptId === scriptId) {
+          const folderScript = groovyApiStore.getScriptScannedFromFolder(scriptId);
+          if (folderScript && folderScript.fileContent) {
+            setEditScriptSource(folderScript.fileContent);
+          }
+        }
+      } else {
+        setError(result.message || 'Failed to refresh folder-scanned script');
+      }
+      return;
+    }
+    
+    // For database scripts, use the normal refresh
     const result = await groovyApiStore.refreshScript(serverUrl, appId, scriptId);
     
     if (result.code === 0) {
       setMessage('Script refreshed from file successfully');
+      
+      // If currently editing this script, update edit state with fresh content
+      if (editingScriptId === scriptId) {
+        const script = groovyApiStore.getScript(scriptId);
+        if (script) {
+          setEditScriptSource(getScriptCode(script.scriptSource));
+        }
+      }
     } else {
       setError(result.message || 'Failed to refresh script');
     }
@@ -189,8 +218,26 @@ const MongoAppGroovyApi = observer(({ store }) => {
     const result = await groovyApiStore.scanFolders(serverUrl, appId);
     
     if (result.code === 0) {
-      const { loadedCount, skippedCount } = result.data;
-      setMessage(`Scan complete: ${loadedCount} scripts loaded, ${skippedCount} skipped`);
+      const { loadedCount, skippedCount, skippedScripts } = result.data;
+      let message = `Scan complete: ${loadedCount} scripts loaded, ${skippedCount} skipped`;
+      
+      // Add details about skipped scripts
+      if (skippedScripts && skippedScripts.length > 0) {
+        message += '\n\nSkipped scripts:';
+        skippedScripts.forEach(skipped => {
+          message += `\n- ${skipped.endpoint} (${skipped.file}): ${skipped.reason}`;
+        });
+      }
+      
+      setMessage(message);
+      
+      // If currently editing a folder-scanned script, update edit state with fresh content
+      if (editingScriptId && editingScriptId.startsWith('folder-scanned:')) {
+        const folderScript = groovyApiStore.getScriptScannedFromFolder(editingScriptId);
+        if (folderScript && folderScript.fileContent) {
+          setEditScriptSource(folderScript.fileContent);
+        }
+      }
     } else {
       setError(result.message || 'Failed to scan folders');
     }
@@ -203,8 +250,26 @@ const MongoAppGroovyApi = observer(({ store }) => {
     const result = await groovyApiStore.scanFolder(serverUrl, appId, fileAccessPointId, path);
     
     if (result.code === 0) {
-      const { loadedCount, skippedCount } = result.data;
-      setMessage(`Folder scanned: ${loadedCount} scripts loaded, ${skippedCount} skipped`);
+      const { loadedCount, skippedCount, skippedScripts } = result.data;
+      let message = `Folder scanned: ${loadedCount} scripts loaded, ${skippedCount} skipped`;
+      
+      // Add details about skipped scripts
+      if (skippedScripts && skippedScripts.length > 0) {
+        message += '\n\nSkipped scripts:';
+        skippedScripts.forEach(skipped => {
+          message += `\n- ${skipped.endpoint} (${skipped.file}): ${skipped.reason}`;
+        });
+      }
+      
+      setMessage(message);
+      
+      // If currently editing a folder-scanned script, update edit state with fresh content
+      if (editingScriptId && editingScriptId.startsWith('folder-scanned:')) {
+        const folderScript = groovyApiStore.getScriptScannedFromFolder(editingScriptId);
+        if (folderScript && folderScript.fileContent) {
+          setEditScriptSource(folderScript.fileContent);
+        }
+      }
     } else {
       setError(result.message || 'Failed to scan folder');
     }

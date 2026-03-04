@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MongoAppGroovyApiCard from './MongoAppGroovyApiCard.jsx';
-import { DownIcon, RefreshIcon } from '@wwf971/react-comp-misc';
+import { DownIcon, RefreshIcon, DeleteIcon } from '@wwf971/react-comp-misc';
 
 /**
  * MongoAppGroovyApiFolder - Display a folder with its grouped scripts
@@ -40,6 +40,17 @@ const MongoAppGroovyApiFolder = ({
   const folderDisplayPath = folder.path || '(root)';
   const folderKey = `${folder.fileAccessPointId}:${folder.path}`;
 
+  const handleToggleExpand = () => {
+    // If collapsing and a script from this folder is being edited, exit edit mode
+    if (isExpanded && editingScriptId) {
+      const isEditingScriptInThisFolder = scripts.some(script => script.id === editingScriptId);
+      if (isEditingScriptInThisFolder && onCancelEdit) {
+        onCancelEdit();
+      }
+    }
+    setIsExpanded(!isExpanded);
+  };
+
   return (
     <div style={{
       border: '1px solid #ddd',
@@ -58,7 +69,7 @@ const MongoAppGroovyApiFolder = ({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={handleToggleExpand}
             style={{
               padding: '2px 0px',
               fontSize: '12px',
@@ -80,7 +91,7 @@ const MongoAppGroovyApiFolder = ({
             </div>
           </button>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
               <span>Folder: {folderDisplayPath}</span>
               <button
                 onClick={onScanFolder}
@@ -93,9 +104,24 @@ const MongoAppGroovyApiFolder = ({
                   display: 'flex',
                   alignItems: 'center'
                 }}
-                title="Refresh scripts from this folder"
+                title="Scan and reload scripts from this folder"
               >
                 <RefreshIcon width={14} height={14} />
+              </button>
+              <button
+                onClick={() => onRemoveFolder(folder.fileAccessPointId, folder.path)}
+                style={{
+                  padding: '2px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#dc3545',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                title="Remove this folder from auto-load list"
+              >
+                <DeleteIcon width={14} height={14} />
               </button>
             </div>
             <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
@@ -111,38 +137,6 @@ const MongoAppGroovyApiFolder = ({
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={onScanFolder}
-            style={{
-              padding: '4px 12px',
-              fontSize: '11px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-            title="Scan and reload scripts from this folder"
-          >
-            Scan
-          </button>
-          <button
-            onClick={() => onRemoveFolder(folder.fileAccessPointId, folder.path)}
-            style={{
-              padding: '4px 12px',
-              fontSize: '11px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-            title="Remove this folder from auto-load list"
-          >
-            Remove
-          </button>
-        </div>
       </div>
 
       {/* Scripts List (with indent) */}
@@ -157,7 +151,7 @@ const MongoAppGroovyApiFolder = ({
               backgroundColor: '#f9f9f9',
               borderRadius: '4px'
             }}>
-              No scripts loaded from this folder yet. Click "Scan" to load scripts.
+              No scripts loaded from this folder yet. Click the refresh icon to scan and load scripts.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -175,8 +169,9 @@ const MongoAppGroovyApiFolder = ({
                   onEditChange={onEditChange}
                   onSaveEdit={onSaveEdit}
                   onCancelEdit={onCancelEdit}
+                  readOnly={true}
                   sourceLabel={{
-                    text: 'FOLDER',
+                    text: 'FROM FOLDER',
                     bgColor: '#e8f5e9',
                     color: '#2e7d32'
                   }}

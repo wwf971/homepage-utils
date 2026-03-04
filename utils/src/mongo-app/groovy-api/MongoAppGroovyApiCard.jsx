@@ -15,6 +15,7 @@ import React, { useState } from 'react';
  * - onEditChange: (field, value) => void - Callback for edit changes
  * - onSaveEdit: (scriptId) => void - Callback to save edits
  * - onCancelEdit: () => void - Callback to cancel editing
+ * - readOnly: boolean - If true, hide save/edit buttons (for view-only scripts)
  */
 const MongoAppGroovyApiCard = ({
   script,
@@ -28,24 +29,11 @@ const MongoAppGroovyApiCard = ({
   onEditChange,
   onSaveEdit,
   onCancelEdit,
-  sourceLabel
+  sourceLabel,
+  readOnly = false
 }) => {
   const isFileBasedScript = (scriptSource) => {
     return scriptSource && typeof scriptSource === 'object' && scriptSource.storageType === 'fileAccessPoint';
-  };
-
-  const getScriptCode = (scriptSource) => {
-    if (typeof scriptSource === 'string') {
-      return scriptSource;
-    }
-    if (scriptSource && typeof scriptSource === 'object') {
-      if (scriptSource.storageType === 'inline') {
-        return scriptSource.rawText;
-      } else if (scriptSource.storageType === 'fileAccessPoint') {
-        return scriptSource.cachedContent || '';
-      }
-    }
-    return '';
   };
 
   if (isEditing) {
@@ -57,44 +45,48 @@ const MongoAppGroovyApiCard = ({
         padding: '12px'
       }}>
         <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>
-          Edit Script {index !== undefined && `#${index}`}
+          {readOnly ? 'View Script' : 'Edit Script'} {index !== undefined && `#${index}`}
         </div>
         
-        <div style={{ marginBottom: '8px' }}>
-          <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
-            Endpoint Name:
-          </label>
-          <input
-            type="text"
-            value={editState.endpoint}
-            onChange={(e) => onEditChange('endpoint', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '6px',
-              fontSize: '12px',
-              border: '1px solid #ddd',
-              borderRadius: '4px'
-            }}
-          />
-        </div>
+        {!readOnly && (
+          <>
+            <div style={{ marginBottom: '8px' }}>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
+                Endpoint Name:
+              </label>
+              <input
+                type="text"
+                value={editState.endpoint}
+                onChange={(e) => onEditChange('endpoint', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px'
+                }}
+              />
+            </div>
 
-        <div style={{ marginBottom: '8px' }}>
-          <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
-            Description:
-          </label>
-          <input
-            type="text"
-            value={editState.description}
-            onChange={(e) => onEditChange('description', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '6px',
-              fontSize: '12px',
-              border: '1px solid #ddd',
-              borderRadius: '4px'
-            }}
-          />
-        </div>
+            <div style={{ marginBottom: '8px' }}>
+              <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
+                Description:
+              </label>
+              <input
+                type="text"
+                value={editState.description}
+                onChange={(e) => onEditChange('description', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  fontSize: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px'
+                }}
+              />
+            </div>
+          </>
+        )}
 
         <div style={{ marginBottom: '8px' }}>
           <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
@@ -104,7 +96,7 @@ const MongoAppGroovyApiCard = ({
             value={editState.scriptSource}
             onChange={(e) => onEditChange('scriptSource', e.target.value)}
             rows={10}
-            readOnly={isFileBasedScript(script.scriptSource)}
+            readOnly={readOnly || isFileBasedScript(script.scriptSource)}
             style={{
               width: '100%',
               padding: '6px',
@@ -112,31 +104,33 @@ const MongoAppGroovyApiCard = ({
               border: '1px solid #ddd',
               borderRadius: '4px',
               fontFamily: 'monospace',
-              backgroundColor: isFileBasedScript(script.scriptSource) ? '#f5f5f5' : '#fff'
+              backgroundColor: (readOnly || isFileBasedScript(script.scriptSource)) ? '#f5f5f5' : '#fff'
             }}
           />
-          {isFileBasedScript(script.scriptSource) && (
+          {(readOnly || isFileBasedScript(script.scriptSource)) && (
             <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
-              File-based scripts are read-only. Use Refresh to update from file.
+              {readOnly ? 'This script is read-only. Use Refresh to update from file.' : 'File-based scripts are read-only. Use Refresh to update from file.'}
             </div>
           )}
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => onSaveEdit(script.id)}
-            style={{
-              padding: '6px 12px',
-              fontSize: '12px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Save
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => onSaveEdit(script.id)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Save
+            </button>
+          )}
           <button
             onClick={onCancelEdit}
             style={{
@@ -149,7 +143,7 @@ const MongoAppGroovyApiCard = ({
               cursor: 'pointer'
             }}
           >
-            Cancel
+            {readOnly ? 'Close' : 'Cancel'}
           </button>
         </div>
       </div>
@@ -228,7 +222,7 @@ const MongoAppGroovyApiCard = ({
               Refresh
             </button>
           )}
-          {onEdit && (
+          {!readOnly && onEdit && (
             <button
               onClick={() => onEdit(script)}
               style={{
@@ -244,7 +238,23 @@ const MongoAppGroovyApiCard = ({
               Edit
             </button>
           )}
-          {onDelete && (
+          {readOnly && onEdit && (
+            <button
+              onClick={() => onEdit(script)}
+              style={{
+                padding: '4px 12px',
+                fontSize: '11px',
+                backgroundColor: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              View
+            </button>
+          )}
+          {!readOnly && onDelete && (
             <button
               onClick={() => onDelete(script.id)}
               style={{

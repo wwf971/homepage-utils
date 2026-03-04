@@ -508,6 +508,53 @@ public class GroovyApiService {
     }
 
     /**
+     * Execute a script directly from code (for folder-scanned scripts)
+     * @param scriptCode The Groovy script code
+     * @param params Request parameters
+     * @param headers Request headers
+     * @param backendApis Optional backend APIs wrapper
+     * @return Execution result
+     */
+    public Map<String, Object> executeScriptDirect(String scriptCode, Map<String, Object> params, Map<String, String> headers, MongoAppScriptBackendApis backendApis) {
+        try {
+            // Compile script
+            GroovyShell shell = new GroovyShell();
+            groovy.lang.Script script = shell.parse(scriptCode);
+            
+            // Create binding
+            Binding binding = new Binding();
+            binding.setVariable("params", params != null ? params : new HashMap<>());
+            binding.setVariable("headers", headers != null ? headers : new HashMap<>());
+            
+            // Add backend APIs if provided
+            if (backendApis != null) {
+                binding.setVariable("backend", backendApis);
+            }
+            
+            script.setBinding(binding);
+            
+            // Execute
+            Object result = script.run();
+            
+            // Format response
+            Map<String, Object> response = new HashMap<>();
+            response.put("code", 0);
+            response.put("data", result);
+            response.put("message", "Success");
+            return response;
+        } catch (Exception e) {
+            System.err.println("Script execution error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", -1);
+            error.put("message", "Script execution failed: " + e.getMessage());
+            error.put("data", null);
+            return error;
+        }
+    }
+    
+    /**
      * Execute a script for a given endpoint
      * Returns a standardized response: {code: 0, data: xxx, message: xxx}
      * code = 0 means success, code < 0 means failure

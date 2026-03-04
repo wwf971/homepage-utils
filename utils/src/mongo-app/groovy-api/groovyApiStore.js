@@ -20,6 +20,9 @@ class GroovyApiStore {
   // Folders configuration
   folders = [];
   
+  // Folder-scanned scripts (in-memory, non-persistent from backend)
+  folderScannedScripts = [];
+  
   // Loading states
   isLoadingScripts = false;
   isLoadingFolders = false;
@@ -59,10 +62,19 @@ class GroovyApiStore {
   }
 
   /**
-   * Get script by ID
+   * Get script by ID (from database scripts)
    */
   getScript(scriptId) {
     return this.scripts.get(scriptId);
+  }
+  
+  /**
+   * Get folder-scanned script by ID (format: "folder-scanned:endpoint")
+   */
+  getScriptScannedFromFolder(scriptId) {
+    if (!scriptId.startsWith('folder-scanned:')) return null;
+    const endpoint = scriptId.substring('folder-scanned:'.length);
+    return this.folderScannedScripts.find(script => script.endpoint === endpoint);
   }
 
   /**
@@ -73,7 +85,30 @@ class GroovyApiStore {
   }
 
   /**
-   * Fetch scripts from server
+   * Fetch folder-scanned scripts (in-memory from backend)
+   */
+  async fetchFolderScannedScripts(serverUrl, appId) {
+    if (!appId || !serverUrl) return { code: -1, message: 'Missing appId or serverUrl' };
+    
+    try {
+      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scripts`);
+      const result = await response.json();
+      
+      if (result.code === 0) {
+        runInAction(() => {
+          this.folderScannedScripts = result.data || [];
+        });
+        return { code: 0, data: result.data };
+      } else {
+        return { code: -1, message: result.message };
+      }
+    } catch (err) {
+      return { code: -2, message: err.message };
+    }
+  }
+
+  /**
+   * Fetch scripts from server (both database and folder-scanned)
    */
   async fetchScripts(serverUrl, appId) {
     if (!appId || !serverUrl) return { code: -1, message: 'Missing appId or serverUrl' };
@@ -84,21 +119,28 @@ class GroovyApiStore {
     });
     
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/list`);
-      const result = await response.json();
+      // Fetch both database scripts and folder-scanned scripts
+      const [dbScriptsResponse, folderScriptsResponse] = await Promise.all([
+        fetch(`${serverUrl}/mongo-app/${appId}/api-config/list`),
+        fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scripts`)
+      ]);
       
-      if (result.code === 0) {
+      const dbResult = await dbScriptsResponse.json();
+      const folderResult = await folderScriptsResponse.json();
+      
+      if (dbResult.code === 0) {
         runInAction(() => {
-          this.setScripts(result.data || {});
+          this.setScripts(dbResult.data || {});
+          this.folderScannedScripts = folderResult.code === 0 ? (folderResult.data || []) : [];
           this.isLoadingScripts = false;
         });
-        return { code: 0, data: result.data };
+        return { code: 0, data: dbResult.data };
       } else {
         runInAction(() => {
-          this.scriptsError = result.message || 'Failed to fetch scripts';
+          this.scriptsError = dbResult.message || 'Failed to fetch scripts';
           this.isLoadingScripts = false;
         });
-        return { code: -1, message: result.message };
+        return { code: -1, message: dbResult.message };
       }
     } catch (err) {
       runInAction(() => {
@@ -362,6 +404,7 @@ class GroovyApiStore {
       return scriptSource && typeof scriptSource === 'object' && scriptSource.storageType === 'fileAccessPoint';
     };
 
+    // Process database scripts
     scriptsArray.forEach(script => {
       if (!isFileBasedScript(script.scriptSource)) {
         inline.push(script);
@@ -399,6 +442,38 @@ class GroovyApiStore {
         if (!belongsToFolder) {
           singleFile.push(script);
         }
+      }
+    });
+
+    // Process folder-scanned scripts (in-memory)
+    this.folderScannedScripts.forEach(script => {
+      const scriptFapId = script.fileAccessPointId;
+      const scriptFolderPath = script.folderPath || '';
+      const folderKey = `${scriptFapId}:${scriptFolderPath}`;
+      
+      // Find matching folder
+      const folder = this.folders.find(f => 
+        f.fileAccessPointId === scriptFapId && (f.path || '') === scriptFolderPath
+      );
+      
+      if (folder) {
+        if (!folderBased.has(folderKey)) {
+          folderBased.set(folderKey, { folder, scripts: [] });
+        }
+        // Convert folder-scanned script format to match DB script format for display
+        const displayScript = {
+          id: `folder-scanned:${script.endpoint}`,
+          endpoint: script.endpoint,
+          scriptSource: {
+            storageType: 'fileAccessPoint',
+            fileAccessPointId: script.fileAccessPointId,
+            path: script.path,
+            cachedContent: script.fileContent || '' // Use fileContent from backend
+          },
+          source: 'folder-scanned',
+          description: `Auto-loaded from folder: ${script.path}`
+        };
+        folderBased.get(folderKey).scripts.push(displayScript);
       }
     });
 

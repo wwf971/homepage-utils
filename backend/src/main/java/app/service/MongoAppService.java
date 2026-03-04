@@ -55,6 +55,13 @@ public class MongoAppService {
     private static final String APP_METADATA_COLL_NAME = "__app__";
     
     /**
+     * In-memory registry for folder-scanned scripts
+     * Structure: Map<appId, Map<endpoint, ScriptFileInfo>>
+     * where ScriptFileInfo contains: fileAccessPointId, path, folderPath
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>> folderScannedScripts = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    /**
      * Get the app metadata collection, creating it if necessary
      */
     private MongoCollection<Document> getAppMetadataCollection() {
@@ -1202,10 +1209,38 @@ public class MongoAppService {
             return error;
         }
         
+        // Check in-memory registry first (folder-scanned scripts)
+        if (folderScannedScripts.containsKey(appId)) {
+            Map<String, String> scriptInfo = folderScannedScripts.get(appId).get(endpoint);
+            if (scriptInfo != null) {
+                // Found in folder-scanned scripts - execute directly from file
+                try {
+                    String fileAccessPointId = scriptInfo.get("fileAccessPointId");
+                    String filePath = scriptInfo.get("path");
+                    
+                    // Load script from file
+                    FileInfo fileContent = fileAccessPointService.getFileContent(fileAccessPointId, filePath);
+                    String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    
+                    // Create backend APIs wrapper
+                    MongoAppScriptBackendApis backendApis = new MongoAppScriptBackendApis(appId, this);
+                    
+                    // Execute script directly
+                    return groovyApiService.executeScriptDirect(scriptCode, params, headers, backendApis);
+                } catch (Exception e) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("code", -4);
+                    error.put("message", "Failed to load/execute folder-scanned script: " + e.getMessage());
+                    error.put("data", null);
+                    return error;
+                }
+            }
+        }
+        
         // Transform endpoint name to {appId}_{endpoint}
         String actualEndpoint = appId + "_" + endpoint;
         
-        // Get all scripts for this app
+        // Not in folder-scanned scripts, check database (single-file scripts)
         app.pojo.ApiResponse<Map<String, Object>> allScripts = groovyApiService.listScripts();
         if (allScripts.getCode() != 0) {
             Map<String, Object> error = new HashMap<>();
@@ -1430,43 +1465,27 @@ public class MongoAppService {
                         continue;
                     }
                     
-                    // Load script content
+                    // Construct file path
                     String filePath = folderPath.isEmpty() ? file.getName() : folderPath + "/" + file.getName();
-                    FileInfo fileContent = fileAccessPointService.getFileContent(fileAccessPointId, filePath);
-                    String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
                     
-                    // Create script source object for file-based script
-                    Map<String, Object> scriptSource = new HashMap<>();
-                    scriptSource.put("storageType", "fileAccessPoint");
-                    scriptSource.put("fileAccessPointId", fileAccessPointId);
-                    scriptSource.put("path", filePath);
+                    // Store in-memory (non-persistent)
+                    endpointRegistry.put(endpoint, fileAccessPointId + ":" + folderPath);
                     
-                    // Register script
-                    app.pojo.ApiResponse<app.pojo.GroovyApiScript> uploadResult = groovyApiService.uploadScriptWithObject(
-                        null, // scriptId - null for new script
-                        appId + "_" + endpoint, // actual endpoint with appId prefix
-                        scriptSource,
-                        "Auto-loaded from " + fileAccessPointId + ":" + filePath,
-                        null, // timezone
-                        appId, // owner
-                        "mongoApp" // source
-                    );
+                    Map<String, String> scriptInfo = new HashMap<>();
+                    scriptInfo.put("fileAccessPointId", fileAccessPointId);
+                    scriptInfo.put("path", filePath);
+                    scriptInfo.put("folderPath", folderPath);
+                    scriptInfo.put("endpoint", endpoint);
                     
-                    if (uploadResult.getCode() == 0) {
-                        endpointRegistry.put(endpoint, fileAccessPointId + ":" + folderPath);
-                        
-                        Map<String, Object> loaded = new HashMap<>();
-                        loaded.put("endpoint", endpoint);
-                        loaded.put("file", filePath);
-                        loaded.put("fileAccessPointId", fileAccessPointId);
-                        loadedScripts.add(loaded);
-                    } else {
-                        Map<String, Object> skipped = new HashMap<>();
-                        skipped.put("endpoint", endpoint);
-                        skipped.put("file", filePath);
-                        skipped.put("reason", "Failed to register: " + uploadResult.getMessage());
-                        skippedScripts.add(skipped);
-                    }
+                    // Get or create app-specific registry
+                    folderScannedScripts.putIfAbsent(appId, new java.util.concurrent.ConcurrentHashMap<>());
+                    folderScannedScripts.get(appId).put(endpoint, scriptInfo);
+                    
+                    Map<String, Object> loaded = new HashMap<>();
+                    loaded.put("endpoint", endpoint);
+                    loaded.put("file", filePath);
+                    loaded.put("fileAccessPointId", fileAccessPointId);
+                    loadedScripts.add(loaded);
                 }
             } catch (Exception e) {
                 System.err.println("Error scanning folder " + folderPath + ": " + e.getMessage());
@@ -1481,6 +1500,46 @@ public class MongoAppService {
         result.put("skippedScripts", skippedScripts);
         
         return ApiResponse.success(result, "Scanned " + scriptFolders.size() + " folders, loaded " + loadedScripts.size() + " scripts");
+    }
+    
+    /**
+     * Get folder-scanned scripts for an app (from in-memory registry)
+     * @param appId The app ID
+     * @return List of scripts with their folder info and file content
+     */
+    public ApiResponse<List<Map<String, Object>>> getScriptScannedFromFolders(String appId) {
+        List<Map<String, Object>> scripts = new ArrayList<>();
+        
+        if (folderScannedScripts.containsKey(appId)) {
+            Map<String, Map<String, String>> appScripts = folderScannedScripts.get(appId);
+            
+            for (Map.Entry<String, Map<String, String>> entry : appScripts.entrySet()) {
+                Map<String, String> scriptInfo = entry.getValue();
+                Map<String, Object> script = new HashMap<>();
+                
+                script.put("endpoint", scriptInfo.get("endpoint"));
+                script.put("fileAccessPointId", scriptInfo.get("fileAccessPointId"));
+                script.put("path", scriptInfo.get("path"));
+                script.put("folderPath", scriptInfo.get("folderPath"));
+                script.put("source", "folder-scanned"); // Mark as folder-scanned
+                
+                // Load file content for display
+                try {
+                    String fileAccessPointId = scriptInfo.get("fileAccessPointId");
+                    String filePath = scriptInfo.get("path");
+                    FileInfo fileContent = fileAccessPointService.getFileContent(fileAccessPointId, filePath);
+                    String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    script.put("fileContent", scriptCode);
+                } catch (Exception e) {
+                    System.err.println("Failed to load file content for " + scriptInfo.get("path") + ": " + e.getMessage());
+                    script.put("fileContent", "// Failed to load file content: " + e.getMessage());
+                }
+                
+                scripts.add(script);
+            }
+        }
+        
+        return ApiResponse.success(scripts, "Folder-scanned scripts retrieved");
     }
     
     /**
@@ -1531,41 +1590,25 @@ public class MongoAppService {
                 // Extract endpoint name (filename without .groovy)
                 String endpoint = file.getName().substring(0, file.getName().length() - ".groovy".length());
                 
-                // Load script content
+                // Construct file path
                 String filePath = folderPath.isEmpty() ? file.getName() : folderPath + "/" + file.getName();
-                FileInfo fileContent = fileAccessPointService.getFileContent(fileAccessPointId, filePath);
-                String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
                 
-                // Create script source object for file-based script
-                Map<String, Object> scriptSource = new HashMap<>();
-                scriptSource.put("storageType", "fileAccessPoint");
-                scriptSource.put("fileAccessPointId", fileAccessPointId);
-                scriptSource.put("path", filePath);
+                // Store in-memory (non-persistent)
+                Map<String, String> scriptInfo = new HashMap<>();
+                scriptInfo.put("fileAccessPointId", fileAccessPointId);
+                scriptInfo.put("path", filePath);
+                scriptInfo.put("folderPath", folderPath);
+                scriptInfo.put("endpoint", endpoint);
                 
-                // Register script (will update if already exists)
-                app.pojo.ApiResponse<app.pojo.GroovyApiScript> uploadResult = groovyApiService.uploadScriptWithObject(
-                    null, // scriptId - null for new script
-                    appId + "_" + endpoint, // actual endpoint with appId prefix
-                    scriptSource,
-                    "Auto-loaded from " + fileAccessPointId + ":" + filePath,
-                    null, // timezone
-                    appId, // owner
-                    "mongoApp" // source
-                );
+                // Get or create app-specific registry
+                folderScannedScripts.putIfAbsent(appId, new java.util.concurrent.ConcurrentHashMap<>());
+                folderScannedScripts.get(appId).put(endpoint, scriptInfo);
                 
-                if (uploadResult.getCode() == 0) {
-                    Map<String, Object> loaded = new HashMap<>();
-                    loaded.put("endpoint", endpoint);
-                    loaded.put("file", filePath);
-                    loaded.put("fileAccessPointId", fileAccessPointId);
-                    loadedScripts.add(loaded);
-                } else {
-                    Map<String, Object> skipped = new HashMap<>();
-                    skipped.put("endpoint", endpoint);
-                    skipped.put("file", filePath);
-                    skipped.put("reason", "Failed to register: " + uploadResult.getMessage());
-                    skippedScripts.add(skipped);
-                }
+                Map<String, Object> loaded = new HashMap<>();
+                loaded.put("endpoint", endpoint);
+                loaded.put("file", filePath);
+                loaded.put("fileAccessPointId", fileAccessPointId);
+                loadedScripts.add(loaded);
             }
         } catch (Exception e) {
             System.err.println("Error scanning folder " + folderPath + ": " + e.getMessage());

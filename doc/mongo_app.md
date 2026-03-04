@@ -56,7 +56,9 @@ Each MongoApp can have its own Groovy scripts for custom API endpoints.
   - Scans folders from last to first (first folder has priority)
   - Only loads `.groovy` files
   - Endpoint name = filename without `.groovy` suffix
-  - Skips duplicate endpoints (first folder wins)
+  - **Scripts are stored IN-MEMORY ONLY** (not persisted to database)
+  - Scripts are always loaded fresh from filesystem on execution
+  - Scripts disappear on backend restart (need re-scan)
 
 **Lifecycle:**
 - When a MongoApp is deleted, all its Groovy scripts are automatically deleted
