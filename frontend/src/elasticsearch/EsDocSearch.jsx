@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SpinningCircle } from '@wwf971/react-comp-misc';
+import { EsDocSearchResult } from '@wwf971/homepage-utils-utils';
 import { searchEsDocs } from './EsStore';
-import EsDocSearchResult from './EsDocSearchResult';
 import '@wwf971/homepage-utils-utils/elasticsearch.css';
 
 /**
