@@ -32,41 +32,13 @@ app mongodb document
 
 ### MongoApp Groovy Scripts (Dynamic APIs)
 
-Each MongoApp can have its own Groovy scripts for custom API endpoints.
+Each MongoApp can have custom Groovy scripts for dynamic API endpoints. See `mongo_app_dynamic_api.md` for detailed documentation.
 
-**Storage:**
-- Scripts are stored in MongoDB database: `main`, collection: `groovy-api`
-- Each script document has `owner` field (set to appId) and `source` field (set to "mongoApp")
-
-**Ownership & Isolation:**
-- Scripts are filtered by `owner=appId` and `source=mongoApp`
-- This ensures each MongoApp can only see and manage its own scripts
-- Endpoint names are prefixed with `{appId}_` to avoid conflicts
-
-**Script Types:**
-1. **Inline scripts**: Script code stored directly in `scriptSource.rawText`
-2. **File-based scripts**: Script loaded from file access point, with cached content
-3. **Auto-loaded scripts**: Scripts automatically loaded from configured folders
-
-**Auto-Loading from Folders:**
-- MongoApps can register folders in file access points for auto-loading Groovy scripts
-- Folder configurations are stored in app metadata: `groovyScriptFolders` array
-- Each folder entry contains: `fileAccessPointId`, `path`, and `addedAt`
-- Scanning process:
-  - Scans folders from last to first (first folder has priority)
-  - Only loads `.groovy` files
-  - Endpoint name = filename without `.groovy` suffix
-  - **Scripts are stored IN-MEMORY ONLY** (not persisted to database)
-  - Scripts are always loaded fresh from filesystem on execution
-  - Scripts disappear on backend restart (need re-scan)
-
-**Lifecycle:**
-- When a MongoApp is deleted, all its Groovy scripts are automatically deleted
-- Scripts can be refreshed from file source using the refresh endpoint
-
-**Execution:**
-- Scripts are accessed via: `POST /mongo-app/{appId}/api/{endpoint}` or `GET /mongo-app/{appId}/api/{endpoint}`
-- Scripts have access to MongoApp services (MongoDB, Elasticsearch, etc.)
+**Quick overview:**
+- Scripts are stored in MongoDB or loaded from files/folders
+- Three types: inline, file-based, auto-loaded from folders
+- Scripts are scoped to their app and cannot access other apps' data
+- Backend automatically scans configured folders on startup
 
 ## API Endpoints
 
@@ -101,24 +73,11 @@ Each MongoApp can have its own Groovy scripts for custom API endpoints.
 
 ### Groovy API Scripts (Dynamic APIs)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/mongo-app/{appId}/api-config/create` | Create inline Groovy script |
-| POST | `/mongo-app/{appId}/api-config/create-from-file` | Create Groovy script from file |
-| GET | `/mongo-app/{appId}/api-config/list` | List all scripts for app |
-| GET | `/mongo-app/{appId}/api-config/get/{scriptId}` | Get script by ID |
-| PUT | `/mongo-app/{appId}/api-config/update/{scriptId}` | Update script |
-| DELETE | `/mongo-app/{appId}/api-config/delete/{scriptId}` | Delete script |
-| POST | `/mongo-app/{appId}/api-config/{scriptId}/refresh` | Refresh file-based script |
-| POST | `/mongo-app/{appId}/api/{endpoint}` | Execute script (POST) |
-| GET | `/mongo-app/{appId}/api/{endpoint}` | Execute script (GET) |
-
-### Groovy Script Folder Auto-Loading
+See `mongo_app_dynamic_api.md` for complete API documentation and examples.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/mongo-app/{appId}/api-folders/add` | Add folder for auto-loading scripts |
-| POST | `/mongo-app/{appId}/api-folders/remove` | Remove folder from auto-loading |
-| GET | `/mongo-app/{appId}/api-folders/list` | List configured folders |
-| POST | `/mongo-app/{appId}/api-folders/scan` | Scan and load scripts from all folders |
-| POST | `/mongo-app/{appId}/api-folders/scan-one` | Scan and load scripts from a specific folder |
+| POST/GET | `/mongo-app/{appId}/api/{endpoint}` | Execute script |
+| POST | `/mongo-app/{appId}/api-config/create` | Create inline script |
+| POST | `/mongo-app/{appId}/api-config/create-from-file` | Create from file |
+| POST | `/mongo-app/{appId}/api-folders/scan` | Scan all folders |

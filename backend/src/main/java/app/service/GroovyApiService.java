@@ -526,9 +526,13 @@ public class GroovyApiService {
             binding.setVariable("params", params != null ? params : new HashMap<>());
             binding.setVariable("headers", headers != null ? headers : new HashMap<>());
             
+            // Provide parameters with new naming convention (same as executeScript)
+            binding.setVariable("requestParams", params != null ? params : new HashMap<>());
+            binding.setVariable("requestHeaders", headers != null ? headers : new HashMap<>());
+            
             // Add backend APIs if provided
             if (backendApis != null) {
-                binding.setVariable("backend", backendApis);
+                binding.setVariable("backendApis", backendApis);
             }
             
             script.setBinding(binding);
@@ -536,12 +540,37 @@ public class GroovyApiService {
             // Execute
             Object result = script.run();
             
-            // Format response
-            Map<String, Object> response = new HashMap<>();
-            response.put("code", 0);
-            response.put("data", result);
-            response.put("message", "Success");
-            return response;
+            // If script returns standard format {code, data, message}, return as-is
+            if (result instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> resultMap = (Map<String, Object>) result;
+                
+                if (resultMap.containsKey("code")) {
+                    // Script returned standard format - return as-is
+                    // Ensure required fields exist
+                    if (!resultMap.containsKey("data")) {
+                        resultMap.put("data", null);
+                    }
+                    if (!resultMap.containsKey("message")) {
+                        resultMap.put("message", null);
+                    }
+                    return resultMap;
+                } else {
+                    // Script returned a Map but not in standard format - wrap it
+                    Map<String, Object> wrapped = new HashMap<>();
+                    wrapped.put("code", 0);
+                    wrapped.put("data", resultMap);
+                    wrapped.put("message", "Success");
+                    return wrapped;
+                }
+            } else {
+                // Script returned non-Map result - wrap it
+                Map<String, Object> wrapped = new HashMap<>();
+                wrapped.put("code", 0);
+                wrapped.put("data", result);
+                wrapped.put("message", "Success");
+                return wrapped;
+            }
         } catch (Exception e) {
             System.err.println("Script execution error: " + e.getMessage());
             e.printStackTrace();

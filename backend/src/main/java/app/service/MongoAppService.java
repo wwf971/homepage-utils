@@ -21,6 +21,7 @@ import com.mongodb.client.model.Updates;
 import app.pojo.ApiResponse;
 import app.pojo.FileInfo;
 import app.util.TimeUtils;
+import jakarta.annotation.PostConstruct;
 
 /**
  * Service for managing MongoDB collections for different apps
@@ -60,6 +61,64 @@ public class MongoAppService {
      * where ScriptFileInfo contains: fileAccessPointId, path, folderPath
      */
     private final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>> folderScannedScripts = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    /**
+     * Initialize service - scan all apps' groovy script folders on startup
+     */
+    @PostConstruct
+    public void init() {
+        System.out.println("MongoAppService: Initializing and scanning groovy script folders...");
+        
+        try {
+            // Get all apps
+            ApiResponse<List<Map<String, Object>>> appsResponse = listAllApps();
+            if (appsResponse.getCode() != 0 || appsResponse.getData() == null) {
+                System.out.println("MongoAppService: No apps found or error listing apps");
+                return;
+            }
+            
+            List<Map<String, Object>> apps = appsResponse.getData();
+            int totalScanned = 0;
+            int totalLoaded = 0;
+            
+            // Scan each app's groovy script folders
+            for (Map<String, Object> app : apps) {
+                String appId = (String) app.get("appId");
+                if (appId == null) continue;
+                
+                // Check if app has groovy script folders configured
+                MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+                Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+                if (appDoc == null) continue;
+                
+                @SuppressWarnings("unchecked")
+                List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+                if (scriptFolders == null || scriptFolders.isEmpty()) {
+                    continue;
+                }
+                
+                // Scan and load scripts for this app
+                System.out.println("MongoAppService: Scanning groovy scripts for app: " + appId + " (" + scriptFolders.size() + " folders)");
+                ApiResponse<Map<String, Object>> scanResult = scanAndLoadGroovyScripts(appId);
+                
+                if (scanResult.getCode() == 0 && scanResult.getData() != null) {
+                    Map<String, Object> resultData = scanResult.getData();
+                    Integer loadedCount = (Integer) resultData.get("loadedCount");
+                    if (loadedCount != null) {
+                        totalLoaded += loadedCount;
+                        System.out.println("MongoAppService: Loaded " + loadedCount + " scripts for app: " + appId);
+                    }
+                }
+                totalScanned++;
+            }
+            
+            System.out.println("MongoAppService: Initialization complete. Scanned " + totalScanned + " apps, loaded " + totalLoaded + " groovy scripts");
+        } catch (Exception e) {
+            System.err.println("MongoAppService: Error during initialization: " + e.getMessage());
+            e.printStackTrace();
+            // Don't throw - let the service start even if scanning fails
+        }
+    }
     
     /**
      * Get the app metadata collection, creating it if necessary

@@ -263,7 +263,7 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
         </PanelToggle>
       )}
       {panels_existence.showGroovyApiTest && (
-        <PanelToggle title="Test MongoApp Groovy APIs" defaultExpanded={true}>
+        <PanelToggle title="Groovy API Scripts Test" defaultExpanded={true}>
           <MongoAppGroovyApiTest store={store} />
         </PanelToggle>
       )}

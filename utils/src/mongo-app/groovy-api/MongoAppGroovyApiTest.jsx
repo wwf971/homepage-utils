@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshIcon } from '@wwf971/react-comp-misc';
+import Tag from '../../ui/Tag.jsx';
+
 const MongoAppGroovyApiTest = ({ store }) => {
   const [scripts, setScripts] = useState({});
   const [selectedEndpoint, setSelectedEndpoint] = useState('');
@@ -19,21 +21,45 @@ const MongoAppGroovyApiTest = ({ store }) => {
     setError(null);
     
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/list`);
-      const result = await response.json();
+      // Fetch both database-persisted scripts and folder-scanned scripts
+      const [configResponse, folderResponse] = await Promise.all([
+        fetch(`${serverUrl}/mongo-app/${appId}/api-config/list`),
+        fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scripts`)
+      ]);
       
-      if (result.code === 0) {
-        const fetchedScripts = result.data || {};
-        setScripts(fetchedScripts);
-        
-        // Auto-select first endpoint if none selected
-        if (!selectedEndpoint && Object.keys(fetchedScripts).length > 0) {
-          const firstScript = Object.values(fetchedScripts)[0];
-          const apiPath = firstScript.apiPath || firstScript.endpoint;
-          setSelectedEndpoint(apiPath);
-        }
-      } else {
-        setError(result.message || 'Failed to fetch scripts');
+      const configResult = await configResponse.json();
+      const folderResult = await folderResponse.json();
+      
+      let allScripts = {};
+      
+      // Add database-persisted scripts
+      if (configResult.code === 0) {
+        allScripts = { ...configResult.data } || {};
+      }
+      
+      // Add folder-scanned scripts (convert array to object keyed by endpoint)
+      if (folderResult.code === 0 && Array.isArray(folderResult.data)) {
+        folderResult.data.forEach(script => {
+          const endpoint = script.endpoint;
+          if (endpoint && !allScripts[endpoint]) {
+            // Mark as folder-scanned script
+            allScripts[endpoint] = {
+              ...script,
+              id: `folder-${endpoint}`,
+              apiPath: endpoint,
+              fromFolder: true
+            };
+          }
+        });
+      }
+      
+      setScripts(allScripts);
+      
+      // Auto-select first endpoint if none selected
+      if (!selectedEndpoint && Object.keys(allScripts).length > 0) {
+        const firstScript = Object.values(allScripts)[0];
+        const apiPath = firstScript.apiPath || firstScript.endpoint;
+        setSelectedEndpoint(apiPath);
       }
     } catch (err) {
       setError(err.message);
@@ -112,15 +138,24 @@ const MongoAppGroovyApiTest = ({ store }) => {
           <div className="mongo-tags-container">
             {scriptsArray.map(script => {
               const apiPath = script.apiPath || script.endpoint;
+              const description = script.description || apiPath;
+              const isFromFolder = script.fromFolder === true;
+              
               return (
-                <span
+                <Tag
                   key={script.id}
-                  className={`mongo-tag mongo-tag-clickable ${selectedEndpoint === apiPath ? 'mongo-tag-selected' : ''}`}
+                  isClickable={true}
+                  isSelected={selectedEndpoint === apiPath}
                   onClick={() => setSelectedEndpoint(apiPath)}
-                  title={script.description || apiPath}
+                  style={{ fontSize: '13px' }}
                 >
                   {apiPath}
-                </span>
+                  {isFromFolder && (
+                    <span style={{ marginLeft: '4px', fontSize: '11px', color: '#999' }}>
+                      (folder)
+                    </span>
+                  )}
+                </Tag>
               );
             })}
           </div>
