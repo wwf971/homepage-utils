@@ -1,4 +1,5 @@
 export { default as MongoAppConfig } from './mongo-app/MongoAppConfig'
+export { default as MongoAppListAll } from './mongo-app/MongoAppListAll'
 export { default as EsDocSearchResult } from './elasticsearch/EsDocSearchResult'
 export { formatTimestamp, getTimezoneInt } from './utils/utils'
 

@@ -11,98 +11,6 @@ import MongoAppCollectionConfig from './MongoAppCollectionConfig.jsx'
 import MongoAppEsConfig from './MongoAppEsConfig.jsx'
 import './MongoAppConfig.css'
 
-// App ID Management Panel
-const AppIdPanel = observer(() => {
-  const store = useMongoAppStore()
-  
-  return (
-    <div className="config-panel-content">
-      <div className="config-row">
-        <label className="config-label">App Name:</label>
-        <input
-          type="text"
-          className="config-input"
-          value={store.appName}
-          onChange={(e) => store.setAppName(e.target.value)}
-          placeholder="jp-learn"
-        />
-      </div>
-
-      <div className="config-row">
-        <label className="config-label">App ID:</label>
-        <input
-          type="text"
-          className="config-input"
-          value={store.appId}
-          readOnly
-          placeholder="Will be generated or searched"
-        />
-      </div>
-
-      <div className="config-button-row">
-        <button
-          className="config-button config-button-primary"
-          onClick={() => store.searchAppId()}
-          disabled={!store.serverUrl || !store.appName || store.isLoadingAppId}
-        >
-          {store.isLoadingAppId ? (
-            <>
-              <SpinningCircle width={14} height={14} color="white" />
-              <span>Searching...</span>
-            </>
-          ) : (
-            'Search App ID'
-          )}
-        </button>
-
-        <button
-          className="config-button config-button-primary"
-          onClick={() => store.createApp()}
-          disabled={!store.serverUrl || !store.appName || store.isCreatingApp}
-        >
-          {store.isCreatingApp ? (
-            <>
-              <SpinningCircle width={14} height={14} color="white" />
-              <span>Creating...</span>
-            </>
-          ) : (
-            'Create App'
-          )}
-        </button>
-      </div>
-
-      {store.foundApps.length > 0 && (
-        <div className="config-found-apps">
-          <div className="config-label">Found Apps:</div>
-          {store.foundApps.map((app) => (
-            <div key={app.appId} className="config-app-item">
-              <div className="config-app-info">
-                <div className="config-app-name">{app.appName}</div>
-                <div className="config-app-id">{app.appId}</div>
-              </div>
-              {app.appId !== store.appId && (
-                <button
-                  className="config-button-small"
-                  onClick={() => store.setAppId(app.appId)}
-                >
-                  Select
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {store.appError && (
-        <div className="config-message-box config-message-error-box">
-          <strong>Error</strong>
-          <div className="config-message-error-text">{store.appError}</div>
-        </div>
-      )}
-    </div>
-  )
-})
-
 // App Metadata Panel
 const AppMetadataPanel = observer(() => {
   const store = useMongoAppStore()
@@ -136,7 +44,7 @@ const AppMetadataPanel = observer(() => {
   )
 })
 
-const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_existence }) => {
+const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_existence, title = 'Configuration' }) => {
   const store = useMongoAppStore()
   const hasInitialized = useRef(false)
   const collectionsRef = useRef(collections)
@@ -184,7 +92,6 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
             store.checkCollections(currentCollections)
           }
           store.fetchAppMetadata()
-          store.checkIndexExists()
         }
       },
       { fireImmediately: true }
@@ -230,16 +137,13 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
 
   return (
     <div className="config-container">
-      <div className="config-title">Configuration</div>
+      {title && (
+        <div className="config-title">{title}</div>
+      )}
 
       {panels_existence.showTestConnection && (
         <PanelToggle title="Server URL" defaultExpanded={!store.serverUrl}>
           <TestConnection />
-        </PanelToggle>
-      )}
-      {panels_existence.showAppIdManagement && (
-        <PanelToggle title="App ID Management" defaultExpanded={!store.appId}>
-          <AppIdPanel />
         </PanelToggle>
       )}
       {panels_existence.showAppMetadata && (
@@ -279,11 +183,11 @@ const MongoAppConfig = ({
   localStorageKey = 'mongo-app-config',
   onConfigChange = null,
   externalStore = null,
-  panels_existence = null
+  panels_existence = null,
+  title = 'Configuration'
 }) => {
   const panelsExistence = panels_existence || {
     showTestConnection: true,
-    showAppIdManagement: true,
     showAppMetadata: true,
     showCollections: true,
     showEsIndices: true,
@@ -295,7 +199,7 @@ const MongoAppConfig = ({
   if (externalStore) {
     return (
       <ExternalStoreProvider store={externalStore}>
-        <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} panels_existence={panelsExistence} />
+        <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} panels_existence={panelsExistence} title={title} />
       </ExternalStoreProvider>
     )
   }
@@ -303,7 +207,7 @@ const MongoAppConfig = ({
   // Otherwise use internal StoreProvider
   return (
     <StoreProvider appName={appName} defaultServerUrl={defaultServerUrl} localStorageKey={localStorageKey}>
-      <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} panels_existence={panelsExistence} />
+      <MongoAppConfigInner collections={collections} onConfigChange={onConfigChange} panels_existence={panelsExistence} title={title} />
     </StoreProvider>
   )
 }

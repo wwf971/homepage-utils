@@ -552,18 +552,13 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
         </div>
         <button
           onClick={() => setShowCreatePanel(true)}
+          className="mongo-app-refresh-button"
+          title="Create Collection"
           style={{
-            padding: '2px 6px',
-            border: '1px solid #0969da',
-            borderRadius: '3px',
-            background: '#0969da',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: '11px',
-            fontWeight: '500'
+            color: '#0969da'
           }}
         >
-          Create Collection
+          <PlusIcon width={14} height={14} />
         </button>
       </div>
 

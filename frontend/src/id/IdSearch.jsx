@@ -439,7 +439,7 @@ const IdSearch = () => {
           message={confirmDialog.message}
           confirmText="Delete"
           cancelText="Cancel"
-          danger={true}
+          isDanger={true}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
         />

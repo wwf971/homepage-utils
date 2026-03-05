@@ -706,7 +706,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
           message={confirmDialog.message}
           confirmText="Confirm"
           cancelText="Cancel"
-          danger={true}
+          isDanger={true}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
         />

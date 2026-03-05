@@ -21,7 +21,8 @@ import IdConfigPanel from './id/IdConfigPanel';
 import IdDataPanel from './id/IdDataPanel';
 import BackendServerPanel from './remote/BackendServerPanel';
 import PanelFileAccessPoint from './file-access-point/PanelFileAccessPoint';
-import PanelMongoApp from './mongo-app/PanelMongApp';
+import PanelMongoAppConfig from './mongo-app/PanelMongoAppConfig';
+import PanelMongoAppCreate from './mongo-app/PanelMongoAppCreate';
 import PanelGroovyApi from './groovy-api/PanelGroovyApi';
 import './App.css';
 
@@ -144,9 +145,14 @@ function App() {
           </Tab>
           
           <Tab label="Mongo App">
-            <SubTab label="Apps">
+            <SubTab label="Create">
               <Panel>
-                <PanelMongoApp />
+                <PanelMongoAppCreate />
+              </Panel>
+            </SubTab>
+            <SubTab label="View">
+              <Panel>
+                <PanelMongoAppConfig />
               </Panel>
             </SubTab>
           </Tab>

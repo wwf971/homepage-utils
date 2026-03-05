@@ -18,7 +18,8 @@
       "import": "./dist/utils.js"
     },
     "./dist/*.css": "./dist/*.css",
-    "./elasticsearch.css": "./src/elasticsearch/elasticsearch.css"
+    "./elasticsearch.css": "./src/elasticsearch/elasticsearch.css",
+    "./mongoApp.css": "./src/mongo-app/mongoApp.css"
   },
   "files": [
     "dist"

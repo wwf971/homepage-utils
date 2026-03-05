@@ -684,8 +684,8 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
           message={`Are you sure you want to delete "${observableDoc.content?.name || 'this file access point'}"? This action cannot be undone.`}
           confirmText={deleting ? "Deleting..." : "Delete"}
           cancelText="Cancel"
-          danger={true}
-          disabled={deleting}
+          isDanger={true}
+          isDisabled={deleting}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setShowDeleteConfirm(false)}
         />

@@ -189,7 +189,7 @@ class MongoAppStore {
     }
   }
 
-  async createApp() {
+  async createMongoApp() {
     if (!this.serverUrl || !this.appName) {
       this.appError = 'Server URL and app name are required'
       return

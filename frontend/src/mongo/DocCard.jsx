@@ -203,7 +203,7 @@ const DocCard = observer(({ doc, index, onDelete }) => {
           message="Are you sure you want to delete this document?"
           confirmText="Delete"
           cancelText="Cancel"
-          danger={true}
+          isDanger={true}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setShowConfirm(false)}
         />

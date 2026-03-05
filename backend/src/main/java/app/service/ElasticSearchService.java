@@ -1,6 +1,7 @@
 package app.service;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -127,10 +128,21 @@ public class ElasticSearchService {
     }
 
     /**
-     * Read response from connection
+     * Read response from connection (supports both success and error streams)
      */
     private String readResponse(HttpURLConnection connection) throws Exception {
-        BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        InputStream stream;
+        try {
+            stream = connection.getInputStream();
+        } catch (Exception e) {
+            // If getInputStream fails, try getErrorStream for error responses
+            stream = connection.getErrorStream();
+            if (stream == null) {
+                throw e;
+            }
+        }
+        
+        BufferedReader in = new BufferedReader(new InputStreamReader(stream));
         StringBuilder response = new StringBuilder();
         String inputLine;
         while ((inputLine = in.readLine()) != null) {
@@ -173,16 +185,6 @@ public class ElasticSearchService {
         
         // Build settings
         ObjectNode settings = root.putObject("settings");
-        
-        // Add metadata if provided
-        if (metadata != null && !metadata.isEmpty()) {
-            ObjectNode indexSettings = settings.putObject("index");
-            ObjectNode meta = indexSettings.putObject("meta");
-            for (Map.Entry<String, String> entry : metadata.entrySet()) {
-                meta.put(entry.getKey(), entry.getValue());
-            }
-        }
-
 
         /*
         "settings": {
@@ -247,10 +249,19 @@ public class ElasticSearchService {
         ObjectNode tokenizer = analysis.putObject("tokenizer");
         ObjectNode charTokenizer = tokenizer.putObject("char_tokenizer");
         charTokenizer.put("type", "pattern");
-        charTokenizer.put("pattern", "");
+        charTokenizer.put("pattern", "."); // Match every character
         
         // Build mappings
         ObjectNode mappings = root.putObject("mappings");
+        
+        // Add metadata if provided (at mapping level, not settings level)
+        if (metadata != null && !metadata.isEmpty()) {
+            ObjectNode meta = mappings.putObject("_meta");
+            for (Map.Entry<String, String> entry : metadata.entrySet()) {
+                meta.put(entry.getKey(), entry.getValue());
+            }
+        }
+        
         ObjectNode properties = mappings.putObject("properties");
         
         // Add keyword fields at top level
@@ -279,6 +290,9 @@ public class ElasticSearchService {
         value.put("term_vector", "with_positions_offsets");
         
         String jsonBody = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+        
+        System.out.println("Creating ES index: " + indexName);
+        System.out.println("Request body:\n" + jsonBody);
 
         HttpURLConnection createConn = setupConnection(indexUri, "PUT");
         createConn.setDoOutput(true);
@@ -292,6 +306,7 @@ public class ElasticSearchService {
             System.out.println("Created ES index: " + indexName);
         } else {
             String errorResponse = readResponse(createConn);
+            System.err.println("Elasticsearch error response: " + errorResponse);
             throw new Exception("Failed to create index: HTTP " + respCode + " - " + errorResponse);
         }
     }
@@ -842,16 +857,18 @@ public class ElasticSearchService {
 
     /**
      * Update index metadata settings
-     * Adds or updates a key-value pair under index.meta
+     * NOTE: _meta is part of mappings, not settings, and cannot be updated after index creation.
+     * This method is kept for backward compatibility but may not work as expected.
+     * Metadata should be set at index creation time via createCharLevelIndex.
      */
     public void updateIndexMeta(String indexName, String key, String value) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String settingsUri = baseUri + indexName + "/_settings";
 
-        // Build settings update with index.meta.key = value
+        // Attempting to update settings (note: _meta is actually in mappings, not settings)
         Map<String, Object> settings = new HashMap<>();
-        settings.put("index.meta." + key, value);
+        settings.put("index._meta." + key, value);
 
         HttpURLConnection connection = setupConnection(settingsUri, "PUT");
         connection.setDoOutput(true);

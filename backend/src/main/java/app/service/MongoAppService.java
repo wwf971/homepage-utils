@@ -254,7 +254,7 @@ public class MongoAppService {
         try {
             Map<String, String> metadata = new HashMap<>();
 
-            // add information about owner app in settings.index.meta
+            // add information about owner app in mappings._meta
             metadata.put("owner", "mongoapp_" + appId);
             esService.createCharLevelIndex(esIndexName, false, metadata);
         } catch (Exception e) {
@@ -569,6 +569,40 @@ public class MongoAppService {
                 "deletedScripts", deletedScripts
             ),
             "App deleted successfully"
+        );
+    }
+    
+    /**
+     * Rename a MongoApp
+     * @param appId The app ID
+     * @param newName The new app name
+     * @return Result with updated app info
+     */
+    public ApiResponse<Map<String, Object>> renameApp(String appId, String newName) {
+        if (newName == null || newName.trim().isEmpty()) {
+            return createErrorResult("New name cannot be empty");
+        }
+        
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        // Update app name
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            new Document("$set", new Document("appName", newName.trim()))
+        );
+        
+        return ApiResponse.success(
+            Map.of(
+                "appId", appId,
+                "oldName", appDoc.getString("appName"),
+                "newName", newName.trim()
+            ),
+            "App renamed successfully"
         );
     }
     

@@ -138,6 +138,20 @@ public class MongoAppController {
     }
 
     /**
+     * Rename an app
+     * PUT /mongo-app/{appId}/rename
+     * Body: { "newName": "new-app-name" }
+     * 
+     * @return { "code": 0, "message": "...", "data": { "appId": "...", "oldName": "...", "newName": "..." } }
+     */
+    @PutMapping("/{appId}/rename")
+    public ApiResponse<Map<String, Object>> renameApp(@PathVariable String appId,
+                                                      @RequestBody Map<String, String> request) {
+        String newName = request.get("newName");
+        return mongoAppService.renameApp(appId, newName);
+    }
+
+    /**
      * Create a document
      * POST /mongo-app/{appId}/coll/{collectionName}/doc/create
      * Body: { "docId": "doc1", "content": { "field1": "value1", ... }, "shouldUpdateIndex": true }

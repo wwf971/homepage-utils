@@ -2,12 +2,11 @@ import React, { useMemo } from 'react'
 import { observer } from 'mobx-react-lite'
 import { MongoAppConfig as MongoAppConfigPanel} from '@wwf971/homepage-utils-utils'
 import { mongoAppStore } from './mongoAppStore'
-import './mongoApp.css'
+// CSS imported in PanelMongoAppConfig.jsx
 
 const EMPTY_ARRAY = []
 const SECTIONS_EXISTENCE = {
   showTestConnection: false,
-  showAppIdManagement: false,
   showAppMetadata: true,
   showCollections: true,
   showEsIndices: true,
@@ -15,7 +14,7 @@ const SECTIONS_EXISTENCE = {
   showGroovyApiTest: true
 }
 
-const MongoAppCard = observer(() => {
+const MongoAppCard = observer(({ title = 'Configuration' }) => {
   const store = mongoAppStore
 
   // Use useMemo to prevent creating new array reference on every render
@@ -41,6 +40,7 @@ const MongoAppCard = observer(() => {
         externalStore={store}
         collections={collections}
         panels_existence={SECTIONS_EXISTENCE}
+        title={title}
       />
     </div>
   )

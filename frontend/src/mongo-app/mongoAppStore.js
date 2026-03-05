@@ -79,6 +79,24 @@ class MongoAppStore {
   }
 
   selectApp(appId) {
+    // Handle deselection
+    if (!appId) {
+      runInAction(() => {
+        this.selectedAppId = null
+        this.selectedApp = null
+        this.appId = ''
+        this.appName = ''
+        this.esIndices = []
+        this.appError = null
+        this.collectionError = null
+        this.indexError = null
+        this.indexSuccess = null
+        this.collectionsInfo = {}
+        this.appMetadata = null
+      })
+      return
+    }
+    
     const app = this.allApps.find(a => a.appId === appId)
     if (app) {
       runInAction(() => {
@@ -167,10 +185,38 @@ class MongoAppStore {
     }
   }
 
-  async createApp() {
-    if (!this.serverUrl || !this.appName) {
+  async checkAppNameExists(appName) {
+    if (!appName || !appName.trim()) {
+      return { exists: false, apps: [] }
+    }
+
+    try {
+      const response = await fetch(`${this.apiBase}/get-id/${encodeURIComponent(appName)}`)
+      
+      if (!response.ok) {
+        return { exists: false, apps: [] }
+      }
+      
+      const result = await response.json()
+      
+      if (result.code === 0 && result.data) {
+        const apps = result.data.apps || []
+        return { exists: apps.length > 0, apps }
+      }
+      
+      return { exists: false, apps: [] }
+    } catch (error) {
+      console.error('Failed to check app name:', error)
+      return { exists: false, apps: [] }
+    }
+  }
+
+  async createMongoApp(appName = null) {
+    const nameToUse = appName || this.appName
+    
+    if (!this.serverUrl || !nameToUse) {
       this.appError = 'Server URL and app name are required'
-      return
+      return { code: -1, message: 'Server URL and app name are required' }
     }
 
     this.isCreatingApp = true
@@ -180,7 +226,7 @@ class MongoAppStore {
       const response = await fetch(`${this.apiBase}/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appName: this.appName }),
+        body: JSON.stringify({ appName: nameToUse }),
       })
       
       if (!response.ok) {
@@ -192,18 +238,24 @@ class MongoAppStore {
       runInAction(() => {
         if (result.code === 0 && result.data) {
           this.appId = result.data.appId
-          // Refresh the list
-          this.fetchAllApps()
+          // Refresh the list and select the new app
+          this.fetchAllApps().then(() => {
+            this.selectApp(result.data.appId)
+          })
         } else {
           this.appError = result.message || 'Failed to create app'
         }
         this.isCreatingApp = false
       })
+      
+      return result
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
       runInAction(() => {
-        this.appError = error instanceof Error ? error.message : 'Unknown error'
+        this.appError = errorMsg
         this.isCreatingApp = false
       })
+      return { code: -1, message: errorMsg }
     }
   }
 

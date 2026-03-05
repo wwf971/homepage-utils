@@ -135,7 +135,7 @@ const GroovyApiCard = observer(({ script, index, onDelete }) => {
           message="Are you sure you want to delete this script?"
           confirmText="Delete"
           cancelText="Cancel"
-          danger={true}
+          isDanger={true}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setShowConfirm(false)}
         />

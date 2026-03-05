@@ -1,18 +1,19 @@
 .mongo-app-panel {
   display: flex;
-  flex-direction: row;
-  gap: 0px;
+  flex-direction: column;
+  gap: 12px;
   height: 100%;
+  padding: 8px;
 }
 
 .mongo-app-list-container {
-  width: 280px;
   background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 12px;
 }
 
 .mongo-app-list-header {
@@ -71,9 +72,9 @@
 }
 
 .mongo-app-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .mongo-app-item {
