@@ -75,7 +75,7 @@ Via the following endpoints:
 | POST | `/mongo-app/{appId}/api-folders/scan-one` | Scan specific folder |
 | GET | `/mongo-app/{appId}/api-folders/scripts` | Get folder-scanned scripts |
 
-## Script Parameters
+### Script Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -85,12 +85,13 @@ Via the following endpoints:
 | `params` | Map | Legacy alias for requestParams |
 | `headers` | Map | Legacy alias for requestHeaders |
 
+## Groovy Scripts input parameters
 
-## Backend API Methods (backendApis)
+### Backend API Methods (backendApis)
 
 Scripts access backend through `backendApis` object, pre-initialized with appId from URL.
 
-### Collection Operations
+#### Collection Operations
 
 | Method | Parameters | Return | Description |
 |--------|------------|--------|-------------|
@@ -98,7 +99,7 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 | `createCollection(collName)` | String | ApiResponse<Map> | Create collection |
 | `collectionExists(collName)` | String | ApiResponse<Map> | Check if exists |
 
-### Document Operations
+#### MongoDB Document Operations
 
 | Method | Parameters | Description |
 |--------|------------|-------------|
@@ -109,14 +110,20 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 | `listDocs(collName, limit, skip)` | String, Int, Int | List with pagination |
 | `searchDocs(collName, query)` | String, Map | Search (not implemented) |
 
-### Index Operations
+#### Elasticsearch Index Operations
 
 | Method | Parameters | Return | Description |
 |--------|------------|--------|-------------|
 | `listAllEsIndices()` | none | ApiResponse<List<String>> | List ES index names |
-| `indexExists(indexName)` | String | ApiResponse<Map> | Check if exists (not impl) |
+| `indexExists(indexName)` | String | ApiResponse<Map> | Check if index exists and whether it belongs to current app |
+| `createEsIndex(indexName)` | String | ApiResponse<Map> | Create app-owned ES index |
+| `deleteEsIndex(indexName)` | String | ApiResponse<Map> | Delete app-owned ES index (cannot delete last index) |
+| `renameEsIndex(oldIndexName, newIndexName)` | String, String | ApiResponse<Map> | Rename app-owned ES index |
+| `getEsIndexInfo(indexName)` | String | ApiResponse<Map> | Get ES index details and doc count |
+| `listEsDocs(indexName, page, pageSize)` | String, Int, Int | ApiResponse<Map> | List docs in ES index |
+| `getEsDoc(indexName, docId)` | String, String | ApiResponse<Map> | Get one ES doc by id |
 
-### App Metadata
+#### App Metadata
 
 | Method | Parameters | Return | Description |
 |--------|------------|--------|-------------|
@@ -128,7 +135,7 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 
 **Note on String Interpolation**: When using Groovy string interpolation (e.g., `"text ${variable}"`), always append `.toString()` to convert the GString to a plain String. Otherwise, the JSON serialization will include the internal GString structure instead of just the string value.
 
-### 1. Simple Addition
+### Basic Example (Inline Script)
 
 ```groovy
 def a = requestParams.a
@@ -144,71 +151,27 @@ return [
 
 Test with: `{"a": 5, "b": 10}`
 
-### 2. Get App Metadata
+### File-Based Example Scripts
 
-```groovy
-def result = backendApis.getAppInfo()
+All full examples are stored in:
+`example/mongo-app-groovy-scripts/`
 
-if (result.code == 0) {
-    return [
-        code: 0,
-        data: result.data,
-        message: "App metadata retrieved successfully"
-    ]
-} else {
-    return [
-        code: result.code,
-        data: null,
-        message: "Failed to get app metadata: ${result.message}".toString()
-    ]
-}
-```
-
-### 3. List All MongoDB Collections
-
-```groovy
-def result = backendApis.listAllCollections()
-
-if (result.code == 0) {
-    def collections = result.data
-    return [
-        code: 0,
-        data: [
-            count: collections.size(),
-            collections: collections
-        ],
-        message: "Successfully listed ${collections.size()} collection(s)".toString()
-    ]
-} else {
-    return [
-        code: result.code,
-        data: null,
-        message: "Failed to list collections: ${result.message}".toString()
-    ]
-}
-```
-
-### 4. List All ES Indices
-
-```groovy
-def result = backendApis.listAllEsIndices()
-
-if (result.code == 0) {
-    def indices = result.data
-    return [
-        code: 0,
-        data: [
-            count: indices.size(),
-            indices: indices
-        ],
-        message: "Successfully listed ${indices.size()} index(es)".toString()
-    ]
-} else {
-    return [
-        code: result.code,
-        data: null,
-        message: "Failed to list ES indices: ${result.message}".toString()
-    ]
-}
-```
+| File Name | Demonstrates |
+|-----------|--------------|
+| `exception-response.groovy` | Standard error return vs thrown exception |
+| `get-app-metadata.groovy` | Reading app metadata with `backendApis.getAppInfo()` |
+| `list-all-mongo-collection.groovy` | Listing app collections (legacy naming example) |
+| `list-all-es-index.groovy` | Listing app ES indices (legacy naming example) |
+| `mongo-collection-create.groovy` | Creating an app collection |
+| `mongo-collection-list.groovy` | Listing collections and optional existence check |
+| `mongo-collection-create-doc.groovy` | Create document in app collection |
+| `mongo-collection-read-doc.groovy` | Read document from app collection |
+| `mongo-collection-update-doc.groovy` | Update document in app collection |
+| `mongo-collection-delete-doc.groovy` | Delete document from app collection |
+| `es-index-list.groovy` | List ES indices bound to current app |
+| `es-index-check-exists.groovy` | Check index existence through `backendApis.indexExists()` |
+| `es-index-create-doc.groovy` | Create document and trigger indexing |
+| `es-index-read-doc.groovy` | Read document while showing app index context |
+| `es-index-update-doc.groovy` | Update document and trigger reindexing |
+| `es-index-delete-doc.groovy` | Delete document (and remove from index) |
 

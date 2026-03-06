@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom';
 import { observer } from 'mobx-react-lite';
 import { MinusIcon, PlusIcon, RefreshIcon, CrossIcon } from '@wwf971/react-comp-misc';
 import './MongoAppConfig.css';
@@ -93,16 +92,15 @@ const CollectionItem = observer(({ collName, collectionInfo, store }) => {
   );
 });
 
-const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
+const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
   const [collectionName, setCollectionName] = useState('');
   const [selectedAppIndices, setSelectedAppIndices] = useState(new Set());
   const [selectedExternalIndices, setSelectedExternalIndices] = useState(new Set());
+  const [indexSourceType, setIndexSourceType] = useState('app');
   const [externalSearchQuery, setExternalSearchQuery] = useState('');
   const [externalSearchResults, setExternalSearchResults] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
-  const [dropdownPosition, setDropdownPosition] = useState(null);
-  const searchInputRef = React.useRef(null);
 
   // Get app's ES indices
   const appIndices = store.appMetadata?.esIndices || [];
@@ -111,6 +109,12 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
   useEffect(() => {
     store.fetchAllMongoIndices();
   }, []);
+
+  useEffect(() => {
+    if (appIndices.length === 0 && indexSourceType === 'app') {
+      setIndexSourceType('external');
+    }
+  }, [appIndices.length, indexSourceType]);
 
   // Filter indices based on search query (using cached data)
   useEffect(() => {
@@ -162,30 +166,20 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
     setSelectedExternalIndices(newSet);
   };
 
-  // Update dropdown position when search results change
-  useEffect(() => {
-    if (externalSearchResults.length > 0 && searchInputRef.current) {
-      const rect = searchInputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 2,
-        left: rect.left,
-        width: rect.width
-      });
-    } else {
-      setDropdownPosition(null);
-    }
-  }, [externalSearchResults]);
-
   const handleCreate = async () => {
     if (!collectionName.trim()) {
       setError('Collection name is required');
       return;
     }
 
-    const allSelectedIndices = [...selectedAppIndices, ...selectedExternalIndices];
+    const selectedIndices = indexSourceType === 'app'
+      ? [...selectedAppIndices]
+      : [...selectedExternalIndices];
 
-    if (allSelectedIndices.length === 0) {
-      setError('At least one index must be selected');
+    if (selectedIndices.length === 0) {
+      setError(indexSourceType === 'app'
+        ? 'Select at least one app index'
+        : 'Select at least one external index');
       return;
     }
 
@@ -222,7 +216,7 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
       });
 
       // Update each selected index
-      const updatePromises = allSelectedIndices.map(async (esIndexName) => {
+      const updatePromises = selectedIndices.map(async (esIndexName) => {
         const indexMeta = indicesMap.get(esIndexName);
         if (!indexMeta) {
           console.warn(`Index metadata not found for ES index: ${esIndexName}`);
@@ -267,34 +261,24 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
 
   return (
     <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
+      marginTop: '6px',
+      border: '1px solid #d0d7de',
+      borderRadius: '4px',
+      background: '#fff'
     }}>
       <div style={{
-        background: '#fff',
-        borderRadius: '4px',
-        maxWidth: '500px',
-        width: '90%',
-        maxHeight: '80vh',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid #e0e0e0' }}>
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
             Create New Collection
           </div>
         </div>
         
         <div style={{
-          padding: '12px 16px',
+          padding: '8px 10px',
           overflowY: 'auto',
           flex: 1
         }}>
@@ -319,99 +303,177 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
             />
           </div>
 
-          {/* App Indices Selection */}
-          {appIndices.length > 0 && (
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px' }}>
-                App Indices (select to monitor):
+          {/* Index Source Selection */}
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+              Elasticsearch Index Source:
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#333' }}>
+                <input
+                  type="radio"
+                  name="indexSourceType"
+                  checked={indexSourceType === 'app'}
+                  disabled={appIndices.length === 0}
+                  onChange={() => {
+                    setIndexSourceType('app');
+                    setError(null);
+                  }}
+                />
+                App Indices
               </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {appIndices.map((indexName) => (
-                  <span
-                    key={indexName}
-                    onClick={() => handleToggleAppIndex(indexName)}
-                    style={{
-                      padding: '2px 6px',
-                      background: selectedAppIndices.has(indexName) ? '#0969da' : '#f6f8fa',
-                      color: selectedAppIndices.has(indexName) ? '#fff' : '#57606a',
-                      border: `1px solid ${selectedAppIndices.has(indexName) ? '#0969da' : '#d0d7de'}`,
-                      borderRadius: '3px',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
-                  >
-                    {indexName}
-                  </span>
-                ))}
-              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#333' }}>
+                <input
+                  type="radio"
+                  name="indexSourceType"
+                  checked={indexSourceType === 'external'}
+                  onChange={() => {
+                    setIndexSourceType('external');
+                    setError(null);
+                  }}
+                />
+                External ES Index
+              </label>
+            </div>
+          </div>
+
+          {/* App Indices Selection */}
+          {indexSourceType === 'app' && (
+            <div style={{ marginBottom: '12px' }}>
+              {appIndices.length > 0 ? (
+                <>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                    App Indices (select to monitor):
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {appIndices.map((indexName) => (
+                      <span
+                        key={indexName}
+                        onClick={() => handleToggleAppIndex(indexName)}
+                        style={{
+                          padding: '2px 6px',
+                          background: selectedAppIndices.has(indexName) ? '#0969da' : '#f6f8fa',
+                          color: selectedAppIndices.has(indexName) ? '#fff' : '#57606a',
+                          border: `1px solid ${selectedAppIndices.has(indexName) ? '#0969da' : '#d0d7de'}`,
+                          borderRadius: '3px',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        {indexName}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '11px', color: '#856404' }}>
+                  No app indices available.
+                </div>
+              )}
             </div>
           )}
 
           {/* External Indices Selection */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px' }}>
-              External Indices (optional):
-            </label>
-            
-            {/* Selected external indices as tags */}
-            {selectedExternalIndices.size > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
-                {Array.from(selectedExternalIndices).map((indexName) => (
-                  <span
-                    key={indexName}
-                    style={{
-                      position: 'relative',
-                      padding: '2px 18px 2px 6px',
-                      background: '#0969da',
-                      color: '#fff',
-                      border: '1px solid #0969da',
-                      borderRadius: '3px',
-                      fontSize: '11px',
-                      userSelect: 'none'
-                    }}
-                  >
-                    {indexName}
+          {indexSourceType === 'external' && (
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                External Indices:
+              </label>
+
+              {/* Selected external indices as tags */}
+              {selectedExternalIndices.size > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                  {Array.from(selectedExternalIndices).map((indexName) => (
                     <span
-                      onClick={() => handleRemoveExternalIndex(indexName)}
+                      key={indexName}
                       style={{
-                        position: 'absolute',
-                        top: '-4px',
-                        right: '-4px',
-                        width: '14px',
-                        height: '14px',
-                        background: '#dc3545',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        border: '1px solid #fff'
+                        position: 'relative',
+                        padding: '2px 18px 2px 6px',
+                        background: '#0969da',
+                        color: '#fff',
+                        border: '1px solid #0969da',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        userSelect: 'none'
                       }}
                     >
-                      <CrossIcon width={8} height={8} color="#fff" />
+                      {indexName}
+                      <span
+                        onClick={() => handleRemoveExternalIndex(indexName)}
+                        style={{
+                          position: 'absolute',
+                          top: '-4px',
+                          right: '-4px',
+                          width: '14px',
+                          height: '14px',
+                          background: '#dc3545',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          border: '1px solid #fff'
+                        }}
+                      >
+                        <CrossIcon width={8} height={8} color="#fff" />
+                      </span>
                     </span>
-                  </span>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
 
-            {/* Search input */}
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={externalSearchQuery}
-              onChange={(e) => setExternalSearchQuery(e.target.value)}
-              placeholder="Search for external index..."
-              style={{
-                width: '100%',
-                padding: '4px 6px',
-                border: '1px solid #d0d7de',
-                borderRadius: '3px',
-                fontSize: '12px'
-              }}
-            />
-          </div>
+              {/* Search input */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={externalSearchQuery}
+                  onChange={(e) => setExternalSearchQuery(e.target.value)}
+                  placeholder="Search for external index..."
+                  style={{
+                    width: '100%',
+                    padding: '4px 6px',
+                    border: '1px solid #d0d7de',
+                    borderRadius: '3px',
+                    fontSize: '12px'
+                  }}
+                />
+                {externalSearchQuery && externalSearchResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 2px)',
+                    left: 0,
+                    right: 0,
+                    background: '#fff',
+                    border: '1px solid #d0d7de',
+                    borderRadius: '3px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    zIndex: 3,
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                  }}>
+                    {externalSearchResults.map((idx) => (
+                      <div
+                        key={idx.esIndex}
+                        onClick={() => handleSelectExternalIndex(idx.esIndex)}
+                        style={{
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f0f0f0',
+                          fontSize: '11px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f6f8fa'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+                      >
+                        <div style={{ fontWeight: '500', color: '#333' }}>{idx.esIndex}</div>
+                        <div style={{ fontSize: '10px', color: '#666' }}>mongo-index: {idx.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {error && (
             <div style={{
@@ -434,16 +496,18 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
           borderTop: '1px solid #e0e0e0',
           display: 'flex', 
           gap: '6px', 
-          justifyContent: 'flex-end' 
+          justifyContent: 'flex-start' 
         }}>
           <button
             onClick={onClose}
             disabled={isCreating}
             style={{
-              padding: '4px 8px',
-              border: '1px solid #d0d7de',
-              borderRadius: '3px',
-              background: '#f6f8fa',
+              padding: '4px 12px',
+              border: 'none',
+              borderRadius: '4px',
+              backgroundColor: '#999',
+              color: 'white',
+              opacity: isCreating ? 0.7 : 1,
               cursor: isCreating ? 'not-allowed' : 'pointer',
               fontSize: '11px'
             }}
@@ -454,11 +518,12 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
             onClick={handleCreate}
             disabled={isCreating || !collectionName.trim()}
             style={{
-              padding: '4px 8px',
-              border: '1px solid #0969da',
-              borderRadius: '3px',
-              background: '#0969da',
-              color: '#fff',
+              padding: '4px 12px',
+              border: 'none',
+              borderRadius: '4px',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              opacity: (isCreating || !collectionName.trim()) ? 0.7 : 1,
               cursor: (isCreating || !collectionName.trim()) ? 'not-allowed' : 'pointer',
               fontSize: '11px'
             }}
@@ -467,42 +532,6 @@ const CreateCollectionPanel = observer(({ store, onClose, onSuccess }) => {
           </button>
         </div>
       </div>
-
-      {/* Search results dropdown - rendered as portal to avoid clipping */}
-      {dropdownPosition && externalSearchQuery && externalSearchResults.length > 0 && ReactDOM.createPortal(
-        <div style={{
-          position: 'fixed',
-          top: `${dropdownPosition.top}px`,
-          left: `${dropdownPosition.left}px`,
-          width: `${dropdownPosition.width}px`,
-          background: '#fff',
-          border: '1px solid #d0d7de',
-          borderRadius: '3px',
-          maxHeight: '200px',
-          overflowY: 'auto',
-          zIndex: 1002,
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          {externalSearchResults.map((idx) => (
-            <div
-              key={idx.esIndex}
-              onClick={() => handleSelectExternalIndex(idx.esIndex)}
-              style={{
-                padding: '6px 8px',
-                cursor: 'pointer',
-                borderBottom: '1px solid #f0f0f0',
-                fontSize: '11px'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f6f8fa'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
-            >
-              <div style={{ fontWeight: '500', color: '#333' }}>{idx.esIndex}</div>
-              <div style={{ fontSize: '10px', color: '#666' }}>mongo-index: {idx.name}</div>
-            </div>
-          ))}
-        </div>,
-        document.body
-      )}
     </div>
   );
 });
@@ -577,11 +606,11 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
             />
           ))}
         </div>
-      ) : (
+      ) : !showCreatePanel ? (
         <div className="items-empty">
-          No collections configured
+          No MongoDB collections configured
         </div>
-      )}
+      ) : null}
 
       {store.collectionError && (
         <div style={{ 
@@ -598,7 +627,7 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
 
       {showCreatePanel && (
         <>
-          <CreateCollectionPanel
+          <CreateMongoCollection
             store={store}
             onClose={() => setShowCreatePanel(false)}
             onSuccess={() => {

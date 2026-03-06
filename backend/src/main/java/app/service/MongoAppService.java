@@ -3,6 +3,7 @@ package app.service;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -502,6 +503,7 @@ public class MongoAppService {
     
     /**
      * Delete an app and all its data
+     * Fails immediately if any operation fails to ensure data consistency
      * 
      * @param appId The app ID
      * @return Result
@@ -520,56 +522,84 @@ public class MongoAppService {
             collections = new ArrayList<>();
         }
         
-        // Delete all collections
-        MongoClient client = mongoService.getMongoClient();
-        MongoDatabase database = client.getDatabase(APP_DB_NAME);
-        
-        for (String collName : collections) {
-            String appCollNameFull = appId + "_" + collName;
-            try {
-                database.getCollection(appCollNameFull).drop();
-            } catch (Exception e) {
-                System.err.println("Failed to drop collection " + appCollNameFull + ": " + e.getMessage());
+        try {
+            // Step 1: Delete all collections
+            MongoClient client = mongoService.getMongoClient();
+            if (client == null) {
+                throw new RuntimeException("MongoDB client not initialized");
             }
-        }
-        
-        // Delete mongo-index metadata
-        try {
-            mongoIndexService.deleteIndex(appId);
-        } catch (Exception e) {
-            System.err.println("Failed to delete index metadata: " + e.getMessage());
-        }
-        
-        // Delete all Groovy API scripts for this app
-        int deletedScripts = 0;
-        try {
-            app.pojo.ApiResponse<Map<String, Object>> scriptsResponse = listMongoAppGroovyApis(appId);
-            if (scriptsResponse.getCode() == 0) {
+            MongoDatabase database = client.getDatabase(APP_DB_NAME);
+            
+            for (String collName : collections) {
+                String appCollNameFull = appId + "_" + collName;
+                try {
+                    database.getCollection(appCollNameFull).drop();
+                    System.out.println("Dropped collection: " + appCollNameFull);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to drop collection " + appCollNameFull + ": " + e.getMessage(), e);
+                }
+            }
+            
+            // Step 2: Delete mongo-index metadata
+            try {
+                mongoIndexService.deleteIndex(appId);
+                System.out.println("Deleted index metadata for app: " + appId);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to delete index metadata: " + e.getMessage(), e);
+            }
+            
+            // Step 3: Delete all Groovy API scripts for this app
+            int deletedScripts = 0;
+            try {
+                app.pojo.ApiResponse<Map<String, Object>> scriptsResponse = listMongoAppGroovyApis(appId);
+                if (scriptsResponse.getCode() != 0) {
+                    throw new RuntimeException("Failed to list Groovy API scripts: " + scriptsResponse.getMessage());
+                }
+                
                 Map<String, Object> scripts = scriptsResponse.getData();
                 for (String scriptId : scripts.keySet()) {
                     try {
                         groovyApiService.deleteScript(scriptId);
                         deletedScripts++;
+                        System.out.println("Deleted script: " + scriptId);
                     } catch (Exception e) {
-                        System.err.println("Failed to delete script " + scriptId + ": " + e.getMessage());
+                        throw new RuntimeException("Failed to delete script " + scriptId + ": " + e.getMessage(), e);
                     }
                 }
+            } catch (RuntimeException e) {
+                throw e; // Re-throw RuntimeException as-is
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to delete Groovy API scripts: " + e.getMessage(), e);
             }
+            
+            // Step 4: Delete app metadata (only if all above steps succeeded)
+            try {
+                com.mongodb.client.result.DeleteResult result = metadataCollection.deleteOne(Filters.eq("appId", appId));
+                if (result.getDeletedCount() == 0) {
+                    throw new RuntimeException("Failed to delete app metadata: no document was deleted");
+                }
+                System.out.println("Deleted app metadata for: " + appId);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to delete app metadata: " + e.getMessage(), e);
+            }
+            
+            return ApiResponse.success(
+                Map.of(
+                    "appId", appId,
+                    "deletedCollections", collections.size(),
+                    "deletedScripts", deletedScripts
+                ),
+                "App deleted successfully"
+            );
+        } catch (RuntimeException e) {
+            System.err.println("App deletion failed for " + appId + ": " + e.getMessage());
+            e.printStackTrace();
+            return createErrorResult("App deletion failed: " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Failed to delete Groovy API scripts: " + e.getMessage());
+            System.err.println("App deletion failed for " + appId + ": " + e.getMessage());
+            e.printStackTrace();
+            return createErrorResult("App deletion failed: " + e.getMessage());
         }
-        
-        // Delete app metadata
-        metadataCollection.deleteOne(Filters.eq("appId", appId));
-        
-        return ApiResponse.success(
-            Map.of(
-                "appId", appId,
-                "deletedCollections", collections.size(),
-                "deletedScripts", deletedScripts
-            ),
-            "App deleted successfully"
-        );
     }
     
     /**
@@ -849,6 +879,349 @@ public class MongoAppService {
                 "createdAt", appDoc.get("createdAt")
             )
         );
+    }
+
+    /**
+     * Check if an ES index exists and whether it is registered under this app.
+     */
+    public ApiResponse<Map<String, Object>> indexExists(String appId, String indexName) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            return createErrorResult("Index name cannot be empty");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedIndexName = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        boolean isOwnedByApp = appEsIndices.contains(normalizedIndexName);
+        boolean isExistsInEs;
+
+        try {
+            isExistsInEs = esService.indexExists(normalizedIndexName);
+        } catch (Exception e) {
+            return createErrorResult("Failed to check index existence: " + e.getMessage());
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("indexName", normalizedIndexName);
+        result.put("exists", isExistsInEs);
+        result.put("isOwnedByApp", isOwnedByApp);
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * Create a new ES index under this app and register it in app metadata.
+     */
+    public ApiResponse<Map<String, Object>> createEsIndex(String appId, String indexName) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            return createErrorResult("Index name cannot be empty");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedIndexName = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (appEsIndices.contains(normalizedIndexName)) {
+            return createErrorResult("Index already registered in app: " + normalizedIndexName);
+        }
+
+        try {
+            if (esService.indexExists(normalizedIndexName)) {
+                return createErrorResult("Elasticsearch index already exists: " + normalizedIndexName);
+            }
+        } catch (Exception e) {
+            return createErrorResult("Failed to validate index existence: " + e.getMessage());
+        }
+
+        @SuppressWarnings("unchecked")
+        List<String> appCollections = (List<String>) appDoc.get("collections");
+        if (appCollections == null) {
+            appCollections = new ArrayList<>();
+        }
+
+        List<Map<String, String>> monitoredCollections = new ArrayList<>();
+        for (String collName : appCollections) {
+            Map<String, String> coll = new HashMap<>();
+            coll.put("database", APP_DB_NAME);
+            coll.put("collection", appId + "_" + collName);
+            monitoredCollections.add(coll);
+        }
+
+        String mongoIndexName = appId + ":" + normalizedIndexName;
+
+        try {
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("appId", appId);
+            metadata.put("createdAt", String.valueOf(System.currentTimeMillis()));
+            esService.createCharLevelIndex(normalizedIndexName, false, metadata);
+            mongoIndexService.createIndex(mongoIndexName, normalizedIndexName, monitoredCollections);
+        } catch (Exception e) {
+            try {
+                if (esService.indexExists(normalizedIndexName)) {
+                    esService.deleteIndex(normalizedIndexName);
+                }
+            } catch (Exception rollbackException) {
+                // Best effort rollback; keep original error as the API result.
+            }
+            return createErrorResult("Failed to create app ES index: " + e.getMessage());
+        }
+
+        appEsIndices.add(normalizedIndexName);
+        Document setFields = new Document("esIndices", appEsIndices);
+        if (appDoc.getString("esIndex") == null || appDoc.getString("esIndex").isEmpty()) {
+            setFields.put("esIndex", normalizedIndexName);
+        }
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            new Document("$set", setFields)
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("indexName", normalizedIndexName);
+        result.put("mongoIndexName", mongoIndexName);
+        result.put("monitoredCollections", monitoredCollections.size());
+        return ApiResponse.success(result, "ES index created and registered");
+    }
+
+    /**
+     * Delete an app-owned ES index and unregister it from app metadata.
+     */
+    public ApiResponse<Map<String, Object>> deleteEsIndex(String appId, String indexName) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            return createErrorResult("Index name cannot be empty");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedIndexName = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (!appEsIndices.contains(normalizedIndexName)) {
+            return createErrorResult("Index does not belong to app: " + normalizedIndexName);
+        }
+        if (appEsIndices.size() <= 1) {
+            return createErrorResult("Cannot delete the last app index");
+        }
+
+        try {
+            if (esService.indexExists(normalizedIndexName)) {
+                esService.deleteIndex(normalizedIndexName);
+            }
+        } catch (Exception e) {
+            return createErrorResult("Failed to delete ES index: " + e.getMessage());
+        }
+
+        for (String mongoIndexName : getMongoIndexNamesForAppEsIndex(appId, normalizedIndexName)) {
+            mongoIndexService.deleteIndex(mongoIndexName);
+        }
+
+        appEsIndices.remove(normalizedIndexName);
+        Document setFields = new Document("esIndices", appEsIndices);
+        if (normalizedIndexName.equals(appDoc.getString("esIndex"))) {
+            setFields.put("esIndex", appEsIndices.isEmpty() ? null : appEsIndices.get(0));
+        }
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            new Document("$set", setFields)
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("indexName", normalizedIndexName);
+        result.put("remainingIndices", appEsIndices);
+        return ApiResponse.success(result, "ES index deleted and unregistered");
+    }
+
+    /**
+     * Rename an app-owned ES index and update app metadata + mongo-index metadata.
+     */
+    public ApiResponse<Map<String, Object>> renameEsIndex(String appId, String oldIndexName, String newIndexName) {
+        if (oldIndexName == null || oldIndexName.trim().isEmpty()) {
+            return createErrorResult("Old index name cannot be empty");
+        }
+        if (newIndexName == null || newIndexName.trim().isEmpty()) {
+            return createErrorResult("New index name cannot be empty");
+        }
+
+        String normalizedOldName = normalizeIndexName(oldIndexName);
+        String normalizedNewName = normalizeIndexName(newIndexName);
+        if (normalizedOldName.equals(normalizedNewName)) {
+            return createErrorResult("New index name must be different from old index name");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (!appEsIndices.contains(normalizedOldName)) {
+            return createErrorResult("Index does not belong to app: " + normalizedOldName);
+        }
+        if (appEsIndices.contains(normalizedNewName)) {
+            return createErrorResult("New index name already exists in app: " + normalizedNewName);
+        }
+
+        try {
+            if (esService.indexExists(normalizedNewName)) {
+                return createErrorResult("Target ES index already exists: " + normalizedNewName);
+            }
+        } catch (Exception e) {
+            return createErrorResult("Failed to validate target index: " + e.getMessage());
+        }
+
+        List<String> mongoIndexNames = getMongoIndexNamesForAppEsIndex(appId, normalizedOldName);
+        List<Map<String, Object>> mongoIndices = new ArrayList<>();
+        for (String mongoIndexName : mongoIndexNames) {
+            Map<String, Object> existing = mongoIndexService.getIndex(mongoIndexName);
+            if (existing != null) {
+                mongoIndices.add(existing);
+            }
+        }
+
+        try {
+            esService.renameIndex(normalizedOldName, normalizedNewName);
+            for (Map<String, Object> mongoIndex : mongoIndices) {
+                String mongoIndexName = (String) mongoIndex.get("name");
+                @SuppressWarnings("unchecked")
+                List<Map<String, String>> collections = (List<Map<String, String>>) mongoIndex.get("collections");
+                if (collections == null) {
+                    collections = new ArrayList<>();
+                }
+                mongoIndexService.updateIndexCollections(mongoIndexName, normalizedNewName, collections);
+            }
+        } catch (Exception e) {
+            return createErrorResult("Failed to rename ES index: " + e.getMessage());
+        }
+
+        List<String> updatedIndices = new ArrayList<>();
+        for (String index : appEsIndices) {
+            if (normalizedOldName.equals(index)) {
+                updatedIndices.add(normalizedNewName);
+            } else {
+                updatedIndices.add(index);
+            }
+        }
+
+        Document setFields = new Document("esIndices", updatedIndices);
+        if (normalizedOldName.equals(appDoc.getString("esIndex"))) {
+            setFields.put("esIndex", normalizedNewName);
+        }
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            new Document("$set", setFields)
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("oldIndexName", normalizedOldName);
+        result.put("newIndexName", normalizedNewName);
+        return ApiResponse.success(result, "ES index renamed");
+    }
+
+    /**
+     * Get app-owned ES index details.
+     */
+    public ApiResponse<Map<String, Object>> getEsIndexInfo(String appId, String indexName) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            return createErrorResult("Index name cannot be empty");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedIndexName = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (!appEsIndices.contains(normalizedIndexName)) {
+            return createErrorResult("Index does not belong to app: " + normalizedIndexName);
+        }
+
+        try {
+            Map<String, Object> info = esService.getIndexInfo(normalizedIndexName);
+            long docCount = esService.getEsDocCount(normalizedIndexName);
+            Map<String, Object> result = new HashMap<>();
+            result.put("indexName", normalizedIndexName);
+            result.put("docCount", docCount);
+            result.put("info", info);
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            return createErrorResult("Failed to read index info: " + e.getMessage());
+        }
+    }
+
+    /**
+     * List docs in an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> listEsDocs(String appId, String indexName, Integer page, Integer pageSize) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            return createErrorResult("Index name cannot be empty");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedIndexName = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (!appEsIndices.contains(normalizedIndexName)) {
+            return createErrorResult("Index does not belong to app: " + normalizedIndexName);
+        }
+
+        int normalizedPage = (page == null || page < 1) ? 1 : page;
+        int normalizedPageSize = (pageSize == null || pageSize < 1) ? 20 : Math.min(pageSize, 200);
+
+        try {
+            Map<String, Object> data = esService.getEsDocs(normalizedIndexName, normalizedPage, normalizedPageSize);
+            return ApiResponse.success(data);
+        } catch (Exception e) {
+            return createErrorResult("Failed to list ES docs: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get one doc from an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> getEsDoc(String appId, String indexName, String docId) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            return createErrorResult("Index name cannot be empty");
+        }
+        if (docId == null || docId.trim().isEmpty()) {
+            return createErrorResult("Doc ID cannot be empty");
+        }
+
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedIndexName = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (!appEsIndices.contains(normalizedIndexName)) {
+            return createErrorResult("Index does not belong to app: " + normalizedIndexName);
+        }
+
+        try {
+            Map<String, Object> data = esService.getEsDoc(normalizedIndexName, docId);
+            return ApiResponse.success(data);
+        } catch (Exception e) {
+            return createErrorResult("Failed to get ES doc: " + e.getMessage());
+        }
     }
     
     /**
@@ -1722,5 +2095,38 @@ public class MongoAppService {
      */
     private ApiResponse<Map<String, Object>> createErrorResult(String message) {
         return ApiResponse.error(message);
+    }
+
+    private String normalizeIndexName(String indexName) {
+        return indexName.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getAppEsIndices(Document appDoc) {
+        List<String> esIndices = (List<String>) appDoc.get("esIndices");
+        if (esIndices == null) {
+            esIndices = new ArrayList<>();
+            String esIndex = appDoc.getString("esIndex");
+            if (esIndex != null && !esIndex.isEmpty()) {
+                esIndices.add(esIndex);
+            }
+        }
+        return new ArrayList<>(esIndices);
+    }
+
+    private List<String> getMongoIndexNamesForAppEsIndex(String appId, String esIndexName) {
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> index : mongoIndexService.listIndices()) {
+            String name = (String) index.get("name");
+            String esIndex = (String) index.get("esIndex");
+            if (name == null || esIndex == null) {
+                continue;
+            }
+            boolean isOwnedByApp = name.equals(appId) || name.startsWith(appId + ":");
+            if (isOwnedByApp && esIndexName.equals(normalizeIndexName(esIndex))) {
+                names.add(name);
+            }
+        }
+        return names;
     }
 }

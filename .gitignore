@@ -7,14 +7,15 @@ node_modules/
 /backend/.project
 /backend/.classpath
 
-
 /frontend/build/
 /frontend/dist/
+
+/example/*
+!/example/mongo-app-groovy-scripts/
+!/example/mongo-app-groovy-scripts/**
 
 /deploy/
 
 *.sqlite
 config.0.js
 setup.sh
-
-/example*

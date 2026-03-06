@@ -1,6 +1,5 @@
 package app.service;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -112,10 +111,6 @@ public class MongoAppScriptBackendApis {
      * Search documents using MongoDB query
      */
     public ApiResponse<Map<String, Object>> searchDocs(String collName, Map<String, Object> query) {
-        // TODO: Implement searchDocs in MongoAppService
-        // For now, return an error or delegate to listDocs
-        Map<String, Object> error = new HashMap<>();
-        error.put("error", "searchDocs not yet implemented");
         return ApiResponse.error("searchDocs not yet implemented");
     }
     
@@ -141,11 +136,49 @@ public class MongoAppScriptBackendApis {
      * Check if index exists
      */
     public ApiResponse<Map<String, Object>> indexExists(String indexName) {
-        // TODO: Implement indexExists in MongoAppService or ElasticSearchService
-        Map<String, Object> result = new HashMap<>();
-        result.put("exists", false);
-        result.put("message", "indexExists not yet implemented");
-        return ApiResponse.success(result);
+        return mongoAppService.indexExists(appId, indexName);
+    }
+
+    /**
+     * Create a new app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> createEsIndex(String indexName) {
+        return mongoAppService.createEsIndex(appId, indexName);
+    }
+
+    /**
+     * Delete an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> deleteEsIndex(String indexName) {
+        return mongoAppService.deleteEsIndex(appId, indexName);
+    }
+
+    /**
+     * Rename an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> renameEsIndex(String oldIndexName, String newIndexName) {
+        return mongoAppService.renameEsIndex(appId, oldIndexName, newIndexName);
+    }
+
+    /**
+     * Get details about an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> getEsIndexInfo(String indexName) {
+        return mongoAppService.getEsIndexInfo(appId, indexName);
+    }
+
+    /**
+     * List docs from an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> listEsDocs(String indexName, Integer page, Integer pageSize) {
+        return mongoAppService.listEsDocs(appId, indexName, page, pageSize);
+    }
+
+    /**
+     * Get one doc from an app-owned ES index.
+     */
+    public ApiResponse<Map<String, Object>> getEsDoc(String indexName, String docId) {
+        return mongoAppService.getEsDoc(appId, indexName, docId);
     }
     
     // ==================== App Metadata ====================

@@ -152,12 +152,12 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panels_exis
         </PanelToggle>
       )}
       {panels_existence.showCollections && (
-        <PanelToggle title="Collections" defaultExpanded={true}>
+        <PanelToggle title="MongoDB Collections" defaultExpanded={true}>
           <MongoAppCollectionConfig store={store} collections={collections} />
         </PanelToggle>
       )}
       {panels_existence.showEsIndices && (
-        <PanelToggle title="ES Indices" defaultExpanded={false}>
+        <PanelToggle title="Elasticsearch Indices" defaultExpanded={false}>
           <MongoAppEsConfig store={store} />
         </PanelToggle>
       )}
