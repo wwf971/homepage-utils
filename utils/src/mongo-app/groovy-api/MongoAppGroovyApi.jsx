@@ -370,7 +370,6 @@ const MongoAppGroovyApi = observer(({ store }) => {
           gap: '8px',
           padding: '8px 0',
           borderBottom: '2px solid #e0e0e0',
-          marginBottom: '8px'
         }}>
           <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
             Inline Scripts
@@ -438,7 +437,6 @@ const MongoAppGroovyApi = observer(({ store }) => {
             color: '#333',
             padding: '8px 0',
             borderBottom: '2px solid #e0e0e0',
-            marginBottom: '8px'
           }}>
             Single File Scripts
           </div>
@@ -477,7 +475,6 @@ const MongoAppGroovyApi = observer(({ store }) => {
           gap: '8px',
           padding: '8px 0',
           borderBottom: '2px solid #e0e0e0',
-          marginBottom: '8px'
         }}>
           <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
             Scripts from Folders

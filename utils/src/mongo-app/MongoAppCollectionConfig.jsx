@@ -555,7 +555,9 @@ const MongoAppCollectionConfig = observer(({ store }) => {
         </div>
       ) : !showCreatePanel ? (
         <div className="items-empty">
-          No MongoDB collections configured
+          {store.collectionError
+            ? 'Cannot query mongodb collections from server'
+            : 'No MongoDB collections configured'}
         </div>
       ) : null}
 

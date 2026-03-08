@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { SpinningCircle, RefreshIcon, PanelPopup } from '@wwf971/react-comp-misc'
+import { SpinningCircle, RefreshIcon, PanelPopup, Menu } from '@wwf971/react-comp-misc'
 import Tag from '../ui/Tag.jsx'
 import './mongoApp.css'
 
@@ -21,6 +21,10 @@ const MongoAppSelector = observer(({
   const [deletePopup, setDeletePopup] = useState(null)
   const [popupLoading, setPopupLoading] = useState(false)
   const [popupMessage, setPopupMessage] = useState(null)
+  const [appContextMenuState, setAppContextMenuState] = useState({
+    position: null,
+    targetApp: null,
+  })
 
   const selectedApp = useMemo(
     () => apps.find((app) => app.appId === selectedAppId) || null,
@@ -44,6 +48,79 @@ const MongoAppSelector = observer(({
     if (onSelectApp) {
       onSelectApp(app)
     }
+  }
+
+  const openAppContextMenu = (app, position) => {
+    // Close first, then reopen in next frame to ensure clean repositioning.
+    setAppContextMenuState({
+      position: null,
+      targetApp: null,
+    })
+    requestAnimationFrame(() => {
+      setAppContextMenuState({
+        position,
+        targetApp: app,
+      })
+    })
+  }
+
+  const handleAppContextMenu = (e, app) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (onSelectApp) {
+      onSelectApp(app)
+    }
+    openAppContextMenu(app, { x: e.clientX, y: e.clientY })
+  }
+
+  const handleContextMenuItemClick = (item) => {
+    if (!appContextMenuState.targetApp) return
+    if (item.data?.action === 'rename' && onRenameApp) {
+      setRenamePopup(appContextMenuState.targetApp)
+    }
+    if (item.data?.action === 'delete' && onDeleteApp) {
+      setDeletePopup(appContextMenuState.targetApp)
+    }
+    setAppContextMenuState({
+      position: null,
+      targetApp: null,
+    })
+  }
+
+  const handleContextMenuClose = () => {
+    setAppContextMenuState((prev) => ({
+      ...prev,
+      position: null,
+    }))
+  }
+
+  const handleMenuBackdropContextMenu = (e) => {
+    e.preventDefault()
+    const backdrop = e.currentTarget
+    backdrop.style.pointerEvents = 'none'
+    const elementBelow = document.elementFromPoint(e.clientX, e.clientY)
+    backdrop.style.pointerEvents = ''
+    const appElement = elementBelow?.closest('[data-mongo-app-id]')
+    const appId = appElement?.getAttribute('data-mongo-app-id')
+    if (!appId) {
+      setAppContextMenuState({
+        position: null,
+        targetApp: null,
+      })
+      return
+    }
+    const targetApp = apps.find((app) => app.appId === appId)
+    if (!targetApp) {
+      setAppContextMenuState({
+        position: null,
+        targetApp: null,
+      })
+      return
+    }
+    if (onSelectApp) {
+      onSelectApp(targetApp)
+    }
+    openAppContextMenu(targetApp, { x: e.clientX, y: e.clientY })
   }
 
   const handleRenameConfirm = async (newName) => {
@@ -219,13 +296,14 @@ const MongoAppSelector = observer(({
               isClickable
               isSelected={selectedAppId === app.appId}
               onClick={() => handleAppClick(app)}
+              onContextMenu={(e) => handleAppContextMenu(e, app)}
               contentComponent={
-                <>
+                <div data-mongo-app-id={app.appId}>
                   <div style={{ fontSize: '13px' }}>{app.appName}</div>
                   <div style={{ fontSize: '11px', color: '#666', marginTop: '2px', fontFamily: 'monospace' }}>
                     {app.appId}
                   </div>
-                </>
+                </div>
               }
             />
           ))}
@@ -237,12 +315,27 @@ const MongoAppSelector = observer(({
               key={app.appId}
               className={`mongo-app-item ${selectedAppId === app.appId ? 'mongo-app-item-selected' : ''}`}
               onClick={() => handleAppClick(app)}
+              onContextMenu={(e) => handleAppContextMenu(e, app)}
+              data-mongo-app-id={app.appId}
             >
               <div className="mongo-app-item-name">{app.appName}</div>
               <div className="mongo-app-item-id">{app.appId}</div>
             </div>
           ))}
         </div>
+      )}
+
+      {appContextMenuState.position && appContextMenuState.targetApp && (
+        <Menu
+          items={[
+            { type: 'item', name: 'Rename', data: { action: 'rename' } },
+            { type: 'item', name: 'Delete', data: { action: 'delete' } },
+          ]}
+          position={appContextMenuState.position}
+          onClose={handleContextMenuClose}
+          onItemClick={handleContextMenuItemClick}
+          onContextMenu={handleMenuBackdropContextMenu}
+        />
       )}
 
       {renamePopup && (

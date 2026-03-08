@@ -37,12 +37,6 @@ class MongoAppStore {
     this.appName = config.appName || ''
     this.backendUrl = config.backendUrlDefault || ''
     this.localStorageKey = config.localStorageKey || 'mongo-app-config'
-
-    this.loadFromLocalStorage({
-      preserveBackendUrl: !!config.backendUrlDefault,
-      preserveAppId: !!config.appId,
-      preserveAppName: !!config.appName,
-    })
   }
 
   get isConfigured() {
@@ -55,17 +49,14 @@ class MongoAppStore {
 
   setBackendUrl(url) {
     this.backendUrl = url.trim()
-    this.saveToLocalStorage()
   }
 
   setAppName(name) {
     this.appName = name.trim()
-    this.saveToLocalStorage()
   }
 
   setAppId(id) {
     this.appId = id.trim()
-    this.saveToLocalStorage()
   }
 
   clearConnectionError() {
@@ -195,7 +186,6 @@ class MongoAppStore {
           this.foundApps = result.data
           if (this.foundApps.length === 1) {
             this.appId = this.foundApps[0].appId
-            this.saveToLocalStorage()
           }
         } else {
           this.appError = result.message || 'Failed to search app'
@@ -235,11 +225,9 @@ class MongoAppStore {
             this.appName = result.data.appName
           }
           this.appMetadata = result.data
-          this.saveToLocalStorage()
         } else {
           this.appId = ''
           this.appError = result.message || `App id not found: ${targetAppId}`
-          this.saveToLocalStorage()
         }
         this.isLoadingAppId = false
       })
@@ -250,7 +238,6 @@ class MongoAppStore {
         this.appId = ''
         this.appError = error instanceof Error ? error.message : 'Unknown error'
         this.isLoadingAppId = false
-        this.saveToLocalStorage()
       })
       return false
     }
@@ -281,7 +268,6 @@ class MongoAppStore {
       runInAction(() => {
         if (result.code === 0 && result.data) {
           this.appId = result.data.appId
-          this.saveToLocalStorage()
         } else {
           this.appError = result.message || 'Failed to create app'
         }
@@ -506,43 +492,6 @@ class MongoAppStore {
     }
   }
 
-  loadFromLocalStorage(options = {}) {
-    const preserveBackendUrl = !!options.preserveBackendUrl
-    const preserveAppId = !!options.preserveAppId
-    const preserveAppName = !!options.preserveAppName
-
-    try {
-      const stored = localStorage.getItem(this.localStorageKey)
-      if (stored) {
-        const config = JSON.parse(stored)
-        if (!preserveBackendUrl && config.backendUrl && config.backendUrl.includes('://')) {
-          this.backendUrl = config.backendUrl
-        }
-        if (!preserveAppId && config.appId) {
-          this.appId = config.appId
-        }
-        if (!preserveAppName && config.appName) {
-          this.appName = config.appName
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load config from localStorage:', error)
-    }
-  }
-
-  saveToLocalStorage() {
-    try {
-      const config = {
-        backendUrl: this.backendUrl,
-        appId: this.appId,
-        appName: this.appName,
-      }
-      localStorage.setItem(this.localStorageKey, JSON.stringify(config))
-    } catch (error) {
-      console.error('Failed to save config to localStorage:', error)
-    }
-  }
-
   reset() {
     this.backendUrl = ''
     this.appId = ''
@@ -562,7 +511,6 @@ class MongoAppStore {
     this.isLoadingAllApps = false
     this.collectionsInfo = {}
     this.appMetadata = null
-    localStorage.removeItem(this.localStorageKey)
   }
 }
 

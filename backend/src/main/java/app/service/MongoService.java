@@ -1,15 +1,17 @@
 package app.service;
 
-import app.event.MongoConfigChangeEvent;
-import app.pojo.MongoConfig;
-import app.pojo.MongoConnectionStatus;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoDatabase;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
 import org.springframework.stereotype.Service;
+
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoDatabase;
+
+import app.event.MongoConfigChangeEvent;
+import app.pojo.MongoConfig;
+import app.pojo.MongoConnectionStatus;
 
 @Service
 public class MongoService {
@@ -574,8 +576,11 @@ public class MongoService {
         com.mongodb.client.MongoDatabase database = mongoClient.getDatabase(databaseName);
         com.mongodb.client.MongoCollection<org.bson.Document> collection = database.getCollection(collectionName);
 
-        // Create filter for the document
-        org.bson.Document filter = new org.bson.Document("_id", new org.bson.types.ObjectId(docId));
+        // Create filter for the document - support both ObjectId and custom string id
+        boolean isObjectId = org.bson.types.ObjectId.isValid(docId);
+        org.bson.Document filter = isObjectId
+            ? new org.bson.Document("_id", new org.bson.types.ObjectId(docId))
+            : new org.bson.Document("id", docId);
 
         // Create update operation based on action
         org.bson.Document update = new org.bson.Document();
@@ -645,7 +650,15 @@ public class MongoService {
                         
                         // Build new document with _id + all other fields in specified order
                         org.bson.Document newDoc = new org.bson.Document();
-                        newDoc.put("_id", new org.bson.types.ObjectId(docId));
+                        if (isObjectId) {
+                            newDoc.put("_id", new org.bson.types.ObjectId(docId));
+                        } else {
+                            // Preserve original _id from existing document
+                            org.bson.Document existing = collection.find(filter).first();
+                            if (existing != null) {
+                                newDoc.put("_id", existing.get("_id"));
+                            }
+                        }
                         
                         // Add fields in the order they appear in the map
                         // LinkedHashMap preserves insertion order
@@ -995,8 +1008,10 @@ public class MongoService {
         com.mongodb.client.MongoDatabase database = mongoClient.getDatabase(databaseName);
         com.mongodb.client.MongoCollection<org.bson.Document> collection = database.getCollection(collectionName);
 
-        // Create filter for the document
-        org.bson.Document filter = new org.bson.Document("_id", new org.bson.types.ObjectId(docId));
+        // Create filter for the document - support both ObjectId and custom string id
+        org.bson.Document filter = org.bson.types.ObjectId.isValid(docId)
+            ? new org.bson.Document("_id", new org.bson.types.ObjectId(docId))
+            : new org.bson.Document("id", docId);
 
         // Delete the document
         com.mongodb.client.result.DeleteResult result = collection.deleteOne(filter);
