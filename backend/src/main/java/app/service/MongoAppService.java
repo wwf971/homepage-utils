@@ -502,6 +502,62 @@ public class MongoAppService {
     }
     
     /**
+     * Delete a collection for an app
+     * 
+     * @param appId The app ID
+     * @param collectionName The collection name
+     * @return Result with deleted collection info
+     */
+    public ApiResponse<Map<String, Object>> deleteCollection(String appId, String collectionName) {
+        if (collectionName == null || collectionName.trim().isEmpty()) {
+            return createErrorResult("Collection name cannot be empty");
+        }
+        
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<String> collections = (List<String>) appDoc.get("collections");
+        if (collections == null) {
+            collections = new ArrayList<>();
+        }
+        
+        if (!collections.contains(collectionName)) {
+            return createErrorResult("Collection not found: " + collectionName);
+        }
+        
+        String appCollNameFull = appId + "_" + collectionName;
+        
+        // Remove collection from mongo-index metadata and drop actual collection.
+        Map<String, Object> deleteResult = mongoIndexService.deleteCollectionFromIndices(APP_DB_NAME, appCollNameFull);
+        Object deleteCodeObj = deleteResult.get("code");
+        int deleteCode = (deleteCodeObj instanceof Number) ? ((Number) deleteCodeObj).intValue() : -1;
+        if (deleteCode != 0) {
+            return createErrorResult("Failed to delete collection from indices: " + deleteResult.get("message"));
+        }
+        
+        // Update app metadata to remove this collection name.
+        List<String> updatedCollections = new ArrayList<>(collections);
+        updatedCollections.remove(collectionName);
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            new Document("$set", new Document("collections", updatedCollections))
+        );
+        
+        return ApiResponse.success(
+            Map.of(
+                "appId", appId,
+                "collectionName", collectionName,
+                "appCollNameFull", appCollNameFull
+            ),
+            "Collection deleted successfully"
+        );
+    }
+    
+    /**
      * Delete an app and all its data
      * Fails immediately if any operation fails to ensure data consistency
      * 

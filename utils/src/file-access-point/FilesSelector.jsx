@@ -7,7 +7,7 @@ import './fileAccessPoint.css';
  * FilesSelector - Multiple files selector
  * 
  * Props:
- * - serverUrl: string - Backend server URL
+ * - backendUrl: string - Backend server URL
  * - fileAccessPointId: string - File access point ID
  * - initialPath: string - Starting path (default: '/')
  * - onConfirm: (selectedFiles) => void - Called with array of selected file objects
@@ -15,7 +15,7 @@ import './fileAccessPoint.css';
  * - height: number - Fixed height for FolderView body (default: 400)
  * - title: string - Title to display (default: 'Select Files')
  */
-const FilesSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select Files' }) => {
+const FilesSelector = ({ backendUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select Files' }) => {
   const itemSelectorRef = useRef(null);
   
   const handleRefresh = () => {
@@ -48,7 +48,7 @@ const FilesSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, o
 
       <ItemSelector
         ref={itemSelectorRef}
-        serverUrl={serverUrl}
+        backendUrl={backendUrl}
         fileAccessPointId={fileAccessPointId}
         initialPath={initialPath}
         selectionConfig={{

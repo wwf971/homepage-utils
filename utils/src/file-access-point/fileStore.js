@@ -28,14 +28,42 @@ let mongoDocStore = null;
 let updateDocField = null;
 let getBackendServerUrl = null;
 
+// Minimal fallback document store to keep file access point selector working
+// even when host app does not provide a full mongoDocStore integration.
+const fallbackMongoDocStore = {
+  docs: new Map(),
+  setDoc(doc) {
+    if (doc && doc.id) {
+      this.docs.set(doc.id, doc);
+    }
+  },
+  getDoc(id) {
+    return this.docs.get(id);
+  },
+  removeDoc(id) {
+    this.docs.delete(id);
+  }
+};
+
+function getBackendUrlOrThrow() {
+  if (typeof getBackendServerUrl !== 'function') {
+    throw new Error('fileStore is not initialized with getBackendServerUrl');
+  }
+  const backendUrl = getBackendServerUrl();
+  if (!backendUrl || typeof backendUrl !== 'string') {
+    throw new Error('Backend server URL is empty');
+  }
+  return backendUrl;
+}
+
 /**
  * Initialize fileStore with required dependencies
  * Must be called from frontend before using the store
  */
 export function initFileStore(dependencies) {
-  mongoDocStore = dependencies.mongoDocStore;
-  updateDocField = dependencies.updateDocField;
-  getBackendServerUrl = dependencies.getBackendServerUrl;
+  mongoDocStore = dependencies.mongoDocStore || fallbackMongoDocStore;
+  updateDocField = dependencies.updateDocField || (async () => ({ code: -1, message: 'updateDocField is not initialized' }));
+  getBackendServerUrl = dependencies.getBackendServerUrl || null;
 }
 
 class FileStore {
@@ -74,15 +102,16 @@ class FileStore {
    * Note: Not a computed property to avoid MobX reaction cycles
    */
   getAllFap() {
+    const activeDocStore = mongoDocStore || fallbackMongoDocStore;
     const docs = this.fapIds
-      .map(id => mongoDocStore.getDoc(id))
+      .map(id => activeDocStore.getDoc(id))
       .filter(Boolean); // Filter out any null/undefined
     
     // Debug: log if we have IDs but no docs
     if (this.fapIds.length > 0 && docs.length === 0) {
       console.warn('[fileStore] Have IDs but no documents found in mongoDocStore');
       console.warn('[fileStore] IDs:', this.fapIds);
-      console.warn('[fileStore] mongoDocStore keys:', Array.from(mongoDocStore.docs.keys()));
+      console.warn('[fileStore] mongoDocStore keys:', Array.from(activeDocStore.docs.keys()));
     }
     
     return docs;
@@ -177,7 +206,7 @@ class FileStore {
     });
 
     try {
-      const backendUrl = getBackendServerUrl();
+      const backendUrl = getBackendUrlOrThrow();
       console.log('Fetching file access points from:', `${backendUrl}/file_access_point/mongo_docs/`);
       const mongoDocsResponse = await fetch(`${backendUrl}/file_access_point/mongo_docs/`);
       
@@ -213,12 +242,14 @@ class FileStore {
       const documents = await Promise.all(fetchPromises);
       const validDocuments = documents.filter(Boolean);
       
+      const activeDocStore = mongoDocStore || fallbackMongoDocStore;
+
       // Store documents in mongoDocStore (single source of truth)
       // Extract custom id values for indexing (mongoDocStore now supports custom id field)
       const docIds = [];
       runInAction(() => {
         validDocuments.forEach(doc => {
-          mongoDocStore.setDoc(doc);
+          activeDocStore.setDoc(doc);
           // Use custom id field (mongoDocStore now indexes by custom id when present)
           if (doc.id) {
             docIds.push(doc.id);
@@ -254,7 +285,7 @@ class FileStore {
    */
   async fetchComputedBaseDir(fileAccessPointId) {
     try {
-      const backendUrl = getBackendServerUrl();
+      const backendUrl = getBackendUrlOrThrow();
       const response = await fetch(`${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/base_dir/`);
       
       const contentType = response.headers.get('content-type');
@@ -280,7 +311,7 @@ class FileStore {
    */
   async fetchFileList(fileAccessPointId, path = '', page = 0, pageSize = 50) {
     try {
-      const backendUrl = getBackendServerUrl();
+      const backendUrl = getBackendUrlOrThrow();
       const response = await fetch(
         `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/files/?path=${encodeURIComponent(path)}&page=${page}&pageSize=${pageSize}`
       );
@@ -314,7 +345,7 @@ class FileStore {
   async fetchFileData(fileAccessPointId, fileId) {
     try {
       const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
-      const backendUrl = getBackendServerUrl();
+      const backendUrl = getBackendUrlOrThrow();
       const url = `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/${encodedFileId}`;
       
       const response = await fetch(url, {
@@ -360,7 +391,7 @@ class FileStore {
   async renameFile(fileAccessPointId, fileId, newName) {
     try {
       const encodedFileId = fileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
-      const backendUrl = getBackendServerUrl();
+      const backendUrl = getBackendUrlOrThrow();
       const response = await fetch(
         `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/${encodedFileId}/rename`,
         {
@@ -397,7 +428,7 @@ class FileStore {
    */
   async deleteFap(id) {
     try {
-      const backendUrl = getBackendServerUrl();
+      const backendUrl = getBackendUrlOrThrow();
       const response = await fetch(
         `${backendUrl}/file_access_point/delete/${encodeURIComponent(id)}/`,
         {
@@ -414,7 +445,8 @@ class FileStore {
           this.fapIds = this.fapIds.filter(fapId => fapId !== id);
           
           // Remove from mongoDocStore (if it's there)
-          mongoDocStore.removeDoc(id);
+          const activeDocStore = mongoDocStore || fallbackMongoDocStore;
+          activeDocStore.removeDoc(id);
         });
         
         console.log(`[fileStore] Deleted file access point: ${id}`);

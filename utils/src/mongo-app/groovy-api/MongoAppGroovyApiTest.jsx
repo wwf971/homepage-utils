@@ -12,10 +12,10 @@ const MongoAppGroovyApiTest = ({ store }) => {
   const [isExecuting, setIsExecuting] = useState(false);
 
   const appId = store?.appId;
-  const serverUrl = store?.serverUrl;
+  const backendUrl = store?.backendUrl;
 
   const fetchScripts = useCallback(async () => {
-    if (!appId || !serverUrl) return;
+    if (!appId || !backendUrl) return;
     
     setIsLoadingg(true);
     setError(null);
@@ -23,8 +23,8 @@ const MongoAppGroovyApiTest = ({ store }) => {
     try {
       // Fetch both database-persisted scripts and folder-scanned scripts
       const [configResponse, folderResponse] = await Promise.all([
-        fetch(`${serverUrl}/mongo-app/${appId}/api-config/list`),
-        fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scripts`)
+        fetch(`${backendUrl}/mongo-app/${appId}/api-config/list`),
+        fetch(`${backendUrl}/mongo-app/${appId}/api-folders/scripts`)
       ]);
       
       const configResult = await configResponse.json();
@@ -66,7 +66,7 @@ const MongoAppGroovyApiTest = ({ store }) => {
     } finally {
       setIsLoadingg(false);
     }
-  }, [appId, serverUrl, selectedEndpoint]);
+  }, [appId, backendUrl, selectedEndpoint]);
 
   useEffect(() => {
     fetchScripts();
@@ -92,7 +92,7 @@ const MongoAppGroovyApiTest = ({ store }) => {
     }
 
     try {
-      const res = await fetch(`${serverUrl}/mongo-app/${appId}/api/${selectedEndpoint}`, {
+      const res = await fetch(`${backendUrl}/mongo-app/${appId}/api/${selectedEndpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)

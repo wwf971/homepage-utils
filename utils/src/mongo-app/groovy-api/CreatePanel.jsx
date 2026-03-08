@@ -4,7 +4,7 @@ import CreatePanelFileAccessPoint from './CreatePanelFileAccessPoint.jsx';
 
 const CreatePanel = ({ 
   appId, 
-  serverUrl, 
+  backendUrl, 
   onSuccess, 
   onCancel 
 }) => {
@@ -49,7 +49,7 @@ const CreatePanel = ({
       
       let url, body;
       if (uploadStorageType === 'inline') {
-        url = `${serverUrl}/mongo-app/${appId}/api-config/create`;
+        url = `${backendUrl}/mongo-app/${appId}/api-config/create`;
         body = {
           endpoint: uploadEndpoint,
           scriptSource: uploadScriptSource,
@@ -57,7 +57,7 @@ const CreatePanel = ({
           timezone
         };
       } else {
-        url = `${serverUrl}/mongo-app/${appId}/api-config/create-from-file`;
+        url = `${backendUrl}/mongo-app/${appId}/api-config/create-from-file`;
         body = {
           endpoint: uploadEndpoint,
           fileAccessPointId: uploadFileAccessPointId,
@@ -146,7 +146,7 @@ const CreatePanel = ({
             value={uploadEndpoint}
             onChange={(e) => setUploadEndpoint(e.target.value)}
             appId={appId}
-            serverUrl={serverUrl}
+            backendUrl={backendUrl}
           />
 
           <div style={{ marginBottom: '12px' }}>
@@ -228,7 +228,7 @@ const CreatePanel = ({
               onSpecificationChange={setUploadFileSpecification}
               filePath={uploadFilePath}
               onFilePathChange={setUploadFilePath}
-              serverUrl={serverUrl}
+              backendUrl={backendUrl}
                 />
           )}
         </div>

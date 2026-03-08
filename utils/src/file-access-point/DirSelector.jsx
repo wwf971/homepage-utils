@@ -7,7 +7,7 @@ import './fileAccessPoint.css';
  * DirSelector - Single directory selector
  * 
  * Props:
- * - serverUrl: string - Backend server URL
+ * - backendUrl: string - Backend server URL
  * - fileAccessPointId: string - File access point ID
  * - initialPath: string - Starting path (default: '/')
  * - onConfirm: (selectedDir) => void - Called with selected directory object
@@ -15,7 +15,7 @@ import './fileAccessPoint.css';
  * - height: number - Fixed height for FolderView body (default: 400)
  * - title: string - Title to display (default: 'Select Folder')
  */
-const DirSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select Folder' }) => {
+const DirSelector = ({ backendUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select Folder' }) => {
   const itemSelectorRef = useRef(null);
   
   const handleConfirm = (selectedItems) => {
@@ -54,7 +54,7 @@ const DirSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, onC
 
       <ItemSelector
         ref={itemSelectorRef}
-        serverUrl={serverUrl}
+        backendUrl={backendUrl}
         fileAccessPointId={fileAccessPointId}
         initialPath={initialPath}
         selectionConfig={{

@@ -346,10 +346,16 @@ public class MongoIndexService {
                     List<Document> collections = (List<Document>) index.get("collections");
                     
                     if (collections != null) {
-                        // Remove the matching collection
+                        // Remove the matching collection and skip malformed entries
                         List<Document> updatedCollections = collections.stream()
-                            .filter(c -> !(c.getString("database").equals(dbName) && 
-                                         c.getString("collection").equals(collName)))
+                            .filter(c -> {
+                                String currentDbName = c.getString("database");
+                                String currentCollName = c.getString("collection");
+                                if (currentDbName == null || currentCollName == null) {
+                                    return false;
+                                }
+                                return !(currentDbName.equals(dbName) && currentCollName.equals(collName));
+                            })
                             .collect(Collectors.toList());
                         
                         // Update the index

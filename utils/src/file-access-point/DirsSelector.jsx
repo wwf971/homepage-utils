@@ -7,7 +7,7 @@ import './fileAccessPoint.css';
  * DirsSelector - Multiple directories selector
  * 
  * Props:
- * - serverUrl: string - Backend server URL
+ * - backendUrl: string - Backend server URL
  * - fileAccessPointId: string - File access point ID
  * - initialPath: string - Starting path (default: '/')
  * - onConfirm: (selectedDirs) => void - Called with array of selected directory objects
@@ -15,7 +15,7 @@ import './fileAccessPoint.css';
  * - height: number - Fixed height for FolderView body (default: 400)
  * - title: string - Title to display (default: 'Select Folders')
  */
-const DirsSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select Folders' }) => {
+const DirsSelector = ({ backendUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select Folders' }) => {
   const itemSelectorRef = useRef(null);
   
   const handleRefresh = () => {
@@ -48,7 +48,7 @@ const DirsSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, on
 
       <ItemSelector
         ref={itemSelectorRef}
-        serverUrl={serverUrl}
+        backendUrl={backendUrl}
         fileAccessPointId={fileAccessPointId}
         initialPath={initialPath}
         selectionConfig={{

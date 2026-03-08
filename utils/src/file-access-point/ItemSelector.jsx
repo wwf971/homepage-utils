@@ -7,7 +7,7 @@ import { FolderView, PathBar, FolderIcon, UpIcon } from '@wwf971/react-comp-misc
  * ItemSelector - File/folder selector component using FolderView
  * 
  * Props:
- * - serverUrl: string - Backend server URL
+ * - backendUrl: string - Backend server URL
  * - fileAccessPointId: string - File access point ID
  * - initialPath: string - Starting path (default: '/')
  * - selectionConfig: {
@@ -21,7 +21,7 @@ import { FolderView, PathBar, FolderIcon, UpIcon } from '@wwf971/react-comp-misc
  * - showTitle: boolean - Whether to show the default title (default: true)
  */
 const ItemSelector = observer(forwardRef(({ 
-  serverUrl,
+  backendUrl,
   fileAccessPointId,
   initialPath = '/',
   selectionConfig = { mode: 'single', allowedTypes: ['file', 'folder'], allowMixed: false },
@@ -72,7 +72,7 @@ const ItemSelector = observer(forwardRef(({
       
       try {
         const response = await fetch(
-          `${serverUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/files/?path=${encodeURIComponent(path)}&page=0&pageSize=1000`
+          `${backendUrl}/file_access_point/${encodeURIComponent(fileAccessPointId)}/files/?path=${encodeURIComponent(path)}&page=0&pageSize=1000`
         );
         const result = await response.json();
         

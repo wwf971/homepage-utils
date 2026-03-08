@@ -87,11 +87,11 @@ class GroovyApiStore {
   /**
    * Fetch folder-scanned scripts (in-memory from backend)
    */
-  async fetchFolderScannedScripts(serverUrl, appId) {
-    if (!appId || !serverUrl) return { code: -1, message: 'Missing appId or serverUrl' };
+  async fetchFolderScannedScripts(backendUrl, appId) {
+    if (!appId || !backendUrl) return { code: -1, message: 'Missing appId or backendUrl' };
     
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scripts`);
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/scripts`);
       const result = await response.json();
       
       if (result.code === 0) {
@@ -110,8 +110,8 @@ class GroovyApiStore {
   /**
    * Fetch scripts from server (both database and folder-scanned)
    */
-  async fetchScripts(serverUrl, appId) {
-    if (!appId || !serverUrl) return { code: -1, message: 'Missing appId or serverUrl' };
+  async fetchScripts(backendUrl, appId) {
+    if (!appId || !backendUrl) return { code: -1, message: 'Missing appId or backendUrl' };
     
     runInAction(() => {
       this.isLoadingScripts = true;
@@ -121,8 +121,8 @@ class GroovyApiStore {
     try {
       // Fetch both database scripts and folder-scanned scripts
       const [dbScriptsResponse, folderScriptsResponse] = await Promise.all([
-        fetch(`${serverUrl}/mongo-app/${appId}/api-config/list`),
-        fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scripts`)
+        fetch(`${backendUrl}/mongo-app/${appId}/api-config/list`),
+        fetch(`${backendUrl}/mongo-app/${appId}/api-folders/scripts`)
       ]);
       
       const dbResult = await dbScriptsResponse.json();
@@ -154,10 +154,10 @@ class GroovyApiStore {
   /**
    * Create a new script
    */
-  async createScript(serverUrl, appId, scriptData) {
+  async createScript(backendUrl, appId, scriptData) {
     try {
       const timezone = -new Date().getTimezoneOffset() / 60;
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/create`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-config/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...scriptData, timezone })
@@ -167,7 +167,7 @@ class GroovyApiStore {
       
       if (result.code === 0) {
         // Refresh scripts to get the new one
-        await this.fetchScripts(serverUrl, appId);
+        await this.fetchScripts(backendUrl, appId);
       }
       
       return result;
@@ -179,10 +179,10 @@ class GroovyApiStore {
   /**
    * Update a script
    */
-  async updateScript(serverUrl, appId, scriptId, scriptData) {
+  async updateScript(backendUrl, appId, scriptId, scriptData) {
     try {
       const timezone = -new Date().getTimezoneOffset() / 60;
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/update/${scriptId}`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-config/update/${scriptId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...scriptData, timezone })
@@ -192,7 +192,7 @@ class GroovyApiStore {
       
       if (result.code === 0) {
         // Refresh scripts
-        await this.fetchScripts(serverUrl, appId);
+        await this.fetchScripts(backendUrl, appId);
       }
       
       return result;
@@ -204,9 +204,9 @@ class GroovyApiStore {
   /**
    * Delete a script
    */
-  async deleteScript(serverUrl, appId, scriptId) {
+  async deleteScript(backendUrl, appId, scriptId) {
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/delete/${scriptId}`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-config/delete/${scriptId}`, {
         method: 'DELETE'
       });
       
@@ -227,9 +227,9 @@ class GroovyApiStore {
   /**
    * Refresh a file-based script
    */
-  async refreshScript(serverUrl, appId, scriptId) {
+  async refreshScript(backendUrl, appId, scriptId) {
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-config/${scriptId}/refresh`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-config/${scriptId}/refresh`, {
         method: 'POST'
       });
       
@@ -237,7 +237,7 @@ class GroovyApiStore {
       
       if (result.code === 0) {
         // Refresh scripts
-        await this.fetchScripts(serverUrl, appId);
+        await this.fetchScripts(backendUrl, appId);
       }
       
       return result;
@@ -258,8 +258,8 @@ class GroovyApiStore {
   /**
    * Fetch folders from server
    */
-  async fetchFolders(serverUrl, appId) {
-    if (!appId || !serverUrl) return { code: -1, message: 'Missing appId or serverUrl' };
+  async fetchFolders(backendUrl, appId) {
+    if (!appId || !backendUrl) return { code: -1, message: 'Missing appId or backendUrl' };
     
     runInAction(() => {
       this.isLoadingFolders = true;
@@ -267,7 +267,7 @@ class GroovyApiStore {
     });
     
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/list`);
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/list`);
       const result = await response.json();
       
       if (result.code === 0) {
@@ -295,9 +295,9 @@ class GroovyApiStore {
   /**
    * Add a folder
    */
-  async addFolder(serverUrl, appId, fileAccessPointId, path) {
+  async addFolder(backendUrl, appId, fileAccessPointId, path) {
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/add`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileAccessPointId, path })
@@ -307,7 +307,7 @@ class GroovyApiStore {
       
       if (result.code === 0) {
         // Refresh folders
-        await this.fetchFolders(serverUrl, appId);
+        await this.fetchFolders(backendUrl, appId);
       }
       
       return result;
@@ -319,9 +319,9 @@ class GroovyApiStore {
   /**
    * Remove a folder
    */
-  async removeFolder(serverUrl, appId, fileAccessPointId, path) {
+  async removeFolder(backendUrl, appId, fileAccessPointId, path) {
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/remove`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/remove`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileAccessPointId, path })
@@ -332,8 +332,8 @@ class GroovyApiStore {
       if (result.code === 0) {
         // Refresh both folders and scripts (scripts from folder will be deleted)
         await Promise.all([
-          this.fetchFolders(serverUrl, appId),
-          this.fetchScripts(serverUrl, appId)
+          this.fetchFolders(backendUrl, appId),
+          this.fetchScripts(backendUrl, appId)
         ]);
       }
       
@@ -346,9 +346,9 @@ class GroovyApiStore {
   /**
    * Scan folders and load scripts
    */
-  async scanFolders(serverUrl, appId) {
+  async scanFolders(backendUrl, appId) {
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scan`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/scan`, {
         method: 'POST'
       });
       
@@ -356,7 +356,7 @@ class GroovyApiStore {
       
       if (result.code === 0) {
         // Refresh scripts
-        await this.fetchScripts(serverUrl, appId);
+        await this.fetchScripts(backendUrl, appId);
       }
       
       return result;
@@ -368,9 +368,9 @@ class GroovyApiStore {
   /**
    * Scan a specific folder and load scripts
    */
-  async scanFolder(serverUrl, appId, fileAccessPointId, path) {
+  async scanFolder(backendUrl, appId, fileAccessPointId, path) {
     try {
-      const response = await fetch(`${serverUrl}/mongo-app/${appId}/api-folders/scan-one`, {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/scan-one`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileAccessPointId, path })
@@ -380,7 +380,7 @@ class GroovyApiStore {
       
       if (result.code === 0) {
         // Refresh scripts
-        await this.fetchScripts(serverUrl, appId);
+        await this.fetchScripts(backendUrl, appId);
       }
       
       return result;

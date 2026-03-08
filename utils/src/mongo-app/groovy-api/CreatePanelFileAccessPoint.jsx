@@ -8,7 +8,7 @@ const CreatePanelFileAccessPoint = ({
   onFileAccessPointChange,
   filePath,
   onFilePathChange,
-  serverUrl
+  backendUrl
 }) => {
   const [showFapSelector, setShowFapSelector] = useState(false);
   const [showFileSelector, setShowFileSelector] = useState(false);
@@ -125,7 +125,7 @@ const CreatePanelFileAccessPoint = ({
       {showFileSelector && fileAccessPointId && (
       <div style={{ marginBottom: '12px' }}>
           <FileSelector
-            serverUrl={serverUrl}
+            backendUrl={backendUrl}
             fileAccessPointId={fileAccessPointId}
             initialPath="/"
             height={350}

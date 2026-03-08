@@ -7,7 +7,7 @@ import './fileAccessPoint.css';
  * FileSelector - Single file selector
  * 
  * Props:
- * - serverUrl: string - Backend server URL
+ * - backendUrl: string - Backend server URL
  * - fileAccessPointId: string - File access point ID
  * - initialPath: string - Starting path (default: '/')
  * - onConfirm: (selectedFile) => void - Called with selected file object
@@ -15,7 +15,7 @@ import './fileAccessPoint.css';
  * - height: number - Fixed height for FolderView body (default: 400)
  * - title: string - Title to display (default: 'Select File')
  */
-const FileSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select File' }) => {
+const FileSelector = ({ backendUrl, fileAccessPointId, initialPath, onConfirm, onCancel, height, title = 'Select File' }) => {
   const itemSelectorRef = useRef(null);
   
   const handleConfirm = (selectedItems) => {
@@ -54,7 +54,7 @@ const FileSelector = ({ serverUrl, fileAccessPointId, initialPath, onConfirm, on
 
       <ItemSelector
         ref={itemSelectorRef}
-        serverUrl={serverUrl}
+        backendUrl={backendUrl}
         fileAccessPointId={fileAccessPointId}
         initialPath={initialPath}
         selectionConfig={{

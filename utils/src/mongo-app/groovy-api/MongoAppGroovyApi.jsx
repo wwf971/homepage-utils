@@ -1,13 +1,27 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { PlusIcon, PanelPopup } from '@wwf971/react-comp-misc';
-import { FileAccessPointSelector, fileStore, DirSelector } from '@wwf971/homepage-utils-utils';
+import { FileAccessPointSelector, fileStore, DirSelector, initFileStore } from '@wwf971/homepage-utils-utils';
 import CreatePanel from './CreatePanel.jsx';
 import MongoAppGroovyApiCard from './MongoAppGroovyApiCard.jsx';
 import MongoAppGroovyApiFolder from './MongoAppGroovyApiFolder.jsx';
 import groovyApiStore from './groovyApiStore.js';
 
 const MongoAppGroovyApi = observer(({ store }) => {
+  const fallbackMongoDocStoreRef = useRef({
+    docs: new Map(),
+    setDoc(doc) {
+      if (doc && doc.id) {
+        this.docs.set(doc.id, doc);
+      }
+    },
+    getDoc(id) {
+      return this.docs.get(id);
+    },
+    removeDoc(id) {
+      this.docs.delete(id);
+    }
+  });
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   
@@ -31,31 +45,39 @@ const MongoAppGroovyApi = observer(({ store }) => {
   const [confirmDialog, setConfirmDialog] = useState(null);
 
   const appId = store?.appId;
-  const serverUrl = store?.serverUrl;
+  const backendUrl = store?.backendUrl;
+
+  useEffect(() => {
+    initFileStore({
+      mongoDocStore: fallbackMongoDocStoreRef.current,
+      updateDocField: async () => ({ code: -1, message: 'updateDocField not available in this context' }),
+      getBackendServerUrl: () => store?.backendUrl || ''
+    });
+  }, [store, backendUrl]);
 
   const fetchScripts = useCallback(async () => {
-    if (!appId || !serverUrl) return;
+    if (!appId || !backendUrl) return;
     
-    const result = await groovyApiStore.fetchScripts(serverUrl, appId);
+    const result = await groovyApiStore.fetchScripts(backendUrl, appId);
     if (result.code !== 0) {
       setError(result.message || 'Failed to fetch scripts');
     }
-  }, [appId, serverUrl]);
+  }, [appId, backendUrl]);
 
   const fetchFolders = useCallback(async () => {
-    if (!appId || !serverUrl) return;
+    if (!appId || !backendUrl) return;
     
-    await groovyApiStore.fetchFolders(serverUrl, appId);
-  }, [appId, serverUrl]);
+    await groovyApiStore.fetchFolders(backendUrl, appId);
+  }, [appId, backendUrl]);
 
   useEffect(() => {
     fetchScripts();
     fetchFolders();
     // Also fetch file access points if not already loaded
-    if (fileStore.fapIds.length === 0 && !fileStore.fileAccessPointsIsLoading) {
+    if (backendUrl && fileStore.fapIds.length === 0 && !fileStore.fileAccessPointsIsLoading) {
       fileStore.fetchFap();
     }
-  }, [fetchScripts, fetchFolders]);
+  }, [fetchScripts, fetchFolders, backendUrl]);
 
   const handleCreateSuccess = (successMessage) => {
     setMessage(successMessage);
@@ -72,7 +94,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
     setError(null);
     setMessage(null);
     
-    const result = await groovyApiStore.updateScript(serverUrl, appId, scriptId, {
+    const result = await groovyApiStore.updateScript(backendUrl, appId, scriptId, {
       endpoint: editEndpoint,
       scriptSource: editScriptSource,
       description: editDescription
@@ -94,7 +116,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
         setError(null);
         setMessage(null);
         
-        const result = await groovyApiStore.deleteScript(serverUrl, appId, scriptId);
+        const result = await groovyApiStore.deleteScript(backendUrl, appId, scriptId);
         
         if (result.code === 0) {
           setMessage('Script deleted successfully');
@@ -134,7 +156,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
     // Check if this is a folder-scanned script (ID format: "folder-scanned:endpoint")
     if (scriptId && scriptId.startsWith('folder-scanned:')) {
       // For folder-scanned scripts, just re-fetch to get fresh file content
-      const result = await groovyApiStore.fetchFolderScannedScripts(serverUrl, appId);
+      const result = await groovyApiStore.fetchFolderScannedScripts(backendUrl, appId);
       if (result.code === 0) {
         setMessage('Folder-scanned script refreshed from file successfully');
         
@@ -152,7 +174,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
     }
     
     // For database scripts, use the normal refresh
-    const result = await groovyApiStore.refreshScript(serverUrl, appId, scriptId);
+    const result = await groovyApiStore.refreshScript(backendUrl, appId, scriptId);
     
     if (result.code === 0) {
       setMessage('Script refreshed from file successfully');
@@ -178,7 +200,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
     setError(null);
     setMessage(null);
     
-    const result = await groovyApiStore.addFolder(serverUrl, appId, newFolderFapId, newFolderPath);
+    const result = await groovyApiStore.addFolder(backendUrl, appId, newFolderFapId, newFolderPath);
     
     if (result.code === 0) {
       setMessage('Folder added successfully');
@@ -200,7 +222,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
         setError(null);
         setMessage(null);
         
-        const result = await groovyApiStore.removeFolder(serverUrl, appId, fileAccessPointId, path);
+        const result = await groovyApiStore.removeFolder(backendUrl, appId, fileAccessPointId, path);
         
         if (result.code === 0) {
           setMessage('Folder removed successfully');
@@ -215,7 +237,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
     setError(null);
     setMessage(null);
     
-    const result = await groovyApiStore.scanFolders(serverUrl, appId);
+    const result = await groovyApiStore.scanFolders(backendUrl, appId);
     
     if (result.code === 0) {
       const { loadedCount, skippedCount, skippedScripts } = result.data;
@@ -247,7 +269,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
     setError(null);
     setMessage(null);
     
-    const result = await groovyApiStore.scanFolder(serverUrl, appId, fileAccessPointId, path);
+    const result = await groovyApiStore.scanFolder(backendUrl, appId, fileAccessPointId, path);
     
     if (result.code === 0) {
       const { loadedCount, skippedCount, skippedScripts } = result.data;
@@ -305,7 +327,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
       {showUploadForm && (
         <CreatePanel
           appId={appId}
-          serverUrl={serverUrl}
+          backendUrl={backendUrl}
           onSuccess={handleCreateSuccess}
           onCancel={() => setShowUploadForm(false)}
         />
@@ -600,7 +622,7 @@ const MongoAppGroovyApi = observer(({ store }) => {
                   position: 'relative'
                 }}>
                   <DirSelector
-                    serverUrl={serverUrl}
+                    backendUrl={backendUrl}
                     fileAccessPointId={newFolderFapId}
                     initialPath="/"
                     onConfirm={(selectedDir) => {

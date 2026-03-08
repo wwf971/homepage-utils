@@ -39,7 +39,7 @@ const MongoAppCard = observer(({ title = 'Configuration' }) => {
       <MongoAppConfigPanel
         externalStore={store}
         collections={collections}
-        panels_existence={SECTIONS_EXISTENCE}
+        panelsExistence={SECTIONS_EXISTENCE}
         title={title}
       />
     </div>

@@ -32,7 +32,7 @@ const SearchPanel = observer(({ esIndexName, store }) => {
     }
 
     try {
-      const response = await fetch(`${store.serverUrl}/elasticsearch/indices/${encodeURIComponent(esIndexName)}/search/`, {
+      const response = await fetch(`${store.backendUrl}/elasticsearch/indices/${encodeURIComponent(esIndexName)}/search/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

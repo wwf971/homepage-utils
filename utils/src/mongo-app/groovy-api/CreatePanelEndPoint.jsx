@@ -1,8 +1,8 @@
 import React from 'react';
 
-const EndPointInput = ({ value, onChange, appId, serverUrl }) => {
+const EndPointInput = ({ value, onChange, appId, backendUrl }) => {
   const endpointPath = `/mongo-app/${appId}/api/${value || '{endpoint_name}'}`;
-  const fullUrl = `${serverUrl}${endpointPath}`;
+  const fullUrl = `${backendUrl}${endpointPath}`;
 
   return (
     <div style={{ marginBottom: '12px' }}>

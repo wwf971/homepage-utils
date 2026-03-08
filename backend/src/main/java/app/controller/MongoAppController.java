@@ -125,6 +125,16 @@ public class MongoAppController {
                                                 @PathVariable String collectionName) {
         return mongoAppService.collectionExists(appId, collectionName);
     }
+    
+    /**
+     * Delete a collection for an app
+     * DELETE /mongo-app/{appId}/coll/{collectionName}/delete
+     */
+    @DeleteMapping("/{appId}/coll/{collectionName}/delete")
+    public ApiResponse<Map<String, Object>> deleteCollection(@PathVariable String appId,
+                                                            @PathVariable String collectionName) {
+        return mongoAppService.deleteCollection(appId, collectionName);
+    }
 
     /**
      * Delete an app and all its data

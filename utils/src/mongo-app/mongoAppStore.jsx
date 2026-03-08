@@ -2,67 +2,59 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import { createContext, useContext, useMemo } from 'react'
 
 class MongoAppStore {
-  // App configuration
-  serverUrl = ''
+  backendUrl = ''
   appId = ''
   appName = ''
-  
-  // UI state
+  allApps = []
+
   isLoadingAppId = false
   isCreatingApp = false
   isCheckingCollections = false
   isTestingConnection = false
+  isLoadingAllApps = false
   connectionSuccess = false
-  
-  // Errors
+
   connectionError = null
   appError = null
   collectionError = null
   indexError = null
-  
-  // App search results
+  allAppsError = null
+
   foundApps = []
-  
-  // Collections info (with indices and existence status)
   collectionsInfo = {}
-  
-  // App metadata
   appMetadata = null
-  
-  // Mongo-index system cache (shared across all apps)
+
   allMongoIndices = []
   isLoadingMongoIndices = false
   mongoIndicesError = null
 
-  // Config
   localStorageKey = 'mongo-app-config'
 
   constructor(config = {}) {
     makeAutoObservable(this)
-    
-    // Set defaults from config
+
+    this.appId = config.appId || ''
     this.appName = config.appName || ''
-    this.serverUrl = config.defaultServerUrl || ''
+    this.backendUrl = config.backendUrlDefault || ''
     this.localStorageKey = config.localStorageKey || 'mongo-app-config'
-    
-    // Load from localStorage
-    this.loadFromLocalStorage()
+
+    this.loadFromLocalStorage({
+      preserveBackendUrl: !!config.backendUrlDefault,
+      preserveAppId: !!config.appId,
+      preserveAppName: !!config.appName,
+    })
   }
 
-  // ============ Getters ============
-  
   get isConfigured() {
-    return this.serverUrl !== '' && this.appId !== ''
+    return this.backendUrl !== '' && this.appId !== ''
   }
 
   get apiBase() {
-    return `${this.serverUrl}/mongo-app`
+    return `${this.backendUrl}/mongo-app`
   }
 
-  // ============ Actions ============
-
-  setServerUrl(url) {
-    this.serverUrl = url.trim()
+  setBackendUrl(url) {
+    this.backendUrl = url.trim()
     this.saveToLocalStorage()
   }
 
@@ -88,11 +80,42 @@ class MongoAppStore {
     this.collectionError = null
   }
 
+  async fetchAllApps() {
+    if (!this.backendUrl) {
+      this.allAppsError = 'Server URL is required'
+      return
+    }
 
-  // ============ Backend API ============
+    this.isLoadingAllApps = true
+    this.allAppsError = null
+
+    try {
+      const response = await fetch(`${this.apiBase}/list`)
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch apps: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+
+      runInAction(() => {
+        if (result.code === 0 && Array.isArray(result.data)) {
+          this.allApps = result.data
+        } else {
+          this.allAppsError = result.message || 'Failed to fetch apps'
+        }
+        this.isLoadingAllApps = false
+      })
+    } catch (error) {
+      runInAction(() => {
+        this.allAppsError = error instanceof Error ? error.message : 'Unknown error'
+        this.isLoadingAllApps = false
+      })
+    }
+  }
 
   async testConnection() {
-    if (!this.serverUrl) {
+    if (!this.backendUrl) {
       this.connectionError = 'Server URL is required'
       return false
     }
@@ -104,31 +127,31 @@ class MongoAppStore {
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000)
-      
-      const response = await fetch(`${this.serverUrl}/actuator/health`, {
+
+      const response = await fetch(`${this.backendUrl}/actuator/health`, {
         method: 'GET',
         signal: controller.signal,
       })
-      
+
       clearTimeout(timeoutId)
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      const success = result.status === 'UP'
-      
+      const isSuccess = result.status === 'UP'
+
       runInAction(() => {
-        if (success) {
+        if (isSuccess) {
           this.connectionSuccess = true
         } else {
           this.connectionError = 'Server is not healthy'
         }
         this.isTestingConnection = false
       })
-      
-      return success
+
+      return isSuccess
     } catch (error) {
       runInAction(() => {
         let errorMsg = 'Unknown error'
@@ -150,7 +173,7 @@ class MongoAppStore {
   }
 
   async searchAppId() {
-    if (!this.serverUrl || !this.appName) {
+    if (!this.backendUrl || !this.appName) {
       this.appError = 'Server URL and app name are required'
       return
     }
@@ -160,18 +183,16 @@ class MongoAppStore {
 
     try {
       const response = await fetch(`${this.apiBase}/get-id/${encodeURIComponent(this.appName)}`)
-      
+
       if (!response.ok) {
         throw new Error(`Failed to search app: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      
+
       runInAction(() => {
         if (result.code === 0 && result.data) {
           this.foundApps = result.data
-          
-          // Auto-select if exactly one app found
           if (this.foundApps.length === 1) {
             this.appId = this.foundApps[0].appId
             this.saveToLocalStorage()
@@ -189,8 +210,54 @@ class MongoAppStore {
     }
   }
 
+  async validateAppId(targetAppId = this.appId) {
+    if (!this.backendUrl || !targetAppId) {
+      this.appError = 'Server URL and app id are required'
+      return false
+    }
+
+    this.isLoadingAppId = true
+    this.appError = null
+
+    try {
+      const response = await fetch(`${this.apiBase}/${encodeURIComponent(targetAppId)}/config`)
+
+      if (!response.ok) {
+        throw new Error(`Failed to check app id: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+
+      runInAction(() => {
+        if (result.code === 0 && result.data) {
+          this.appId = targetAppId
+          if (result.data.appName) {
+            this.appName = result.data.appName
+          }
+          this.appMetadata = result.data
+          this.saveToLocalStorage()
+        } else {
+          this.appId = ''
+          this.appError = result.message || `App id not found: ${targetAppId}`
+          this.saveToLocalStorage()
+        }
+        this.isLoadingAppId = false
+      })
+
+      return result.code === 0 && !!result.data
+    } catch (error) {
+      runInAction(() => {
+        this.appId = ''
+        this.appError = error instanceof Error ? error.message : 'Unknown error'
+        this.isLoadingAppId = false
+        this.saveToLocalStorage()
+      })
+      return false
+    }
+  }
+
   async createMongoApp() {
-    if (!this.serverUrl || !this.appName) {
+    if (!this.backendUrl || !this.appName) {
       this.appError = 'Server URL and app name are required'
       return
     }
@@ -204,13 +271,13 @@ class MongoAppStore {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appName: this.appName }),
       })
-      
+
       if (!response.ok) {
         throw new Error(`Failed to create app: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      
+
       runInAction(() => {
         if (result.code === 0 && result.data) {
           this.appId = result.data.appId
@@ -241,11 +308,9 @@ class MongoAppStore {
       const checks = await Promise.all(
         collectionNames.map(async (collName) => {
           const response = await fetch(`${this.apiBase}/${this.appId}/coll/exists/${encodeURIComponent(collName)}`)
-          
           if (!response.ok) {
             throw new Error(`Failed to check collection ${collName}`)
           }
-          
           const result = await response.json()
           return { collName, exists: result.data?.exists || false }
         })
@@ -280,27 +345,81 @@ class MongoAppStore {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ collectionName }),
       })
-      
+
       if (!response.ok) {
         throw new Error(`Failed to create collection: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      
+
       if (result.code === 0) {
         runInAction(() => {
           if (!this.collectionsInfo[collectionName]) {
             this.collectionsInfo[collectionName] = {}
           }
           this.collectionsInfo[collectionName].exists = true
+          if (this.appMetadata) {
+            const currentCollections = Array.isArray(this.appMetadata.collections) ? this.appMetadata.collections : []
+            if (!currentCollections.includes(collectionName)) {
+              this.appMetadata = {
+                ...this.appMetadata,
+                collections: [...currentCollections, collectionName],
+              }
+            }
+          }
         })
-        // Refresh to get updated info
         await this.fetchAllCollections()
         return true
-      } else {
-        this.collectionError = result.message || 'Failed to create collection'
-        return false
       }
+
+      this.collectionError = result.message || 'Failed to create collection'
+      return false
+    } catch (error) {
+      this.collectionError = error instanceof Error ? error.message : 'Unknown error'
+      return false
+    }
+  }
+
+  async deleteCollection(collectionName) {
+    if (!this.isConfigured) {
+      this.collectionError = 'App not configured'
+      return false
+    }
+
+    this.collectionError = null
+
+    try {
+      const response = await fetch(
+        `${this.apiBase}/${this.appId}/coll/${encodeURIComponent(collectionName)}/delete`,
+        { method: 'DELETE' }
+      )
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete collection: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+
+      if (result.code === 0) {
+        runInAction(() => {
+          const nextCollectionsInfo = { ...this.collectionsInfo }
+          delete nextCollectionsInfo[collectionName]
+          this.collectionsInfo = nextCollectionsInfo
+          if (this.appMetadata) {
+            const currentCollections = Array.isArray(this.appMetadata.collections) ? this.appMetadata.collections : []
+            this.appMetadata = {
+              ...this.appMetadata,
+              collections: currentCollections.filter((name) => name !== collectionName),
+            }
+          }
+        })
+
+        await this.fetchAllCollections()
+        return true
+      }
+
+      this.collectionError = result.message || 'Failed to delete collection'
+      return false
     } catch (error) {
       this.collectionError = error instanceof Error ? error.message : 'Unknown error'
       return false
@@ -312,13 +431,13 @@ class MongoAppStore {
 
     try {
       const response = await fetch(`${this.apiBase}/${this.appId}/config`)
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch metadata: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      
+
       if (result.code === 0) {
         runInAction(() => {
           this.appMetadata = result.data
@@ -336,13 +455,13 @@ class MongoAppStore {
 
     try {
       const response = await fetch(`${this.apiBase}/${this.appId}/coll/get-detail`)
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch collections: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      
+
       if (result.code === 0) {
         runInAction(() => {
           this.collectionsInfo = result.data || {}
@@ -355,22 +474,54 @@ class MongoAppStore {
     }
   }
 
+  async fetchAllMongoIndices(force = false) {
+    if (!this.backendUrl) return
+    if (!force && this.allMongoIndices.length > 0) return
 
-  // ============ Utility ============
+    this.isLoadingMongoIndices = true
+    this.mongoIndicesError = null
 
-  loadFromLocalStorage() {
+    try {
+      const response = await fetch(`${this.backendUrl}/mongo-index/list`)
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch mongo-indices: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+
+      runInAction(() => {
+        if (result.code === 0 && Array.isArray(result.data)) {
+          this.allMongoIndices = result.data
+        } else {
+          this.mongoIndicesError = result.message || 'Failed to fetch mongo-indices'
+        }
+        this.isLoadingMongoIndices = false
+      })
+    } catch (error) {
+      runInAction(() => {
+        this.mongoIndicesError = error instanceof Error ? error.message : 'Unknown error'
+        this.isLoadingMongoIndices = false
+      })
+    }
+  }
+
+  loadFromLocalStorage(options = {}) {
+    const preserveBackendUrl = !!options.preserveBackendUrl
+    const preserveAppId = !!options.preserveAppId
+    const preserveAppName = !!options.preserveAppName
+
     try {
       const stored = localStorage.getItem(this.localStorageKey)
       if (stored) {
         const config = JSON.parse(stored)
-        // Only override if values exist in storage
-        if (config.serverUrl && config.serverUrl.includes('://')) {
-          this.serverUrl = config.serverUrl
+        if (!preserveBackendUrl && config.backendUrl && config.backendUrl.includes('://')) {
+          this.backendUrl = config.backendUrl
         }
-        if (config.appId) {
+        if (!preserveAppId && config.appId) {
           this.appId = config.appId
         }
-        if (config.appName) {
+        if (!preserveAppName && config.appName) {
           this.appName = config.appName
         }
       }
@@ -382,7 +533,7 @@ class MongoAppStore {
   saveToLocalStorage() {
     try {
       const config = {
-        serverUrl: this.serverUrl,
+        backendUrl: this.backendUrl,
         appId: this.appId,
         appName: this.appName,
       }
@@ -393,7 +544,7 @@ class MongoAppStore {
   }
 
   reset() {
-    this.serverUrl = ''
+    this.backendUrl = ''
     this.appId = ''
     this.appName = ''
     this.isLoadingAppId = false
@@ -405,25 +556,24 @@ class MongoAppStore {
     this.appError = null
     this.collectionError = null
     this.indexError = null
+    this.allAppsError = null
     this.foundApps = []
+    this.allApps = []
+    this.isLoadingAllApps = false
     this.collectionsInfo = {}
     this.appMetadata = null
-    // Note: Keep allMongoIndices cache across app switches
     localStorage.removeItem(this.localStorageKey)
   }
 }
 
-// Create context
 export const StoreContext = createContext(null)
 
-// Create provider component
-export const StoreProvider = ({ children, appName, defaultServerUrl, localStorageKey }) => {
-  // Create store instance only once using useMemo
+export const StoreProvider = ({ children, appId, appName, backendUrlDefault, localStorageKey }) => {
   const store = useMemo(
-    () => new MongoAppStore({ appName, defaultServerUrl, localStorageKey }),
-    [appName, defaultServerUrl, localStorageKey]
+    () => new MongoAppStore({ appId, appName, backendUrlDefault, localStorageKey }),
+    [appId, appName, backendUrlDefault, localStorageKey]
   )
-  
+
   return (
     <StoreContext.Provider value={store}>
       {children}
@@ -431,7 +581,6 @@ export const StoreProvider = ({ children, appName, defaultServerUrl, localStorag
   )
 }
 
-// Custom hook to use the store
 export const useMongoAppStore = () => {
   const store = useContext(StoreContext)
   if (!store) {
@@ -440,7 +589,6 @@ export const useMongoAppStore = () => {
   return store
 }
 
-// Provider for external store (when store is managed by parent)
 export const ExternalStoreProvider = ({ children, store }) => {
   return (
     <StoreContext.Provider value={store}>
@@ -448,3 +596,4 @@ export const ExternalStoreProvider = ({ children, store }) => {
     </StoreContext.Provider>
   )
 }
+

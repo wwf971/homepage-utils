@@ -34,17 +34,17 @@ const FileAccessPointCreate = ({ onSuccess }) => {
   // Fetch system root file access point on mount
   useEffect(() => {
     const fetchSystemRoot = async () => {
-      const serverUrl = getBackendServerUrl();
+      const backendUrl = getBackendServerUrl();
       
-      if (!serverUrl || serverUrl.trim() === '') {
-        console.log('FileAccessPointCreate: serverUrl is empty, skipping fetch');
+      if (!backendUrl || backendUrl.trim() === '') {
+        console.log('FileAccessPointCreate: backendUrl is empty, skipping fetch');
         return;
       }
       
-      console.log('FileAccessPointCreate: Fetching system root FAP from:', serverUrl);
+      console.log('FileAccessPointCreate: Fetching system root FAP from:', backendUrl);
       
       try {
-        const response = await fetch(`${serverUrl}/file_access_point/special/`, {
+        const response = await fetch(`${backendUrl}/file_access_point/special/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: 'root-browser' })
@@ -82,10 +82,10 @@ const FileAccessPointCreate = ({ onSuccess }) => {
     setCreating(true);
     setError(null);
     
-    const serverUrl = getBackendServerUrl();
+    const backendUrl = getBackendServerUrl();
     
     try {
-      const response = await fetch(`${serverUrl}/file_access_point/create/`, {
+      const response = await fetch(`${backendUrl}/file_access_point/create/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -217,7 +217,7 @@ const FileAccessPointCreate = ({ onSuccess }) => {
       {showDirSelector && systemRootFapId && (
         <div>
           <DirSelector
-            serverUrl={getBackendServerUrl()}
+            backendUrl={getBackendServerUrl()}
             fileAccessPointId={systemRootFapId}
             initialPath="/"
             height={300}

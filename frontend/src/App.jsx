@@ -150,7 +150,7 @@ function App() {
                 <PanelMongoAppCreate />
               </Panel>
             </SubTab>
-            <SubTab label="View">
+            <SubTab label="View" isDefault={true}>
               <Panel>
                 <PanelMongoAppConfig />
               </Panel>

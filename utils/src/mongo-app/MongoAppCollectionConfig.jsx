@@ -1,96 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
-import { MinusIcon, PlusIcon, RefreshIcon, CrossIcon } from '@wwf971/react-comp-misc';
+import { PlusIcon, RefreshIcon, CrossIcon } from '@wwf971/react-comp-misc';
+import MongoAppCollectionCard from './MongoAppCollectionCard';
 import './MongoAppConfig.css';
-
-const CollectionItem = observer(({ collName, collectionInfo, store }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  const exists = collectionInfo?.exists || false;
-  const docCount = collectionInfo?.docCount || 0;
-  const indices = collectionInfo?.indices || [];
-  
-  // Separate internal and external indices
-  const internalIndices = indices.filter(idx => !idx.external);
-  const externalIndices = indices.filter(idx => idx.external);
-
-  const handleCreate = async () => {
-    await store.createCollection(collName);
-  };
-
-  return (
-    <div className="collection-item-container">
-      <div 
-        className={`collection-item-header ${!exists ? 'collection-item-header-nonexist' : ''}`}
-        onClick={exists ? () => setIsExpanded(!isExpanded) : undefined}
-      >
-        <div className="collection-item-content">
-          {exists && (
-            isExpanded ? (
-              <MinusIcon width={10} height={10} color="#999" strokeWidth={2} />
-            ) : (
-              <PlusIcon width={10} height={10} color="#999" strokeWidth={2} />
-            )
-          )}
-          <span className={`collection-item-name ${!exists ? 'collection-item-name-nonexist' : ''}`}>
-            {collName}
-            {exists && docCount > 0 && (
-              <span className="collection-item-count">
-                ({docCount})
-              </span>
-            )}
-          </span>
-        </div>
-        <div className="collection-item-status">
-          {exists ? (
-            <span className="collection-item-status-exists">Exists</span>
-          ) : (
-            <button
-              className="config-button-small config-button-small-primary"
-              onClick={handleCreate}
-              style={{ fontSize: '10px', padding: '2px 6px' }}
-            >
-              Create
-            </button>
-          )}
-        </div>
-      </div>
-      
-      {exists && isExpanded && (
-        <div className="collection-item-details">
-          <div className="collection-item-details-label">ES Indices:</div>
-          {indices.length > 0 ? (
-            <div className="collection-indices-container">
-              {internalIndices.length > 0 && (
-                <div className="collection-indices-row">
-                  {internalIndices.map((indexInfo, idx) => (
-                    <span key={idx} className="index-tag-internal">
-                      {indexInfo.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {externalIndices.length > 0 && (
-                <div>
-                  <div className="external-label">External:</div>
-                  <div className="collection-indices-row">
-                    {externalIndices.map((indexInfo, idx) => (
-                      <span key={idx} className="index-tag-external">
-                        {indexInfo.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="no-items-text">None</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-});
 
 const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
   const [collectionName, setCollectionName] = useState('');
@@ -199,7 +111,10 @@ const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
         throw new Error(createResult.message || 'Failed to create collection');
       }
 
-      const fullCollName = createResult.data.fullCollectionName;
+      const fullCollName = createResult.data.fullCollectionName || createResult.data.appCollNameFull;
+      if (!fullCollName) {
+        throw new Error('Failed to resolve created collection full name');
+      }
 
       // 2. Register collection with each selected index
       const APP_DB_NAME = 'mongo-app';
@@ -219,7 +134,6 @@ const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
       const updatePromises = selectedIndices.map(async (esIndexName) => {
         const indexMeta = indicesMap.get(esIndexName);
         if (!indexMeta) {
-          console.warn(`Index metadata not found for ES index: ${esIndexName}`);
           return;
         }
 
@@ -233,7 +147,7 @@ const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
         ];
 
         // Update index
-        await fetch(`${store.serverUrl}/mongo-index/${indexMeta.name}/update`, {
+        await fetch(`${store.backendUrl}/mongo-index/${indexMeta.name}/update`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -536,9 +450,10 @@ const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
   );
 });
 
-const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
+const MongoAppCollectionConfig = observer(({ store }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [deletingCollectionName, setDeletingCollectionName] = useState('');
 
   useEffect(() => {
     if (store.isConfigured) {
@@ -556,12 +471,40 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
     await loadCollections();
   };
 
+  const handleCreateCollection = async (collName) => {
+    const isCreated = await store.createCollection(collName);
+    if (isCreated) {
+      await loadCollections();
+    }
+  };
+
+  const handleDeleteCollection = async (collName) => {
+    setDeletingCollectionName(collName);
+    const deleteCollectionFn = typeof store.deleteCollection === 'function'
+      ? store.deleteCollection.bind(store)
+      : async (targetCollName) => {
+          const response = await fetch(
+            `${store.apiBase}/${store.appId}/coll/${encodeURIComponent(targetCollName)}/delete`,
+            { method: 'DELETE' }
+          );
+          if (!response.ok) {
+            throw new Error(`Failed to delete collection: ${response.statusText}`);
+          }
+          const result = await response.json();
+          return result.code === 0;
+        };
+
+    const isDeleted = await deleteCollectionFn(collName);
+    setDeletingCollectionName('');
+    if (isDeleted) {
+      await loadCollections();
+    }
+  };
+
   if (!store.isConfigured) return null;
 
-  // Merge expected collections with fetched collections
   const collectionsInfo = store.collectionsInfo || {};
-  const allCollectionNames = new Set([...Object.keys(collectionsInfo), ...collections]);
-  const collectionsList = Array.from(allCollectionNames);
+  const collectionsList = Object.keys(collectionsInfo);
 
   return (
     <div style={{ marginTop: '8px' }}>
@@ -597,12 +540,16 @@ const MongoAppCollectionConfig = observer(({ store, collections = [] }) => {
         </div>
       ) : collectionsList.length > 0 ? (
         <div>
-          {collectionsList.map((collName) => (
-            <CollectionItem 
-              key={collName} 
+          {collectionsList.map((collName, index) => (
+            <MongoAppCollectionCard
+              key={collName}
+              index={index + 1}
+              appId={store.appId}
               collName={collName}
               collectionInfo={collectionsInfo[collName]}
-              store={store}
+              onCreate={handleCreateCollection}
+              onDelete={handleDeleteCollection}
+              isDeleting={deletingCollectionName === collName}
             />
           ))}
         </div>
