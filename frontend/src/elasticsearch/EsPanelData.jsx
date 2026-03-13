@@ -1,11 +1,12 @@
 import React from 'react';
 import { useAtomValue } from 'jotai';
 import { TabsOnTop } from '@wwf971/react-comp-misc';
+import { EsDocListAll } from '@wwf971/homepage-utils-utils';
 import { esSelectedIndexAtom } from '../remote/dataStore';
+import { getBackendServerUrl } from '../remote/dataStore';
 import EsIndexListAll from './EsIndexListAll';
 import EsIndexCard from './EsIndexCard';
 import EsDocSearch from './EsDocSearch';
-import EsDocListAll from './EsDocListAll';
 
 /**
  * Main ElasticSearch Data Panel component for index operations
@@ -29,7 +30,10 @@ export const EsPanelData = () => {
             </TabsOnTop.Tab>
             
             <TabsOnTop.Tab label="All Docs">
-              <EsDocListAll indexName={selectedIndexName} />
+              <EsDocListAll
+                indexName={selectedIndexName}
+                backendUrl={getBackendServerUrl()}
+              />
             </TabsOnTop.Tab>
           </TabsOnTop>
         </div>

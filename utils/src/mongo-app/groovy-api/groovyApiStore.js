@@ -344,6 +344,37 @@ class GroovyApiStore {
   }
 
   /**
+   * Update a folder configuration
+   */
+  async updateFolder(backendUrl, appId, oldFileAccessPointId, oldPath, newFileAccessPointId, newPath) {
+    try {
+      const response = await fetch(`${backendUrl}/mongo-app/${appId}/api-folders/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oldFileAccessPointId,
+          oldPath,
+          newFileAccessPointId,
+          newPath,
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.code === 0) {
+        await Promise.all([
+          this.fetchFolders(backendUrl, appId),
+          this.fetchScripts(backendUrl, appId)
+        ]);
+      }
+
+      return result;
+    } catch (err) {
+      return { code: -2, message: err.message };
+    }
+  }
+
+  /**
    * Scan folders and load scripts
    */
   async scanFolders(backendUrl, appId) {

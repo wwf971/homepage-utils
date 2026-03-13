@@ -554,6 +554,7 @@ public class GroovyApiService {
                     if (!resultMap.containsKey("message")) {
                         resultMap.put("message", null);
                     }
+                    normalizeMessageField(resultMap);
                     return resultMap;
                 } else {
                     // Script returned a Map but not in standard format - wrap it
@@ -694,6 +695,7 @@ public class GroovyApiService {
                     if (!resultMap.containsKey("message")) {
                         resultMap.put("message", null);
                     }
+                    normalizeMessageField(resultMap);
                     return resultMap;
                 } else {
                     // Wrap the result in standard format
@@ -746,5 +748,21 @@ public class GroovyApiService {
             sb.append(element.toString()).append("\n");
         }
         return sb.toString();
+    }
+
+    /**
+     * Convert Groovy GString message values to plain String before JSON serialization.
+     */
+    private void normalizeMessageField(Map<String, Object> resultMap) {
+        if (!resultMap.containsKey("message")) {
+            return;
+        }
+        Object message = resultMap.get("message");
+        if (message == null) {
+            return;
+        }
+        if (!(message instanceof String)) {
+            resultMap.put("message", message.toString());
+        }
     }
 }

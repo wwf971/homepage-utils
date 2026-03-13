@@ -3,6 +3,7 @@ import { useStore } from 'jotai';
 import { makeAutoObservable, isObservable, toJS } from 'mobx';
 import { observer } from 'mobx-react-lite';
 import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonCompMobx, TabsOnTop } from '@wwf971/react-comp-misc';
+import { EsDocListAll } from '@wwf971/homepage-utils-utils';
 import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import { getBackendServerUrl } from '../remote/dataStore';
 import { updateMongoIndex, deleteMongoIndex } from './mongoIndexStore';
@@ -10,7 +11,6 @@ import { searchDatabases, searchCollections } from '../mongo/mongoStore';
 import { useMongoDocEditorMobx } from '../mongo/mongoEditMobx';
 import MongoIndexDashboard from './MongoIndexDashBoard';
 import EsDocSearch from '../elasticsearch/EsDocSearch';
-import EsDocListAll from '../elasticsearch/EsDocListAll';
 import '../mongo/mongo.css';
 import './mongo-index.css';
 
@@ -380,7 +380,10 @@ const MongoIndexCard = observer(({ index, onUpdate, onDelete, onJsonEdit }) => {
           
           <TabsOnTop.Tab label="All Es Docs">
             <div style={{ padding: '8px' }}>
-              <EsDocListAll indexName={index.esIndex} />
+              <EsDocListAll
+                indexName={index.esIndex}
+                backendUrl={getBackendServerUrl()}
+              />
             </div>
           </TabsOnTop.Tab>
         </TabsOnTop>

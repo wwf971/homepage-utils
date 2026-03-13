@@ -92,6 +92,32 @@ public class MongoAppScriptBackendApis {
     public ApiResponse<Map<String, Object>> updateDoc(String collName, String docId, Map<String, Object> updates, Boolean shouldUpdateIndex) {
         return mongoAppService.updateDoc(appId, collName, docId, updates, shouldUpdateIndex);
     }
+
+    /**
+     * Index with a custom source object into a specific app-owned ES index.
+     * Backend will flatten and index this object instead of flattening Mongo doc directly.
+     */
+    public ApiResponse<Map<String, Object>> indexDocWithCustomSource(String collName, String docId,
+                                                                      Map<String, Object> docForIndex,
+                                                                      String indexName) {
+        return mongoAppService.indexDocWithCustomSource(appId, collName, docId, docForIndex, indexName);
+    }
+
+    /**
+     * Execute another MongoApp Groovy API endpoint within the same app.
+     * This allows scripts to reuse shared logic in helper endpoints.
+     */
+    public Map<String, Object> executeApiScript(String endpoint, Map<String, Object> requestParams) {
+        return mongoAppService.executeApiScript(appId, endpoint, requestParams, null);
+    }
+
+    /**
+     * Execute another MongoApp Groovy API endpoint with explicit headers.
+     */
+    public Map<String, Object> executeApiScript(String endpoint, Map<String, Object> requestParams,
+                                                Map<String, String> requestHeaders) {
+        return mongoAppService.executeApiScript(appId, endpoint, requestParams, requestHeaders);
+    }
     
     /**
      * Delete a document
@@ -120,23 +146,20 @@ public class MongoAppScriptBackendApis {
      * List all Elasticsearch index names for this app
      */
     public ApiResponse<List<String>> listAllEsIndices() {
-        // Get app info which contains esIndices
-        ApiResponse<Map<String, Object>> response = mongoAppService.getAppInfo(appId);
-        
-        if (response.getCode() == 0) {
-            @SuppressWarnings("unchecked")
-            List<String> indices = (List<String>) response.getData().get("esIndices");
-            return ApiResponse.success(indices != null ? indices : List.of());
-        } else {
+        ApiResponse<Map<String, Object>> response = getAppInfo();
+        if (response.getCode() != 0 || response.getData() == null) {
             return ApiResponse.error(response.getMessage());
         }
+        @SuppressWarnings("unchecked")
+        List<String> indices = (List<String>) response.getData().get("esIndices");
+        return ApiResponse.success(indices != null ? indices : List.of());
     }
     
     /**
      * Check if index exists
      */
-    public ApiResponse<Map<String, Object>> indexExists(String indexName) {
-        return mongoAppService.indexExists(appId, indexName);
+    public ApiResponse<Map<String, Object>> esIndexExists(String indexName) {
+        return mongoAppService.esIndexExists(appId, indexName);
     }
 
     /**
@@ -187,7 +210,37 @@ public class MongoAppScriptBackendApis {
      * Get current app's metadata
      */
     public ApiResponse<Map<String, Object>> getAppInfo() {
-        return mongoAppService.getAppInfo(appId);
+        ApiResponse<Map<String, Object>> response = mongoAppService.getAppInfo(appId);
+        if (response.getCode() != 0 || response.getData() == null) {
+            return response;
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> raw = response.getData();
+        Map<String, Object> data = new java.util.HashMap<>(raw);
+
+        String prefix = appId + "_";
+        Object esIndexObj = raw.get("esIndex");
+        if (esIndexObj instanceof String) {
+            String full = (String) esIndexObj;
+            data.put("esIndex", full.startsWith(prefix) ? full.substring(prefix.length()) : full);
+        }
+
+        Object indicesObj = raw.get("esIndices");
+        if (indicesObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> fullList = (List<String>) indicesObj;
+            List<String> shortList = new java.util.ArrayList<>();
+            for (String full : fullList) {
+                if (full == null) {
+                    continue;
+                }
+                shortList.add(full.startsWith(prefix) ? full.substring(prefix.length()) : full);
+            }
+            data.put("esIndices", shortList);
+        }
+
+        return ApiResponse.success(data);
     }
     
     /**

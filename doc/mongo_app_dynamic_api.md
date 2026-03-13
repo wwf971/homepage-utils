@@ -69,6 +69,7 @@ Via the following endpoints:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/mongo-app/{appId}/api-folders/add` | Add folder |
+| POST | `/mongo-app/{appId}/api-folders/update` | Update folder (change FAP or path) |
 | POST | `/mongo-app/{appId}/api-folders/remove` | Remove folder |
 | GET | `/mongo-app/{appId}/api-folders/list` | List folders |
 | POST | `/mongo-app/{appId}/api-folders/scan` | Scan all folders |
@@ -105,7 +106,8 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 |--------|------------|-------------|
 | `createDoc(collName, docId, content)` | String, String, Map | Create document |
 | `getDoc(collName, docId)` | String, String | Get document |
-| `updateDoc(collName, docId, updates)` | String, String, Map | Update document |
+| `updateDoc(collName, docId, updates)` | String, String, Map | Update document (also triggers ES reindex) |
+| `updateDoc(collName, docId, updates, shouldUpdateIndex)` | String, String, Map, Boolean | Update document, control whether ES index is updated |
 | `deleteDoc(collName, docId)` | String, String | Delete document |
 | `listDocs(collName, limit, skip)` | String, Int, Int | List with pagination |
 | `searchDocs(collName, query)` | String, Map | Search (not implemented) |
@@ -115,20 +117,28 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 | Method | Parameters | Return | Description |
 |--------|------------|--------|-------------|
 | `listAllEsIndices()` | none | ApiResponse<List<String>> | List ES index names |
-| `indexExists(indexName)` | String | ApiResponse<Map> | Check if index exists and whether it belongs to current app |
+| `esIndexExists(indexName)` | String | ApiResponse<Map> | Check if index exists and whether it belongs to current app |
 | `createEsIndex(indexName)` | String | ApiResponse<Map> | Create app-owned ES index |
 | `deleteEsIndex(indexName)` | String | ApiResponse<Map> | Delete app-owned ES index (cannot delete last index) |
 | `renameEsIndex(oldIndexName, newIndexName)` | String, String | ApiResponse<Map> | Rename app-owned ES index |
 | `getEsIndexInfo(indexName)` | String | ApiResponse<Map> | Get ES index details and doc count |
 | `listEsDocs(indexName, page, pageSize)` | String, Int, Int | ApiResponse<Map> | List docs in ES index |
 | `getEsDoc(indexName, docId)` | String, String | ApiResponse<Map> | Get one ES doc by id |
+| `indexDocWithCustomSource(collName, docId, docForIndex, indexName)` | String, String, Map, String | ApiResponse<Map> | Index doc using a custom source object (instead of raw Mongo doc) into a specific app-owned ES index. Typical usage: call `updateDoc(..., false)` first, then this. |
 
 #### App Metadata
 
 | Method | Parameters | Return | Description |
 |--------|------------|--------|-------------|
-| `getAppInfo()` | none | ApiResponse<Map> | Get app metadata |
+| `getAppInfo()` | none | ApiResponse<Map> | Get app metadata (ES index names are returned without the `appId_` prefix) |
 | `getAppId()` | none | String | Get current appId |
+
+#### Cross-Script Calls
+
+| Method | Parameters | Return | Description |
+|--------|------------|--------|-------------|
+| `executeApiScript(endpoint, requestParams)` | String, Map | Map | Execute another Groovy API endpoint within the same app |
+| `executeApiScript(endpoint, requestParams, requestHeaders)` | String, Map, Map | Map | Same, with explicit request headers |
 
 
 ## Example Scripts
@@ -169,7 +179,7 @@ All full examples are stored in:
 | `mongo-collection-update-doc.groovy` | Update document in app collection |
 | `mongo-collection-delete-doc.groovy` | Delete document from app collection |
 | `es-index-list.groovy` | List ES indices bound to current app |
-| `es-index-check-exists.groovy` | Check index existence through `backendApis.indexExists()` |
+| `es-index-check-exists.groovy` | Check index existence through `backendApis.esIndexExists()` |
 | `es-index-create-doc.groovy` | Create document and trigger indexing |
 | `es-index-read-doc.groovy` | Read document while showing app index context |
 | `es-index-update-doc.groovy` | Update document and trigger reindexing |

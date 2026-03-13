@@ -416,6 +416,46 @@ public class MongoAppController {
         
         return mongoAppService.removeGroovyScriptFolder(appId, fileAccessPointId, path);
     }
+
+    /**
+     * Update a groovy script folder
+     * POST /mongo-app/{appId}/api-folders/update
+     * Body: {
+     *   "oldFileAccessPointId": "...",
+     *   "oldPath": "...",
+     *   "newFileAccessPointId": "...",
+     *   "newPath": "..."
+     * }
+     */
+    @PostMapping("/{appId}/api-folders/update")
+    public ApiResponse<Map<String, Object>> updateGroovyScriptFolder(@PathVariable String appId,
+                                                                      @RequestBody Map<String, String> request) {
+        String oldFileAccessPointId = request.get("oldFileAccessPointId");
+        String oldPath = request.get("oldPath");
+        String newFileAccessPointId = request.get("newFileAccessPointId");
+        String newPath = request.get("newPath");
+
+        if (oldFileAccessPointId == null || oldFileAccessPointId.trim().isEmpty()) {
+            return ApiResponse.error("oldFileAccessPointId is required");
+        }
+        if (oldPath == null) {
+            return ApiResponse.error("oldPath is required");
+        }
+        if (newFileAccessPointId == null || newFileAccessPointId.trim().isEmpty()) {
+            return ApiResponse.error("newFileAccessPointId is required");
+        }
+        if (newPath == null) {
+            return ApiResponse.error("newPath is required");
+        }
+
+        return mongoAppService.updateGroovyScriptFolder(
+            appId,
+            oldFileAccessPointId,
+            oldPath,
+            newFileAccessPointId,
+            newPath
+        );
+    }
     
     /**
      * List groovy script folders

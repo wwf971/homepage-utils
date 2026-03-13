@@ -10,7 +10,7 @@ if (!indexName) {
     ]
 }
 
-def result = backendApis.indexExists(indexName)
+def result = backendApis.esIndexExists(indexName)
 
 if (result.code == 0) {
     return [

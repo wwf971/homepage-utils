@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { MinusIcon, PlusIcon, RefreshIcon } from '@wwf971/react-comp-misc';
 import MongoAppEsIndexCard from './MongoAppEsIndexCard.jsx';
-import './MongoAppConfig.css';
+import '../MongoAppConfig.css';
 
 const IndexItem = observer(({ esIndexName, indexInfo, appId, store }) => {
   const [isExpanded, setIsExpanded] = useState(false);

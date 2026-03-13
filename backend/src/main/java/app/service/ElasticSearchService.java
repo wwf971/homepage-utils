@@ -161,7 +161,7 @@ public class ElasticSearchService {
         String indexUri = baseUri + indexName;
 
         // Check if index exists
-        boolean exists = indexExists(indexName);
+        boolean exists = esIndexExists(indexName);
 
         if (exists) {
             if (clearIfExists) {
@@ -249,7 +249,9 @@ public class ElasticSearchService {
         ObjectNode tokenizer = analysis.putObject("tokenizer");
         ObjectNode charTokenizer = tokenizer.putObject("char_tokenizer");
         charTokenizer.put("type", "pattern");
-        charTokenizer.put("pattern", "."); // Match every character
+        // charTokenizer.put("pattern", "."); // Match every character
+        // Empty regex splits input into single-character tokens for char-level search.
+        charTokenizer.put("pattern", "");
         
         // Build mappings
         ObjectNode mappings = root.putObject("mappings");
@@ -556,7 +558,7 @@ public class ElasticSearchService {
     /**
      * Check if index exists
      */
-    public boolean indexExists(String indexName) throws Exception {
+    public boolean esIndexExists(String indexName) throws Exception {
         indexName = indexName.toLowerCase();
         String baseUri = getBaseUri();
         String indexUri = baseUri + indexName;

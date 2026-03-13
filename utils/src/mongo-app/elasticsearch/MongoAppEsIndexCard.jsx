@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { SpinningCircle, TabsOnTop } from '@wwf971/react-comp-misc';
-import EsDocSearchResult from '../elasticsearch/EsDocSearchResult';
-import './MongoAppConfig.css';
-import '../elasticsearch/elasticsearch.css';
+import EsDocListAll from './EsDocListAll';
+import EsDocSearchResult from '../../elasticsearch/EsDocSearchResult';
+import '../MongoAppConfig.css';
+import '../../elasticsearch/elasticsearch.css';
 
 // Search panel component
 const SearchPanel = observer(({ esIndexName, store }) => {
@@ -267,18 +268,46 @@ const CollectionsPanel = observer(({ collections, appId }) => {
   );
 });
 
+const AllDocsPanel = ({ tabsState, tabKey, esIndexName, backendUrl }) => {
+  const [isActivated, setIsActivated] = useState(false);
+
+  useEffect(() => {
+    const clickCount = tabsState?.[tabKey]?.clickCount || 0;
+    if (clickCount > 0 && !isActivated) {
+      setIsActivated(true);
+    }
+  }, [tabsState, tabKey, isActivated]);
+
+  if (!isActivated) {
+    return null;
+  }
+
+  return (
+    <EsDocListAll
+      indexName={esIndexName}
+      backendUrl={backendUrl}
+    />
+  );
+};
+
 // Main component with tabs (embedded, not modal)
 const MongoAppEsIndexCard = observer(({ esIndexName, indexInfo, appId, store }) => {
   const collections = indexInfo?.collections || [];
 
   return (
     <div style={{ marginTop: '8px' }}>
-      <TabsOnTop defaultTab="Collections">
+      <TabsOnTop defaultTab="Collections" autoSwitchToNewTab={false}>
         <TabsOnTop.Tab label="Collections">
           <CollectionsPanel collections={collections} appId={appId} />
         </TabsOnTop.Tab>
         <TabsOnTop.Tab label="Search">
           <SearchPanel esIndexName={esIndexName} store={store} />
+        </TabsOnTop.Tab>
+        <TabsOnTop.Tab label="All Docs">
+          <AllDocsPanel
+            esIndexName={esIndexName}
+            backendUrl={store?.backendUrl || ''}
+          />
         </TabsOnTop.Tab>
       </TabsOnTop>
     </div>

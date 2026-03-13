@@ -778,8 +778,9 @@ public class MongoAppService {
             Object mongoId = doc.get("_id");
             Map<String, Object> updateDict = new HashMap<>(content);
             updateDict.put("id", docId);
+            String mongoIndexName = resolveMongoIndexNameForWrites(appId, appDoc);
             
-            mongoIndexService.updateDoc(appId, APP_DB_NAME, appCollNameFull, docId, updateDict, updateIndex);
+            mongoIndexService.updateDoc(mongoIndexName, APP_DB_NAME, appCollNameFull, docId, updateDict, updateIndex);
             
             return ApiResponse.success(
                 Map.of(
@@ -820,9 +821,10 @@ public class MongoAppService {
         
         // Default to true if not specified
         boolean updateIndex = (shouldUpdateIndex != null) ? shouldUpdateIndex : true;
+        String mongoIndexName = resolveMongoIndexNameForWrites(appId, appDoc);
         
         // Use MongoIndexService for update (handles ES indexing based on shouldUpdateIndex)
-        Map<String, Object> result = mongoIndexService.updateDoc(appId, APP_DB_NAME, appCollNameFull, docId, updates, updateIndex);
+        Map<String, Object> result = mongoIndexService.updateDoc(mongoIndexName, APP_DB_NAME, appCollNameFull, docId, updates, updateIndex);
         // Convert old format to ApiResponse
         Integer code = (Integer) result.get("code");
         if (code != null && code == 0) {
@@ -830,6 +832,53 @@ public class MongoAppService {
         } else {
             return ApiResponse.error((String) result.get("message"));
         }
+    }
+
+    /**
+     * Index a document with a custom source object into a specific app-owned ES index.
+     * indexName is required; scripts must always specify which app-owned ES index to write to.
+     */
+    public ApiResponse<Map<String, Object>> indexDocWithCustomSource(String appId, String collectionName, String docId,
+                                                                      Map<String, Object> docForIndex,
+                                                                      String indexName) {
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        @SuppressWarnings("unchecked")
+        List<String> collections = (List<String>) appDoc.get("collections");
+        if (collections == null || !collections.contains(collectionName)) {
+            return createErrorResult("Collection not found: " + collectionName);
+        }
+
+        String mongoIndexName = appId;
+        if (indexName != null && !indexName.trim().isEmpty()) {
+            String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
+            List<String> appEsIndices = getAppEsIndices(appDoc);
+            if (!appEsIndices.contains(normalizedIndexName)) {
+                return createErrorResult("Index does not belong to app: " + normalizedIndexName);
+            }
+            List<String> mongoIndexNames = getMongoIndexNamesForAppEsIndex(appId, normalizedIndexName);
+            if (mongoIndexNames.isEmpty()) {
+                return createErrorResult("No mongo-index mapping found for ES index: " + normalizedIndexName);
+            }
+            mongoIndexName = mongoIndexNames.get(0);
+        }
+
+        String appCollNameFull = appId + "_" + collectionName;
+        Map<String, Object> result = mongoIndexService.indexDocWithCustomSource(
+            mongoIndexName, APP_DB_NAME, appCollNameFull, docId, docForIndex
+        );
+
+        Integer code = (Integer) result.get("code");
+        if (code != null && code == 0) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) result.get("data");
+            return ApiResponse.success(data, (String) result.get("message"));
+        }
+        return ApiResponse.error((String) result.get("message"));
     }
     
     /**
@@ -914,33 +963,29 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
         
-        // Migrate old apps to support multiple indices
-        @SuppressWarnings("unchecked")
-        List<String> esIndices = (List<String>) appDoc.get("esIndices");
-        if (esIndices == null) {
-            esIndices = new ArrayList<>();
-            String esIndex = appDoc.getString("esIndex");
-            if (esIndex != null) {
-                esIndices.add(esIndex);
-            }
+        List<String> esIndices = getAppEsIndices(appDoc);
+        // Legacy compatibility field. The canonical source is esIndices.
+        String esIndexCompat = appDoc.getString("esIndex");
+        if (esIndexCompat != null && !esIndexCompat.trim().isEmpty()) {
+            esIndexCompat = normalizeIndexName(esIndexCompat);
+        } else if (!esIndices.isEmpty()) {
+            esIndexCompat = esIndices.get(0);
         }
-        
-        return ApiResponse.success(
-            Map.of(
-                "appId", appDoc.getString("appId"),
-                "appName", appDoc.getString("appName"),
-                "esIndex", appDoc.getString("esIndex"),
-                "esIndices", esIndices,
-                "collections", appDoc.get("collections", new ArrayList<>()),
-                "createdAt", appDoc.get("createdAt")
-            )
-        );
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("appId", appDoc.getString("appId"));
+        data.put("appName", appDoc.getString("appName"));
+        data.put("esIndex", esIndexCompat);
+        data.put("esIndices", esIndices);
+        data.put("collections", appDoc.get("collections", new ArrayList<>()));
+        data.put("createdAt", appDoc.get("createdAt"));
+        return ApiResponse.success(data);
     }
 
     /**
      * Check if an ES index exists and whether it is registered under this app.
      */
-    public ApiResponse<Map<String, Object>> indexExists(String appId, String indexName) {
+    public ApiResponse<Map<String, Object>> esIndexExists(String appId, String indexName) {
         if (indexName == null || indexName.trim().isEmpty()) {
             return createErrorResult("Index name cannot be empty");
         }
@@ -951,13 +996,13 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
 
-        String normalizedIndexName = normalizeIndexName(indexName);
+        String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
         List<String> appEsIndices = getAppEsIndices(appDoc);
         boolean isOwnedByApp = appEsIndices.contains(normalizedIndexName);
         boolean isExistsInEs;
 
         try {
-            isExistsInEs = esService.indexExists(normalizedIndexName);
+            isExistsInEs = esService.esIndexExists(normalizedIndexName);
         } catch (Exception e) {
             return createErrorResult("Failed to check index existence: " + e.getMessage());
         }
@@ -983,14 +1028,14 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
 
-        String normalizedIndexName = normalizeIndexName(indexName);
+        String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
         List<String> appEsIndices = getAppEsIndices(appDoc);
         if (appEsIndices.contains(normalizedIndexName)) {
             return createErrorResult("Index already registered in app: " + normalizedIndexName);
         }
 
         try {
-            if (esService.indexExists(normalizedIndexName)) {
+            if (esService.esIndexExists(normalizedIndexName)) {
                 return createErrorResult("Elasticsearch index already exists: " + normalizedIndexName);
             }
         } catch (Exception e) {
@@ -1021,7 +1066,7 @@ public class MongoAppService {
             mongoIndexService.createIndex(mongoIndexName, normalizedIndexName, monitoredCollections);
         } catch (Exception e) {
             try {
-                if (esService.indexExists(normalizedIndexName)) {
+                if (esService.esIndexExists(normalizedIndexName)) {
                     esService.deleteIndex(normalizedIndexName);
                 }
             } catch (Exception rollbackException) {
@@ -1061,7 +1106,7 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
 
-        String normalizedIndexName = normalizeIndexName(indexName);
+        String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
         List<String> appEsIndices = getAppEsIndices(appDoc);
         if (!appEsIndices.contains(normalizedIndexName)) {
             return createErrorResult("Index does not belong to app: " + normalizedIndexName);
@@ -1071,7 +1116,7 @@ public class MongoAppService {
         }
 
         try {
-            if (esService.indexExists(normalizedIndexName)) {
+            if (esService.esIndexExists(normalizedIndexName)) {
                 esService.deleteIndex(normalizedIndexName);
             }
         } catch (Exception e) {
@@ -1109,16 +1154,16 @@ public class MongoAppService {
             return createErrorResult("New index name cannot be empty");
         }
 
-        String normalizedOldName = normalizeIndexName(oldIndexName);
-        String normalizedNewName = normalizeIndexName(newIndexName);
-        if (normalizedOldName.equals(normalizedNewName)) {
-            return createErrorResult("New index name must be different from old index name");
-        }
-
         MongoCollection<Document> metadataCollection = getAppMetadataCollection();
         Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
         if (appDoc == null) {
             return createErrorResult("App not found: " + appId);
+        }
+
+        String normalizedOldName = resolveAppOwnedEsIndexName(appId, appDoc, oldIndexName);
+        String normalizedNewName = resolveAppOwnedEsIndexName(appId, appDoc, newIndexName);
+        if (normalizedOldName.equals(normalizedNewName)) {
+            return createErrorResult("New index name must be different from old index name");
         }
 
         List<String> appEsIndices = getAppEsIndices(appDoc);
@@ -1130,7 +1175,7 @@ public class MongoAppService {
         }
 
         try {
-            if (esService.indexExists(normalizedNewName)) {
+            if (esService.esIndexExists(normalizedNewName)) {
                 return createErrorResult("Target ES index already exists: " + normalizedNewName);
             }
         } catch (Exception e) {
@@ -1199,7 +1244,7 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
 
-        String normalizedIndexName = normalizeIndexName(indexName);
+        String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
         List<String> appEsIndices = getAppEsIndices(appDoc);
         if (!appEsIndices.contains(normalizedIndexName)) {
             return createErrorResult("Index does not belong to app: " + normalizedIndexName);
@@ -1232,7 +1277,7 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
 
-        String normalizedIndexName = normalizeIndexName(indexName);
+        String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
         List<String> appEsIndices = getAppEsIndices(appDoc);
         if (!appEsIndices.contains(normalizedIndexName)) {
             return createErrorResult("Index does not belong to app: " + normalizedIndexName);
@@ -1266,7 +1311,7 @@ public class MongoAppService {
             return createErrorResult("App not found: " + appId);
         }
 
-        String normalizedIndexName = normalizeIndexName(indexName);
+        String normalizedIndexName = resolveAppOwnedEsIndexName(appId, appDoc, indexName);
         List<String> appEsIndices = getAppEsIndices(appDoc);
         if (!appEsIndices.contains(normalizedIndexName)) {
             return createErrorResult("Index does not belong to app: " + normalizedIndexName);
@@ -1853,6 +1898,70 @@ public class MongoAppService {
         result.put("path", folderPath);
         return ApiResponse.success(result, "Groovy script folder added successfully");
     }
+
+    /**
+     * Update a groovy script folder configuration.
+     */
+    public ApiResponse<Map<String, Object>> updateGroovyScriptFolder(String appId,
+                                                                      String oldFileAccessPointId,
+                                                                      String oldFolderPath,
+                                                                      String newFileAccessPointId,
+                                                                      String newFolderPath) {
+        MongoCollection<Document> metadataCollection = getAppMetadataCollection();
+        Document appDoc = metadataCollection.find(Filters.eq("appId", appId)).first();
+        if (appDoc == null) {
+            return createErrorResult("App not found: " + appId);
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Document> scriptFolders = (List<Document>) appDoc.get("groovyScriptFolders");
+        if (scriptFolders == null || scriptFolders.isEmpty()) {
+            return createErrorResult("No groovy script folders configured");
+        }
+
+        int targetIndex = -1;
+        for (int i = 0; i < scriptFolders.size(); i++) {
+            Document folder = scriptFolders.get(i);
+            String fapId = folder.getString("fileAccessPointId");
+            String path = folder.getString("path");
+            if (oldFileAccessPointId.equals(fapId) && oldFolderPath.equals(path)) {
+                targetIndex = i;
+                break;
+            }
+        }
+
+        if (targetIndex < 0) {
+            return createErrorResult("Folder not found: " + oldFolderPath);
+        }
+
+        for (int i = 0; i < scriptFolders.size(); i++) {
+            if (i == targetIndex) {
+                continue;
+            }
+            Document folder = scriptFolders.get(i);
+            String fapId = folder.getString("fileAccessPointId");
+            String path = folder.getString("path");
+            if (newFileAccessPointId.equals(fapId) && newFolderPath.equals(path)) {
+                return createErrorResult("Folder already registered: " + newFolderPath);
+            }
+        }
+
+        Document targetFolder = scriptFolders.get(targetIndex);
+        targetFolder.put("fileAccessPointId", newFileAccessPointId);
+        targetFolder.put("path", newFolderPath);
+
+        metadataCollection.updateOne(
+            Filters.eq("appId", appId),
+            Updates.set("groovyScriptFolders", scriptFolders)
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("oldFileAccessPointId", oldFileAccessPointId);
+        result.put("oldPath", oldFolderPath);
+        result.put("fileAccessPointId", newFileAccessPointId);
+        result.put("path", newFolderPath);
+        return ApiResponse.success(result, "Groovy script folder updated successfully");
+    }
     
     /**
      * Remove a groovy script folder
@@ -2157,9 +2266,27 @@ public class MongoAppService {
         return indexName.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Resolve user-facing short index name (xxx) to app-scoped ES index name ({appId}_{xxx}).
+     * If indexName already matches an owned full index name, keep it unchanged.
+     */
+    private String resolveAppOwnedEsIndexName(String appId, Document appDoc, String indexName) {
+        String normalized = normalizeIndexName(indexName);
+        List<String> appEsIndices = getAppEsIndices(appDoc);
+        if (appEsIndices.contains(normalized)) {
+            return normalized;
+        }
+        String prefixed = normalizeIndexName(appId) + "_" + normalized;
+        if (appEsIndices.contains(prefixed)) {
+            return prefixed;
+        }
+        return prefixed;
+    }
+
     @SuppressWarnings("unchecked")
     private List<String> getAppEsIndices(Document appDoc) {
         List<String> esIndices = (List<String>) appDoc.get("esIndices");
+        List<String> normalizedIndices = new ArrayList<>();
         if (esIndices == null) {
             esIndices = new ArrayList<>();
             String esIndex = appDoc.getString("esIndex");
@@ -2167,7 +2294,16 @@ public class MongoAppService {
                 esIndices.add(esIndex);
             }
         }
-        return new ArrayList<>(esIndices);
+        for (String esIndex : esIndices) {
+            if (esIndex == null || esIndex.trim().isEmpty()) {
+                continue;
+            }
+            String normalized = normalizeIndexName(esIndex);
+            if (!normalizedIndices.contains(normalized)) {
+                normalizedIndices.add(normalized);
+            }
+        }
+        return normalizedIndices;
     }
 
     private List<String> getMongoIndexNamesForAppEsIndex(String appId, String esIndexName) {
@@ -2184,5 +2320,20 @@ public class MongoAppService {
             }
         }
         return names;
+    }
+
+    /**
+     * Resolve a mongo-index key used for writes/queue updates.
+     * Prefer the mongo-index mapped to appDoc.esIndex; fallback to appId for legacy setups.
+     */
+    private String resolveMongoIndexNameForWrites(String appId, Document appDoc) {
+        String esIndexCompat = appDoc.getString("esIndex");
+        if (esIndexCompat != null && !esIndexCompat.trim().isEmpty()) {
+            List<String> names = getMongoIndexNamesForAppEsIndex(appId, normalizeIndexName(esIndexCompat));
+            if (!names.isEmpty()) {
+                return names.get(0);
+            }
+        }
+        return appId;
     }
 }

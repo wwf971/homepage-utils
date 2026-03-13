@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react'
+import { observer } from 'mobx-react-lite'
 import { MongoAppSelector } from '@wwf971/homepage-utils-utils'
 import MongoAppCard from './MongoAppCard'
 import { mongoAppStore } from './mongoAppStore'
 import '@wwf971/homepage-utils-utils/mongoApp.css'
 
-const PanelMongoAppConfig = () => {
+const PanelMongoAppConfig = observer(() => {
   const handleRefresh = () => mongoAppStore.fetchAllApps()
 
   const handleSelectApp = (selectedApp) => {
@@ -60,6 +61,6 @@ const PanelMongoAppConfig = () => {
       <MongoAppCard title="Selected Mongo App Details" />
     </div>
   )
-}
+})
 
 export default PanelMongoAppConfig

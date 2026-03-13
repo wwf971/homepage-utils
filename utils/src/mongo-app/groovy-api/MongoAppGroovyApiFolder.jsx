@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MongoAppGroovyApiCard from './MongoAppGroovyApiCard.jsx';
 import { DownIcon, RefreshIcon, DeleteIcon } from '@wwf971/react-comp-misc';
+import MongoAppGroovyApiFolderCreateOrUpdate from './MongoAppGroovyApiFolderCreateOrUpdate.jsx';
 
 /**
  * MongoAppGroovyApiFolder - Display a folder with its grouped scripts
@@ -29,6 +30,8 @@ const MongoAppGroovyApiFolder = ({
   onRefresh,
   onRemoveFolder,
   onScanFolder,
+  onUpdateFolder,
+  backendUrl,
   editingScriptId,
   editState,
   onEditChange,
@@ -36,6 +39,7 @@ const MongoAppGroovyApiFolder = ({
   onCancelEdit
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isEditingFolder, setIsEditingFolder] = useState(false);
 
   const folderDisplayPath = folder.path || '(root)';
   const folderKey = `${folder.fileAccessPointId}:${folder.path}`;
@@ -123,6 +127,22 @@ const MongoAppGroovyApiFolder = ({
               >
                 <DeleteIcon width={14} height={14} />
               </button>
+              <button
+                onClick={() => setIsEditingFolder(!isEditingFolder)}
+                style={{
+                  padding: '2px 4px',
+                  fontSize: '11px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#2196F3',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                title="Edit this folder"
+              >
+                Edit
+              </button>
             </div>
             <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
               <span style={{ fontWeight: 'bold' }}>FAP:</span> {folder.fileAccessPointId}
@@ -142,7 +162,25 @@ const MongoAppGroovyApiFolder = ({
       {/* Scripts List (with indent) */}
       {isExpanded && (
         <div style={{ padding: '8px', paddingLeft: '24px' }}>
-          {scripts.length === 0 ? (
+          {isEditingFolder ? (
+            <MongoAppGroovyApiFolderCreateOrUpdate
+              mode="update"
+              backendUrl={backendUrl}
+              fileAccessPointId={folder.fileAccessPointId}
+              path={folder.path || ''}
+              onConfirm={(nextFolder) => {
+                onUpdateFolder?.(
+                  {
+                    fileAccessPointId: folder.fileAccessPointId,
+                    path: folder.path || '',
+                  },
+                  nextFolder,
+                  () => setIsEditingFolder(false)
+                );
+              }}
+              onCancel={() => setIsEditingFolder(false)}
+            />
+          ) : scripts.length === 0 ? (
             <div style={{ 
               padding: '12px', 
               fontSize: '12px', 

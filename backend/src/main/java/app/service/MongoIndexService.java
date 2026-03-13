@@ -553,6 +553,67 @@ public class MongoIndexService {
     }
 
     /**
+     * Index a document using a custom source object instead of the raw MongoDB document.
+     * The custom source will be flattened by backend and written to ES with normal
+     * version/queue safeguards.
+     *
+     * This method does not update MongoDB document content. Typical usage:
+     * 1) update Mongo doc with updateIndex=false
+     * 2) call this method with a custom index source object
+     */
+    public Map<String, Object> indexDocWithCustomSource(String indexName, String database, String collection,
+                                                         String docId, Map<String, Object> docForIndex) {
+        if (docForIndex == null) {
+            return createErrorResult("docForIndex is required");
+        }
+
+        // Verify collection is part of index
+        Map<String, Object> indexMeta = getIndex(indexName);
+        if (indexMeta == null) {
+            return createErrorResult("Index not found: " + indexName);
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> collections = (List<Map<String, String>>) indexMeta.get("collections");
+        boolean isCollectionInIndex = false;
+        if (collections != null) {
+            for (Map<String, String> collInfo : collections) {
+                if (database.equals(collInfo.get("database")) && collection.equals(collInfo.get("collection"))) {
+                    isCollectionInIndex = true;
+                    break;
+                }
+            }
+        }
+
+        if (!isCollectionInIndex) {
+            return createErrorResult("Collection " + database + "." + collection + " is not part of index: " + indexName);
+        }
+
+        Object mongoIdObj = parseDocId(docId);
+        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(database, collection, docId, mongoIdObj);
+        if (queueEntry == null) {
+            return createErrorResult("Doc with docId: " + docId + " not found in " + database + "." + collection);
+        }
+
+        String esIndexName = (String) indexMeta.get("esIndex");
+
+        try {
+            createIndexForCustomSource(indexName, database, collection, docId, docForIndex, esIndexName, false);
+            Map<String, Object> resultData = new HashMap<>();
+            resultData.put("docId", docId);
+            resultData.put("esIndex", esIndexName);
+            resultData.put("indexedPairs", "unknown");
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 0);
+            result.put("message", "Custom source indexed successfully");
+            result.put("data", resultData);
+            return result;
+        } catch (Exception e) {
+            return createErrorResult("Failed to index custom source: " + e.getMessage());
+        }
+    }
+
+    /**
      * Get a document (returns document data at top level)
      * 
      * @param indexName The mongo-index name
@@ -1014,6 +1075,133 @@ public class MongoIndexService {
             throw new RuntimeException("Failed to index document to Elasticsearch: " + e.getMessage(), e);
         } finally {
             // Release lock if it was acquired
+            if (lockAcquired && lock != null) {
+                try {
+                    lock.unlock();
+                } catch (Exception e) {
+                    System.err.println("Warning: Failed to release lock: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Index a custom source object for an existing document id.
+     * The source object is flattened using the same flattening logic as normal indexing.
+     */
+    private void createIndexForCustomSource(String indexName, String dbName, String collName, String docId,
+                                            Map<String, Object> docForIndex, String esIndexName,
+                                            boolean forceReindex) {
+        String customId = docId == null ? "" : docId.trim();
+        if (customId.isEmpty()) {
+            throw new RuntimeException("docId is required");
+        }
+
+        // Ensure target document still exists in Mongo collection.
+        MongoClient client = mongoService.getMongoClient();
+        MongoDatabase database = client.getDatabase(dbName);
+        MongoCollection<Document> collection = database.getCollection(collName);
+        Document existingDoc = collection.find(Filters.eq("id", customId)).first();
+        if (existingDoc == null) {
+            throw new RuntimeException("Doc with docId: " + customId + " not found");
+        }
+
+        // Acquire queue metadata used for ES version/timestamp.
+        Object mongoIdObj = parseDocId(customId);
+        Document queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, customId, mongoIdObj);
+        if (queueEntry == null) {
+            throw new RuntimeException("Failed to get IndexQueue entry for document: " + customId);
+        }
+
+        String lockKey = "doc-index-lock:" + esIndexName + ":" + customId;
+        RLock lock = null;
+        boolean lockAcquired = false;
+
+        try {
+            lock = redissonClient.getLock(lockKey);
+            lockAcquired = lock.tryLock(10, 30, TimeUnit.SECONDS);
+            if (!lockAcquired) {
+                if (CONTINUE_ON_LOCK_FAILURE) {
+                    System.err.println("Warning: Could not acquire lock for document " + customId + ", continuing without lock");
+                } else {
+                    throw new RuntimeException("Failed to acquire lock for document: " + customId);
+                }
+            }
+        } catch (Exception e) {
+            if (CONTINUE_ON_LOCK_FAILURE) {
+                System.err.println("Warning: Lock acquisition failed for document " + customId + " (Redis may be down), continuing without lock: " + e.getMessage());
+                lockAcquired = false;
+            } else {
+                throw new RuntimeException("Failed to acquire lock: " + e.getMessage(), e);
+            }
+        }
+
+        try {
+            queueEntry = indexQueueService.getOrCreateIndexQueueEntry(dbName, collName, customId, mongoIdObj);
+            if (queueEntry == null) {
+                throw new RuntimeException("Failed to get IndexQueue entry for document: " + customId);
+            }
+
+            Long docUpdateAt = queueEntry.getLong("updateAt");
+            Long docUpdateVersion = queueEntry.getLong("updateVersion");
+            Integer docUpdateAtTimeZone = queueEntry.getInteger("updateAtTimeZone");
+
+            if (docUpdateAt == null) {
+                docUpdateAt = TimeUtils.getCurrentTimestamp();
+            }
+            if (docUpdateVersion == null) {
+                docUpdateVersion = 0L;
+            }
+
+            FlattenResult flattenResult = flattenJsonDoc(docForIndex, null);
+            esService.indexDoc(esIndexName, customId, dbName, collName,
+                flattenResult.flattenedPairs, flattenResult.topLevelEntries,
+                docUpdateVersion, docUpdateAt, docUpdateAtTimeZone, forceReindex);
+
+            if (CHECK_BEFORE_SETTING_INDEX_VERSION && !forceReindex) {
+                MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(dbName);
+                Document currentQueueEntry = indexQueue.find(Filters.eq("docId", customId)).first();
+                if (currentQueueEntry == null) {
+                    System.err.println("Warning: IndexQueue entry disappeared after ES indexing: " + customId);
+                    return;
+                }
+
+                Long currentUpdateVersion = currentQueueEntry.getLong("updateVersion");
+                if (currentUpdateVersion == null) {
+                    currentUpdateVersion = 0L;
+                }
+
+                Long currentIndexVersion = currentQueueEntry.getLong("indexVersion");
+                if (currentIndexVersion == null) {
+                    currentIndexVersion = 0L;
+                }
+
+                if (currentUpdateVersion > docUpdateVersion) {
+                    System.err.println("Warning: Document " + customId + " was updated during indexing. " +
+                        "Original version: " + docUpdateVersion + ", current version: " + currentUpdateVersion +
+                        ". Aborting indexVersion update to avoid overwriting newer version.");
+                    return;
+                }
+
+                if (currentIndexVersion >= docUpdateVersion) {
+                    System.err.println("Warning: Document " + customId + " indexVersion already at " + currentIndexVersion +
+                        ", which is >= target version " + docUpdateVersion +
+                        ". Aborting to avoid overwriting or redundant update.");
+                    return;
+                }
+            }
+
+            MongoCollection<Document> indexQueue = indexQueueService.getIndexQueueCollection(dbName);
+            indexQueue.updateOne(
+                Filters.eq("docId", customId),
+                Updates.combine(
+                    Updates.set("status", 0),
+                    Updates.set("indexVersion", docUpdateVersion)
+                )
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to index custom source to Elasticsearch: " + e.getMessage(), e);
+        } finally {
             if (lockAcquired && lock != null) {
                 try {
                     lock.unlock();
