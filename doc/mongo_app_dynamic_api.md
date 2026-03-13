@@ -140,6 +140,10 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 | `executeApiScript(endpoint, requestParams)` | String, Map | Map | Execute another Groovy API endpoint within the same app |
 | `executeApiScript(endpoint, requestParams, requestHeaders)` | String, Map, Map | Map | Same, with explicit request headers |
 
+#### Access to File Access Points
+
+Scripts can read/write files inside the app's registered FAP folders. See `mongo_app_file_access_point.md` for registration management and the full method list.
+
 
 ## Example Scripts
 

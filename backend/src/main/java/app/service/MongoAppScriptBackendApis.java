@@ -14,6 +14,7 @@ public class MongoAppScriptBackendApis {
     
     private final String appId;
     private final MongoAppService mongoAppService;
+    private final MongoAppFileAccess mongoAppFileAccess;
     
     /**
      * Constructor - appId is set from the request URL, not from the script
@@ -21,6 +22,14 @@ public class MongoAppScriptBackendApis {
     public MongoAppScriptBackendApis(String appId, MongoAppService mongoAppService) {
         this.appId = appId;
         this.mongoAppService = mongoAppService;
+        this.mongoAppFileAccess = null;
+    }
+
+    public MongoAppScriptBackendApis(String appId, MongoAppService mongoAppService,
+                                     MongoAppFileAccess mongoAppFileAccess) {
+        this.appId = appId;
+        this.mongoAppService = mongoAppService;
+        this.mongoAppFileAccess = mongoAppFileAccess;
     }
     
     // ==================== Collection Operations ====================
@@ -249,5 +258,56 @@ public class MongoAppScriptBackendApis {
      */
     public String getAppId() {
         return appId;
+    }
+
+    // ==================== File Access Point Operations ====================
+
+    /**
+     * List all file accesses (registered FAP folders) for this app.
+     */
+    public ApiResponse<List<Map<String, Object>>> listFileAccesses() {
+        if (mongoAppFileAccess == null) return ApiResponse.error("File access point service not available");
+        return mongoAppFileAccess.listFileAccesses(appId);
+    }
+
+    /**
+     * List files/directories at the file access root/subPath.
+     * Pass "" or "/" for the file access root.
+     */
+    public ApiResponse<Map<String, Object>> listFiles(String fileAccessId, String subPath) {
+        if (mongoAppFileAccess == null) return ApiResponse.error("File access point service not available");
+        return mongoAppFileAccess.listFiles(appId, fileAccessId, subPath);
+    }
+
+    /**
+     * Check if a file or directory exists.
+     */
+    public ApiResponse<Map<String, Object>> fileExists(String fileAccessId, String filePath) {
+        if (mongoAppFileAccess == null) return ApiResponse.error("File access point service not available");
+        return mongoAppFileAccess.fileExists(appId, fileAccessId, filePath);
+    }
+
+    /**
+     * Read file content as string.
+     */
+    public ApiResponse<Map<String, Object>> readFile(String fileAccessId, String filePath) {
+        if (mongoAppFileAccess == null) return ApiResponse.error("File access point service not available");
+        return mongoAppFileAccess.readFile(appId, fileAccessId, filePath);
+    }
+
+    /**
+     * Write (create or overwrite) a file.
+     */
+    public ApiResponse<Map<String, Object>> writeFile(String fileAccessId, String filePath, String content) {
+        if (mongoAppFileAccess == null) return ApiResponse.error("File access point service not available");
+        return mongoAppFileAccess.writeFile(appId, fileAccessId, filePath, content);
+    }
+
+    /**
+     * Delete a file.
+     */
+    public ApiResponse<Map<String, Object>> deleteFile(String fileAccessId, String filePath) {
+        if (mongoAppFileAccess == null) return ApiResponse.error("File access point service not available");
+        return mongoAppFileAccess.deleteFile(appId, fileAccessId, filePath);
     }
 }

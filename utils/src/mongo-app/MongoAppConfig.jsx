@@ -10,6 +10,7 @@ import MongoAppCollectionConfig from './MongoAppCollectionConfig.jsx'
 import MongoAppEsConfig from './elasticsearch/MongoAppEsConfig.jsx'
 import MongoAppMetadata from './MongoAppMetadata.jsx'
 import MongoAppSelector from './MongoAppSelector.jsx'
+import MongoAppFileAccess from '../file-access-point/MongoAppFileAccess.jsx'
 import './MongoAppConfig.css'
 
 const MongoAppConfigInner = observer(({ collections, onConfigChange, panelsExistence, title = 'Configuration', appId = '', appName = '' }) => {
@@ -175,6 +176,11 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panelsExist
               <MongoAppEsConfig store={store} />
             </PanelToggle>
           )}
+          {panelsExistence.showFileAccessPoints && (
+            <PanelToggle title="File Access Points" defaultExpanded={false}>
+              <MongoAppFileAccess store={store} />
+            </PanelToggle>
+          )}
           {panelsExistence.showGroovyApi && (
             <PanelToggle title="Groovy API Scripts" defaultExpanded={true}>
               <MongoAppGroovyApi store={store} />
@@ -207,6 +213,7 @@ const MongoAppConfig = ({
     showAppMetadata: true,
     showCollections: true,
     showEsIndices: true,
+    showFileAccessPoints: true,
     showGroovyApi: true,
     showGroovyApiTest: true,
   }

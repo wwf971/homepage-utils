@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import MongoAppGroovyApiCard from './MongoAppGroovyApiCard.jsx';
-import { DownIcon, RefreshIcon, DeleteIcon } from '@wwf971/react-comp-misc';
+import { DownIcon, RefreshIcon, DeleteIcon, EditIcon } from '@wwf971/react-comp-misc';
 import MongoAppGroovyApiFolderCreateOrUpdate from './MongoAppGroovyApiFolderCreateOrUpdate.jsx';
 
 /**
@@ -130,8 +130,7 @@ const MongoAppGroovyApiFolder = ({
               <button
                 onClick={() => setIsEditingFolder(!isEditingFolder)}
                 style={{
-                  padding: '2px 4px',
-                  fontSize: '11px',
+                  padding: '2px',
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
@@ -141,7 +140,7 @@ const MongoAppGroovyApiFolder = ({
                 }}
                 title="Edit this folder"
               >
-                Edit
+                <EditIcon width={14} height={14} />
               </button>
             </div>
             <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>

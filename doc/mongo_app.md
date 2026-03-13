@@ -30,6 +30,10 @@ app mongodb document
 - a default elasticsearch index is generated for each newly created mongo app.
   - default elasticsearch index name: `{appId}_index_default`
 
+### MongoApp File Access Point Registrations
+
+Each MongoApp can register access to specific folders inside file access points (FAPs). See `mongo_app_file_access_point.md` for full documentation.
+
 ### MongoApp Groovy Scripts (Dynamic APIs)
 
 Each MongoApp can have custom Groovy scripts for dynamic API endpoints. See `mongo_app_dynamic_api.md` for detailed documentation.

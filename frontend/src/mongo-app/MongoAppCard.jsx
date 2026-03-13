@@ -10,6 +10,7 @@ const SECTIONS_EXISTENCE = {
   showAppMetadata: true,
   showCollections: true,
   showEsIndices: true,
+  showFileAccessPoints: true,
   showGroovyApi: true,
   showGroovyApiTest: true
 }

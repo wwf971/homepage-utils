@@ -31,6 +31,9 @@ public class MongoAppController {
     @Autowired
     private MongoAppService mongoAppService;
 
+    @Autowired
+    private app.service.MongoAppFileAccess mongoAppFileAccess;
+
     /**
      * List all mongo apps
      * GET /mongo-app/list
@@ -502,5 +505,42 @@ public class MongoAppController {
     @GetMapping("/{appId}/api-folders/scripts")
     public ApiResponse<List<Map<String, Object>>> getScriptScannedFromFolders(@PathVariable String appId) {
         return mongoAppService.getScriptScannedFromFolders(appId);
+    }
+
+    // ==================== File Accesses ====================
+
+    @GetMapping("/{appId}/file-access-point/list")
+    public ApiResponse<List<Map<String, Object>>> listFileAccesses(@PathVariable String appId) {
+        return mongoAppFileAccess.listFileAccesses(appId);
+    }
+
+    @PostMapping("/{appId}/file-access-point/add")
+    public ApiResponse<Map<String, Object>> addFileAccess(@PathVariable String appId,
+                                                          @RequestBody Map<String, String> request) {
+        String id = request.get("id");
+        String fileAccessPointId = request.get("fileAccessPointId");
+        String path = request.get("path");
+        if (id == null || id.trim().isEmpty()) return ApiResponse.error("id is required");
+        if (fileAccessPointId == null || fileAccessPointId.trim().isEmpty()) return ApiResponse.error("fileAccessPointId is required");
+        return mongoAppFileAccess.addFileAccess(appId, id, fileAccessPointId, path);
+    }
+
+    @PostMapping("/{appId}/file-access-point/remove")
+    public ApiResponse<Map<String, Object>> removeFileAccess(@PathVariable String appId,
+                                                             @RequestBody Map<String, String> request) {
+        String id = request.get("id");
+        if (id == null || id.trim().isEmpty()) return ApiResponse.error("id is required");
+        return mongoAppFileAccess.removeFileAccess(appId, id);
+    }
+
+    @PostMapping("/{appId}/file-access-point/update")
+    public ApiResponse<Map<String, Object>> updateFileAccess(@PathVariable String appId,
+                                                             @RequestBody Map<String, String> request) {
+        String id = request.get("id");
+        String fileAccessPointId = request.get("fileAccessPointId");
+        String path = request.get("path");
+        if (id == null || id.trim().isEmpty()) return ApiResponse.error("id is required");
+        if (fileAccessPointId == null || fileAccessPointId.trim().isEmpty()) return ApiResponse.error("fileAccessPointId is required");
+        return mongoAppFileAccess.updateFileAccess(appId, id, fileAccessPointId, path);
     }
 }

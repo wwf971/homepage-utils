@@ -52,6 +52,9 @@ public class MongoAppService {
     
     @Autowired
     private FileAccessPointService fileAccessPointService;
+
+    @Autowired
+    private MongoAppFileAccess mongoAppFileAccess;
     
     private static final String APP_DB_NAME = "mongo-app";
     private static final String APP_METADATA_COLL_NAME = "__app__";
@@ -1790,7 +1793,7 @@ public class MongoAppService {
                     String scriptCode = new String(fileContent.getFileBytes(), java.nio.charset.StandardCharsets.UTF_8);
                     
                     // Create backend APIs wrapper
-                    MongoAppScriptBackendApis backendApis = new MongoAppScriptBackendApis(appId, this);
+                    MongoAppScriptBackendApis backendApis = new MongoAppScriptBackendApis(appId, this, mongoAppFileAccess);
                     
                     // Execute script directly
                     return groovyApiService.executeScriptDirect(scriptCode, params, headers, backendApis);
@@ -1843,7 +1846,7 @@ public class MongoAppService {
         }
         
         // Create backend APIs wrapper with appId from URL (not from script)
-        MongoAppScriptBackendApis backendApis = new MongoAppScriptBackendApis(appId, this);
+        MongoAppScriptBackendApis backendApis = new MongoAppScriptBackendApis(appId, this, mongoAppFileAccess);
         
         // Execute the script with the scoped backend APIs
         return groovyApiService.executeScript(matchingEndpoint, params, headers, backendApis);
