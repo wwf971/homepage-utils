@@ -507,6 +507,14 @@ public class MongoAppController {
         return mongoAppService.getScriptScannedFromFolders(appId);
     }
 
+    // ==================== ES Index Management ====================
+
+    @DeleteMapping("/{appId}/es-index/{indexName}/delete")
+    public ApiResponse<Map<String, Object>> deleteEsIndex(@PathVariable String appId,
+                                                          @PathVariable String indexName) {
+        return mongoAppService.deleteEsIndex(appId, indexName);
+    }
+
     // ==================== File Accesses ====================
 
     @GetMapping("/{appId}/file-access-point/list")

@@ -47,53 +47,37 @@ const IndexItem = observer(({ esIndexName, indexInfo, appId, store }) => {
 });
 
 const MongoAppEsConfig = observer(({ store }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [indicesDetails, setIndicesDetails] = useState({});
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (store.isConfigured) {
-      loadIndices();
+      store.fetchAllMongoIndices().catch((err) => setError(err.message || 'Failed to load indices'));
     }
   }, [store.appId]);
 
-  const loadIndices = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Ensure mongo-indices cache is loaded
-      await store.fetchAllMongoIndices();
-      
-      // Get app's ES indices
-      const appEsIndices = store.appMetadata?.esIndices || [];
-      
-      // Find corresponding mongo-index metadata for each ES index
-      const details = {};
-      for (const esIndexName of appEsIndices) {
-        const mongoIndex = store.allMongoIndices.find(idx => idx.esIndex === esIndexName);
-        if (mongoIndex) {
-          // Use ES index name as key for display
-          details[esIndexName] = mongoIndex;
-        }
-      }
-      
-      setIndicesDetails(details);
-    } catch (err) {
-      setError(err.message || 'Failed to load indices');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleRefresh = async () => {
-    await store.fetchAppMetadata();
-    await store.fetchAllMongoIndices(true);
-    await loadIndices();
+    setError(null);
+    try {
+      await store.fetchAppMetadata();
+      await store.fetchAllMongoIndices(true);
+    } catch (err) {
+      setError(err.message || 'Failed to refresh');
+    }
   };
 
   if (!store.isConfigured) return null;
 
+  // Derived directly from observables — reacts instantly to any store update
+  const appEsIndices = store.appMetadata?.esIndices || [];
+  const indicesDetails = {};
+  for (const esIndexName of appEsIndices) {
+    const mongoIndex = store.allMongoIndices.find((idx) => idx.esIndex === esIndexName);
+    if (mongoIndex) {
+      indicesDetails[esIndexName] = mongoIndex;
+    }
+  }
+
+  const isLoading = store.isLoadingMongoIndices;
   const esIndexNames = Object.keys(indicesDetails);
 
   return (

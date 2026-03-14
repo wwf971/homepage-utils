@@ -142,7 +142,7 @@ Scripts access backend through `backendApis` object, pre-initialized with appId 
 
 #### Access to File Access Points
 
-Scripts can read/write files inside the app's registered FAP folders. See `mongo_app_file_access_point.md` for registration management and the full method list.
+Scripts can read/write files inside the app's registered FAP folders. See `mongo_app_file_access.md` for registration management and the full method list.
 
 
 ## Example Scripts

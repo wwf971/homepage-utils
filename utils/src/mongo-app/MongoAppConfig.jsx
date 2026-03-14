@@ -6,11 +6,11 @@ import { StoreProvider, ExternalStoreProvider, useMongoAppStore } from './mongoA
 import TestConnection from './TestConnection.jsx'
 import MongoAppGroovyApi from './groovy-api/MongoAppGroovyApi.jsx'
 import MongoAppGroovyApiTest from './groovy-api/MongoAppGroovyApiTest.jsx'
-import MongoAppCollectionConfig from './MongoAppCollectionConfig.jsx'
+import AppMongoCollectionConfig from './mongodb/AppMongoCollectionConfig.jsx'
 import MongoAppEsConfig from './elasticsearch/MongoAppEsConfig.jsx'
 import MongoAppMetadata from './MongoAppMetadata.jsx'
 import MongoAppSelector from './MongoAppSelector.jsx'
-import MongoAppFileAccess from '../file-access-point/MongoAppFileAccess.jsx'
+import MongoAppFileAccess from './file-access/MongoAppFileAccess.jsx'
 import './MongoAppConfig.css'
 
 const MongoAppConfigInner = observer(({ collections, onConfigChange, panelsExistence, title = 'Configuration', appId = '', appName = '' }) => {
@@ -168,7 +168,7 @@ const MongoAppConfigInner = observer(({ collections, onConfigChange, panelsExist
           )}
           {panelsExistence.showCollections && (
             <PanelToggle title="MongoDB Collections" defaultExpanded={true}>
-              <MongoAppCollectionConfig store={store} collections={collections} />
+              <AppMongoCollectionConfig store={store} collections={collections} />
             </PanelToggle>
           )}
           {panelsExistence.showEsIndices && (

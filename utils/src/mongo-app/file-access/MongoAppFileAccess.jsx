@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import { RefreshIcon, DeleteIcon, PlusIcon, EditIcon } from '@wwf971/react-comp-misc';
-import { FileAccessPointSelector, DirSelector, fileStore, initFileStore } from './index.js';
+import { FileAccessPointSelector, DirSelector, fileStore, initFileStore } from '../../file-access-point/index.js';
 import mongoAppFapStore from './mongoAppFapStore.js';
 
 const MongoAppFileAccessCreaetOrUpdate = ({ mode = 'create', backendUrl, initialId = '', initialFapId = '', initialPath = '', onConfirm, onCancel }) => {
@@ -289,7 +289,7 @@ const MongoAppFileAccess = observer(({ store }) => {
         </div>
         <button
           onClick={() => { setShowAddForm(!showAddForm); setEditingFileAccess(null); }}
-          style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#4CAF50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ padding: '4px 6px', fontSize: '12px', backgroundColor: '#4CAF50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
           <PlusIcon width={12} height={12} /> Add
         </button>

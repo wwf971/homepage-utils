@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { MinusIcon, PlusIcon } from '@wwf971/react-comp-misc';
-import './MongoAppConfig.css';
+import '../MongoAppConfig.css';
 
-const MongoAppCollectionCard = ({
+const AppMongoCollectionCard = ({
   collName,
   collectionInfo,
   appId,
@@ -152,4 +152,4 @@ const MongoAppCollectionCard = ({
   );
 };
 
-export default MongoAppCollectionCard;
+export default AppMongoCollectionCard;

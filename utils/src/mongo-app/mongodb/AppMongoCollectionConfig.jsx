@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { observer } from 'mobx-react-lite';
 import { PlusIcon, RefreshIcon, CrossIcon } from '@wwf971/react-comp-misc';
-import MongoAppCollectionCard from './MongoAppCollectionCard';
-import './MongoAppConfig.css';
+import AppMongoCollectionCard from './AppMongoCollectionCard';
+import '../MongoAppConfig.css';
 
 const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
   const [collectionName, setCollectionName] = useState('');
@@ -450,7 +450,7 @@ const CreateMongoCollection = observer(({ store, onClose, onSuccess }) => {
   );
 });
 
-const MongoAppCollectionConfig = observer(({ store }) => {
+const AppMongoCollectionConfig = observer(({ store }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [deletingCollectionName, setDeletingCollectionName] = useState('');
@@ -541,7 +541,7 @@ const MongoAppCollectionConfig = observer(({ store }) => {
       ) : collectionsList.length > 0 ? (
         <div>
           {collectionsList.map((collName, index) => (
-            <MongoAppCollectionCard
+            <AppMongoCollectionCard
               key={collName}
               index={index + 1}
               appId={store.appId}
@@ -590,4 +590,4 @@ const MongoAppCollectionConfig = observer(({ store }) => {
   );
 });
 
-export default MongoAppCollectionConfig;
+export default AppMongoCollectionConfig;

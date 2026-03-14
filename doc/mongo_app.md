@@ -32,7 +32,7 @@ app mongodb document
 
 ### MongoApp File Access Point Registrations
 
-Each MongoApp can register access to specific folders inside file access points (FAPs). See `mongo_app_file_access_point.md` for full documentation.
+Each MongoApp can register access to specific folders inside file access points (FAPs). See `mongo_app_file_access.md` for full documentation.
 
 ### MongoApp Groovy Scripts (Dynamic APIs)
 
@@ -56,7 +56,7 @@ Each MongoApp can have custom Groovy scripts for dynamic API endpoints. See `mon
 | GET | `/mongo-app/{appId}/config` | Get app info |
 | DELETE | `/mongo-app/{appId}/delete` | Delete app (also deletes all scripts) |
 
-### Collection Management
+### MongoDb Collection Management
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -65,7 +65,7 @@ Each MongoApp can have custom Groovy scripts for dynamic API endpoints. See `mon
 | GET | `/mongo-app/{appId}/coll/get-detail` | List collections with detailed info |
 | GET | `/mongo-app/{appId}/coll/exists/{collName}` | Check if collection exists |
 
-### Document Operations
+### MongoDb Document Operations
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -74,6 +74,23 @@ Each MongoApp can have custom Groovy scripts for dynamic API endpoints. See `mon
 | GET | `/mongo-app/{appId}/coll/{collName}/doc/{docId}/get` | Get document |
 | DELETE | `/mongo-app/{appId}/coll/{collName}/doc/{docId}/delete` | Delete document |
 | GET | `/mongo-app/{appId}/coll/{collName}/doc/list` | List all documents |
+
+### ES Index Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| DELETE | `/mongo-app/{appId}/es-index/{indexName}/delete` | Delete an app-owned ES index |
+
+### File Access Point Registrations
+
+See `mongo_app_file_access.md` for full documentation.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/mongo-app/{appId}/file-access-point/list` | List registered FAP folders |
+| POST | `/mongo-app/{appId}/file-access-point/add` | Register a folder |
+| POST | `/mongo-app/{appId}/file-access-point/remove` | Remove a registration |
+| POST | `/mongo-app/{appId}/file-access-point/update` | Update a registration |
 
 ### Groovy API Scripts (Dynamic APIs)
 

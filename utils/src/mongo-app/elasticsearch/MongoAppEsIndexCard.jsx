@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { SpinningCircle, TabsOnTop } from '@wwf971/react-comp-misc';
+import { SpinningCircle, TabsOnTop, DeleteIcon, PanelPopup } from '@wwf971/react-comp-misc';
 import EsDocListAll from './EsDocListAll';
 import EsDocSearchResult from '../../elasticsearch/EsDocSearchResult';
 import '../MongoAppConfig.css';
@@ -290,12 +290,74 @@ const AllDocsPanel = ({ tabsState, tabKey, esIndexName, backendUrl }) => {
   );
 };
 
+const DeletePanel = observer(({ esIndexName, store }) => {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleConfirm = () => {
+    setIsConfirming(false);
+    setIsDeleting(true);
+    setError(null);
+    store.deleteEsIndex(esIndexName).then((result) => {
+      setIsDeleting(false);
+      if (result.code !== 0) {
+        setError(result.message || 'Failed to delete index');
+      }
+    });
+  };
+
+  return (
+    <div style={{ padding: '8px' }}>
+      {error && (
+        <div className="test-result error" style={{ marginBottom: '8px' }}>
+          <div className="result-message">{error}</div>
+        </div>
+      )}
+      <button
+        className="es-icon-button es-delete-button"
+        onClick={() => setIsConfirming(true)}
+        disabled={isDeleting}
+        title="Delete this index"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '5px 10px',
+          background: '#fff0f0',
+          color: '#c0392b',
+          border: '1px solid #e8a0a0',
+          borderRadius: '4px',
+          cursor: isDeleting ? 'not-allowed' : 'pointer',
+          fontSize: '13px',
+          opacity: isDeleting ? 0.6 : 1,
+        }}
+      >
+        <DeleteIcon width={14} height={14} />
+        <span>Delete this Es Index</span>
+      </button>
+      {isDeleting && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#666' }}>Deleting...</span>}
+      {isConfirming && (
+        <PanelPopup
+          type="confirm"
+          isDanger
+          title="Delete ES Index"
+          message={`Delete index "${esIndexName}"? This cannot be undone.`}
+          confirmText="Delete"
+          onConfirm={handleConfirm}
+          onCancel={() => setIsConfirming(false)}
+        />
+      )}
+    </div>
+  );
+});
+
 // Main component with tabs (embedded, not modal)
 const MongoAppEsIndexCard = observer(({ esIndexName, indexInfo, appId, store }) => {
   const collections = indexInfo?.collections || [];
 
   return (
-    <div style={{ marginTop: '8px' }}>
+    <div>
       <TabsOnTop defaultTab="Collections" autoSwitchToNewTab={false}>
         <TabsOnTop.Tab label="Collections">
           <CollectionsPanel collections={collections} appId={appId} />
@@ -308,6 +370,9 @@ const MongoAppEsIndexCard = observer(({ esIndexName, indexInfo, appId, store }) 
             esIndexName={esIndexName}
             backendUrl={store?.backendUrl || ''}
           />
+        </TabsOnTop.Tab>
+        <TabsOnTop.Tab label="Delete">
+          <DeletePanel esIndexName={esIndexName} store={store} />
         </TabsOnTop.Tab>
       </TabsOnTop>
     </div>
