@@ -155,57 +155,106 @@ const BackendServerConfig = () => {
     return result;
   }, [setLocalConfig]);
 
+  const getConfigValueComp = useCallback((compName) => {
+    if (compName === 'backendUrl') {
+      return (props) => (
+        <EditableValueComp
+          {...props}
+          category="backend"
+          configKey="url"
+          onUpdate={handleUpdateUrl}
+        />
+      );
+    }
+
+    if (compName === 'serverName') {
+      return (props) => localConfigLoading ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <SpinningCircle width={16} height={16} color="#666" />
+          <span style={{ fontSize: '13px', color: '#666' }}>Loading...</span>
+        </span>
+      ) : localConfigError ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            color: '#d32f2f',
+            fontSize: '13px',
+            fontStyle: 'italic'
+          }}>
+            {props.data}
+          </span>
+          <span
+            style={{
+              color: '#d32f2f',
+              fontSize: '12px',
+              cursor: 'help'
+            }}
+            title={localConfigError}
+          >
+            {localConfigError}
+          </span>
+        </span>
+      ) : (
+        <EditableValueComp
+          {...props}
+          category="backend"
+          isNotSet={!localConfig.serverName}
+          configKey="serverName"
+          onUpdate={handleUpdateLocalConfig}
+        />
+      );
+    }
+
+    if (compName === 'serverId') {
+      return (props) => localConfigLoading ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <SpinningCircle width={16} height={16} color="#666" />
+          <span style={{ fontSize: '13px', color: '#666' }}>Loading...</span>
+        </span>
+      ) : localConfigError ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            color: '#d32f2f',
+            fontSize: '13px',
+            fontStyle: 'italic'
+          }}>
+            {props.data}
+          </span>
+          <span
+            style={{
+              color: '#d32f2f',
+              fontSize: '12px',
+              cursor: 'help'
+            }}
+            title={localConfigError}
+          >
+            {localConfigError}
+          </span>
+        </span>
+      ) : (
+        <EditableValueComp
+          {...props}
+          category="backend"
+          isNotSet={!localConfig.serverId}
+          configKey="serverId"
+          onUpdate={handleUpdateLocalConfig}
+        />
+      );
+    }
+
+    return null;
+  }, [handleUpdateLocalConfig, handleUpdateUrl, localConfig.serverId, localConfig.serverName, localConfigError, localConfigLoading]);
+
   const configData = useMemo(() => {
     return [
       {
         key: 'Backend URL',
         value: backendUrl || 'http://localhost:900',
-        valueComp: (props) => (
-          <EditableValueComp 
-            {...props} 
-            category="backend"
-            configKey="url"
-            onUpdate={handleUpdateUrl}
-          />
-        )
+        valueCompName: 'backendUrl'
       },
       {
         key: 'Server Name',
         value: localConfigLoading ? 'Loading...' : (localConfigError ? '(error fetching)' : (localConfig.serverName || '(not set)')),
-        valueComp: (props) => localConfigLoading ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <SpinningCircle width={16} height={16} color="#666" />
-            <span style={{ fontSize: '13px', color: '#666' }}>Loading...</span>
-          </span>
-        ) : localConfigError ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ 
-              color: '#d32f2f', 
-              fontSize: '13px',
-              fontStyle: 'italic'
-            }}>
-              {props.data}
-            </span>
-            <span 
-              style={{ 
-                color: '#d32f2f', 
-                fontSize: '12px',
-                cursor: 'help'
-              }}
-              title={localConfigError}
-            >
-              {localConfigError}
-            </span>
-          </span>
-        ) : (
-          <EditableValueComp 
-            {...props} 
-            category="backend"
-            isNotSet={!localConfig.serverName}
-            configKey="serverName"
-            onUpdate={handleUpdateLocalConfig}
-          />
-        )
+        valueCompName: 'serverName'
       },
       {
         key: (
@@ -219,43 +268,10 @@ const BackendServerConfig = () => {
           </span>
         ),
         value: localConfigLoading ? 'Loading...' : (localConfigError ? '(error fetching)' : (localConfig.serverId || '(not set)')),
-        valueComp: (props) => localConfigLoading ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <SpinningCircle width={16} height={16} color="#666" />
-            <span style={{ fontSize: '13px', color: '#666' }}>Loading...</span>
-          </span>
-        ) : localConfigError ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ 
-              color: '#d32f2f', 
-              fontSize: '13px',
-              fontStyle: 'italic'
-            }}>
-              {props.data}
-            </span>
-            <span 
-              style={{ 
-                color: '#d32f2f', 
-                fontSize: '12px',
-                cursor: 'help'
-              }}
-              title={localConfigError}
-            >
-              {localConfigError}
-            </span>
-          </span>
-        ) : (
-          <EditableValueComp 
-            {...props} 
-            category="backend"
-            isNotSet={!localConfig.serverId}
-            configKey="serverId"
-            onUpdate={handleUpdateLocalConfig}
-          />
-        )
+        valueCompName: 'serverId'
       }
     ];
-  }, [backendUrl, localConfig, localConfigLoading, localConfigError, handleUpdateUrl, handleUpdateLocalConfig]);
+  }, [backendUrl, localConfig, localConfigLoading, localConfigError]);
 
   return (
     <>
@@ -266,6 +282,7 @@ const BackendServerConfig = () => {
           isEditable={false}
           alignColumn={true}
           keyColWidth="min"
+          getComp={getConfigValueComp}
         />
         
         <div className="config-note">

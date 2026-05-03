@@ -514,7 +514,7 @@ const FileExplorerLocalExternal = observer(({ fileAccessPoint }) => {
         <PathBar
           pathData={{ segments: pathSegments }}
           onPathSegClicked={handlePathSegClick}
-          addSlashBeforeFirstSeg={true}
+          hasLeadingSlash={true}
           allowEditText={false}
           height={26}
         />

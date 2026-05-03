@@ -685,7 +685,7 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
           confirmText={deleting ? "Deleting..." : "Delete"}
           cancelText="Cancel"
           isDanger={true}
-          isDisabled={deleting}
+          isConfirmDisabled={deleting}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setShowDeleteConfirm(false)}
         />
