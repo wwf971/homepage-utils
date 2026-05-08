@@ -7,8 +7,8 @@ node_modules/
 /backend/.project
 /backend/.classpath
 
-/frontend/build/
-/frontend/dist/
+frontend/build/
+frontend/dist/
 
 /example/*
 !/example/mongo-app-groovy-scripts/
