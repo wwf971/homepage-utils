@@ -9,7 +9,7 @@ It stores versioned objects with payload type:
 - `bytes`
 - `json`
 
-Core response and transaction rules are defined in `./api.md`.
+Core response and transaction rules are defined in `./doc/api.md`.
 
 ## Core Concepts
 
@@ -23,7 +23,7 @@ Core response and transaction rules are defined in `./api.md`.
 
 ## ID Strategy
 
-Detailed ID design is in `./id.md`.
+Detailed ID design is in `./doc/id.md`.
 
 Short notes:
 - all IDs use the same `ms_48` schema, which is based on unix timestamp. all IDs are generated via one unique allocator API
@@ -31,16 +31,16 @@ Short notes:
 
 ## Document Map
 
-- space concept, metadata semantics, lifecycle flow: `./space.md`
-- object history tree and version operation semantics: `./object_version.md`
-- unified ID design and allocator contract: `./id.md`
-- database schema model and constraints: `./database.md`
-- endpoint model, request notes, response contract: `./api.md`
-- folder structure: `./dir_config.md`
-- config conventions: `./config.md`
-- workflow entry and job checklists: `./workflow.md`
-- docker and runtime environment notes: `./docker.md`
-- frontend/backend route and mechanism notes: `./route.md`, `./backend.md`
+- space concept, metadata semantics, lifecycle flow: `./doc/space.md`
+- object history tree and version operation semantics: `./doc/object_version.md`
+- unified ID design and allocator contract: `./doc/id.md`
+- database schema model and constraints: `./doc/database.md`
+- endpoint model, request notes, response contract: `./doc/api.md`
+- folder structure: `./doc/dir_config.md`
+- config conventions: `./doc/config.md`
+- workflow entry and job checklists: `./doc/workflow.md`
+- docker and runtime environment notes: `./doc/docker.md`
+- frontend/backend route and mechanism notes: `./doc/route.md`, `./doc/backend.md`
 
 ## Dependencies
 

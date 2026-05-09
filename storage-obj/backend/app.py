@@ -5,12 +5,15 @@ import os
 import random
 import string
 import time
-import base64
 from contextlib import closing
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable
 
 from flask import Flask, jsonify, request, send_from_directory
+from object import register_object_routes
+from service import register_service_routes
+from space import register_space_routes
 from utils import lexorank_between, lexorank_initial
 
 psycopg_import_error = None
@@ -21,13 +24,18 @@ except Exception as error:
     psycopg_import_error = error
 
 
+ms48_id_lock = Lock()
+ms48_last_timestamp_ms = 0
+ms48_offset = -1
+
+
 def make_json_response(code: int, data: Any = None, message: str = ""):
-    payload = {"code": code}
+    response_data = {"code": code}
     if data is not None:
-        payload["data"] = data
+        response_data["data"] = data
     if message:
-        payload["message"] = message
-    return jsonify(payload)
+        response_data["message"] = message
+    return jsonify(response_data)
 
 
 def get_dir_base() -> Path:
@@ -276,39 +284,54 @@ def create_random_space_id(length: int = 10):
     return "".join(random.choice(chars) for _ in range(length))
 
 
-def create_random_object_id(length: int = 16):
-    chars = string.ascii_lowercase + string.digits
-    return "".join(random.choice(chars) for _ in range(length))
+def create_ms48_id():
+    global ms48_last_timestamp_ms
+    global ms48_offset
+    with ms48_id_lock:
+        current_timestamp_ms = int(time.time() * 1000)
+        if current_timestamp_ms != ms48_last_timestamp_ms:
+            ms48_last_timestamp_ms = current_timestamp_ms
+            ms48_offset = 0
+        else:
+            ms48_offset = ms48_offset + 1
+            if ms48_offset > 0xFFFF:
+                while current_timestamp_ms <= ms48_last_timestamp_ms:
+                    time.sleep(0.001)
+                    current_timestamp_ms = int(time.time() * 1000)
+                ms48_last_timestamp_ms = current_timestamp_ms
+                ms48_offset = 0
+        id_value = (ms48_last_timestamp_ms << 16) | (ms48_offset & 0xFFFF)
+        return str(id_value)
 
 
-def normalize_payload_type(payload_type_raw: str):
-    payload_type = str(payload_type_raw or "").strip().lower()
-    if payload_type not in ("text", "bytes", "json"):
+def normalize_payload_type(data_type_raw: str):
+    data_type = str(data_type_raw or "").strip().lower()
+    if data_type not in ("text", "bytes", "json"):
         raise RuntimeError("dataType should be one of text/bytes/json")
-    return payload_type
+    return data_type
 
 
-def get_object_table_name(space_id: str, payload_type: str):
+def get_object_table_name(space_id: str, data_type: str):
     if not is_valid_space_id(space_id):
         raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-    normalized_payload_type = normalize_payload_type(payload_type)
-    return f"space_{space_id}_object_{normalized_payload_type}_status"
+    normalized_data_type = normalize_payload_type(data_type)
+    return f"space_{space_id}_object_{normalized_data_type}_status"
 
 
-def get_payload_column_name(payload_type: str):
-    normalized_payload_type = normalize_payload_type(payload_type)
-    if normalized_payload_type == "text":
+def get_payload_column_name(data_type: str):
+    normalized_data_type = normalize_payload_type(data_type)
+    if normalized_data_type == "text":
         return "valueText"
-    if normalized_payload_type == "bytes":
+    if normalized_data_type == "bytes":
         return "valueBytes"
     return "valueJson"
 
 
-def get_object_history_table_name(space_id: str, payload_type: str):
+def get_object_history_table_name(space_id: str, data_type: str):
     if not is_valid_space_id(space_id):
         raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-    normalized_payload_type = normalize_payload_type(payload_type)
-    return f"space_{space_id}_object_{normalized_payload_type}_history"
+    normalized_data_type = normalize_payload_type(data_type)
+    return f"space_{space_id}_object_{normalized_data_type}_history"
 
 
 def normalize_object_type_value(raw_value: Any, default_value: int = -1, allow_none: bool = False):
@@ -324,50 +347,52 @@ def normalize_object_type_value(raw_value: Any, default_value: int = -1, allow_n
 
 
 def parse_base64_payload(value: Any):
-    payload_text = str(value or "")
-    comma_idx = payload_text.find(",")
-    raw_base64 = payload_text[comma_idx + 1 :] if comma_idx >= 0 else payload_text
+    encoded_text = str(value or "")
+    comma_idx = encoded_text.find(",")
+    raw_base64 = encoded_text[comma_idx + 1 :] if comma_idx >= 0 else encoded_text
     return raw_base64.strip()
 
 
-def ensure_object_status_table(cursor, space_id: str, payload_type: str):
-    table_name = get_object_table_name(space_id, payload_type)
-    normalized_payload_type = normalize_payload_type(payload_type)
-    payload_column_name = get_payload_column_name(normalized_payload_type)
-    payload_column_sql = "text" if normalized_payload_type == "text" else "bytea" if normalized_payload_type == "bytes" else "jsonb"
+def ensure_object_status_table(cursor, space_id: str, data_type: str):
+    table_name = get_object_table_name(space_id, data_type)
+    normalized_data_type = normalize_payload_type(data_type)
+    value_column_name = get_payload_column_name(normalized_data_type)
+    value_column_sql = "text" if normalized_data_type == "text" else "bytea" if normalized_data_type == "bytes" else "jsonb"
     cursor.execute(
         f"""
         create table if not exists {table_name} (
             objectId text primary key,
-            {payload_column_name} {payload_column_sql},
+            {value_column_name} {value_column_sql},
             type integer not null default -1,
             isDeleted boolean not null default false,
+            editType smallint not null default 0,
             createdAt timestamptz default now(),
             updatedAt timestamptz default now(),
             updatedAtTz varchar(6)
         )
         """
     )
-    cursor.execute(f"alter table {table_name} add column if not exists {payload_column_name} {payload_column_sql}")
+    cursor.execute(f"alter table {table_name} add column if not exists {value_column_name} {value_column_sql}")
     cursor.execute(f"alter table {table_name} add column if not exists type integer not null default -1")
     cursor.execute(f"alter table {table_name} add column if not exists isDeleted boolean not null default false")
+    cursor.execute(f"alter table {table_name} add column if not exists editType smallint not null default 0")
     cursor.execute(f"alter table {table_name} add column if not exists createdAt timestamptz default now()")
     cursor.execute(f"alter table {table_name} add column if not exists updatedAt timestamptz default now()")
     cursor.execute(f"alter table {table_name} add column if not exists updatedAtTz varchar(6)")
-    history_table_name = get_object_history_table_name(space_id, normalized_payload_type)
+    history_table_name = get_object_history_table_name(space_id, normalized_data_type)
     cursor.execute(
         f"""
         create table if not exists {history_table_name} (
             objectId text not null,
             versionNum bigint not null,
-            {payload_column_name} {payload_column_sql},
+            {value_column_name} {value_column_sql},
             isDataDeleted boolean not null default false,
             createdAt timestamptz default now(),
             primary key (objectId, versionNum)
         )
         """
     )
-    cursor.execute(f"alter table {history_table_name} add column if not exists {payload_column_name} {payload_column_sql}")
+    cursor.execute(f"alter table {history_table_name} add column if not exists {value_column_name} {value_column_sql}")
     cursor.execute(f"alter table {history_table_name} add column if not exists isDataDeleted boolean not null default false")
     cursor.execute(f"alter table {history_table_name} add column if not exists createdAt timestamptz default now()")
 
@@ -509,1189 +534,92 @@ def resolve_space_metadata_rank(cursor, space_id: str, tag: str, requested_rank:
     return generate_appendable_rank(rank_text_list)
 
 
+def get_current_database_key():
+    return current_database_key
+
+
+def set_current_database_key(value: str):
+    global current_database_key
+    current_database_key = value
+
+
+def get_active_database_config():
+    return active_database_config
+
+
+def set_active_database_config(value: dict[str, Any]):
+    global active_database_config
+    active_database_config = value
+
+
+def get_is_database_switching():
+    return is_database_switching
+
+
+def set_is_database_switching(value: bool):
+    global is_database_switching
+    is_database_switching = value
+
+
 app = Flask(__name__)
 
-
-@app.get("/health/test")
-@app.get("/api/health/test")
-def health_test():
-    requested_database_key = str(request.args.get("databaseKey") or "").strip()
-    timeout_seconds_raw = str(request.args.get("timeoutSeconds") or "").strip()
-    try:
-        timeout_seconds = int(timeout_seconds_raw) if timeout_seconds_raw else 5
-    except Exception:
-        timeout_seconds = 5
-    timeout_seconds = max(1, min(timeout_seconds, 30))
-
-    selected_database_key = current_database_key
-    selected_database_config = active_database_config
-    if requested_database_key:
-        preset_item = find_database_preset_by_key(requested_database_key)
-        if preset_item is None:
-            return make_json_response(-1, message=f"database key not found: {requested_database_key}"), 404
-        selected_database_key = str(preset_item["key"])
-        selected_database_config = to_db_config_from_preset(preset_item)
-    try:
-        test_result = test_database_connection(selected_database_config, timeout_seconds=timeout_seconds)
-        return make_json_response(
-            0,
-            data={
-                **test_result,
-                "databaseKey": selected_database_key,
-                "timeoutSeconds": timeout_seconds,
-            },
-        )
-    except Exception as error:
-        return make_json_response(-1, message=f"database test failed: {error}"), 500
-
-
-@app.post("/config/database/test")
-@app.post("/api/config/database/test")
-def config_database_test():
-    body = request.get_json(silent=True) or {}
-    requested_database_key = str(body.get("databaseKey") or "").strip()
-    if not requested_database_key:
-        return make_json_response(-1, message="databaseKey is required"), 400
-    timeout_seconds_raw = body.get("timeoutSeconds")
-    try:
-        timeout_seconds = int(timeout_seconds_raw) if timeout_seconds_raw is not None else 5
-    except Exception:
-        timeout_seconds = 5
-    timeout_seconds = max(1, min(timeout_seconds, 30))
-
-    preset_item = find_database_preset_by_key(requested_database_key)
-    if preset_item is None:
-        return make_json_response(-1, message=f"database key not found: {requested_database_key}"), 404
-    try:
-        test_result = test_database_connection(
-            to_db_config_from_preset(preset_item),
-            timeout_seconds=timeout_seconds,
-        )
-        return make_json_response(
-            0,
-            data={
-                **test_result,
-                "databaseKey": requested_database_key,
-                "timeoutSeconds": timeout_seconds,
-            },
-        )
-    except Exception as error:
-        return make_json_response(-1, message=f"database test failed: {error}"), 500
-
-
-@app.post("/echo")
-@app.post("/api/echo")
-def echo():
-    body = request.get_json(silent=True) or {}
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            cursor.execute("select %s::text as payload", (str(body),))
-            row = cursor.fetchone()
-        return {"echo": row[0] if row else str(body)}
-
-    return run_in_transaction(action)
-
-
-@app.get("/health/ping")
-@app.get("/api/health/ping")
-def health_ping():
-    return make_json_response(0, data={"status": "ok"})
-
-
-@app.get("/config/database/list")
-@app.get("/api/config/database/list")
-def config_database_list():
-    return make_json_response(
-        0,
-        data={
-            "currentKey": current_database_key,
-            "items": build_database_list_payload(),
-        },
-    )
-
-
-@app.post("/config/database/switch")
-@app.post("/api/config/database/switch")
-def config_database_switch():
-    global current_database_key
-    global active_database_config
-    global is_database_switching
-
-    body = request.get_json(silent=True) or {}
-    next_database_key = str(body.get("databaseKey") or "").strip()
-    if not next_database_key:
-        return make_json_response(-1, message="databaseKey is required"), 400
-    if is_database_switching:
-        return make_json_response(-1, message="database switch is busy"), 409
-
-    selected_preset = find_database_preset_by_key(next_database_key)
-    if selected_preset is None:
-        return make_json_response(-1, message=f"database key not found: {next_database_key}"), 404
-    if current_database_key == next_database_key:
-        return make_json_response(
-            0,
-            data={
-                "currentKey": current_database_key,
-                "items": build_database_list_payload(),
-                "messageText": "database already selected",
-            },
-        )
-    is_database_switching = True
-    try:
-        next_db_config = to_db_config_from_preset(selected_preset)
-        test_database_connection(next_db_config)
-        active_database_config = next_db_config
-        current_database_key = next_database_key
-        return make_json_response(
-            0,
-            data={
-                "currentKey": current_database_key,
-                "items": build_database_list_payload(),
-                "messageText": f"database switched: {current_database_key}",
-            },
-        )
-    except Exception as error:
-        return make_json_response(-1, message=f"database switch failed: {error}"), 500
-    finally:
-        is_database_switching = False
-
-
-@app.post("/config/database/reinit")
-@app.post("/api/config/database/reinit")
-def config_database_reinit():
-    body = request.get_json(silent=True) or {}
-    isIncludeExampleData = body.get("isIncludeExampleData")
-    is_include_example_data = True if isIncludeExampleData is None else bool(isIncludeExampleData)
-    if connect is None:
-        import_error_text = str(psycopg_import_error) if psycopg_import_error else "unknown import error"
-        return make_json_response(-1, message=f"psycopg is not installed: {import_error_text}"), 500
-    db = None
-    try:
-        init_db_script_text = load_sql_script_text("init_db.sql")
-        init_data_script_text = load_sql_script_text("init_data_example.sql") if is_include_example_data else ""
-    except Exception as error:
-        return make_json_response(-1, message=f"failed to load sql script: {error}"), 500
-    try:
-        db = connect(**active_database_config)
-        db.autocommit = True
-        run_sql_script_text(db, init_db_script_text)
-        if not is_include_example_data:
-            return make_json_response(
-                0,
-                data={
-                    "isInitDbSuccess": True,
-                    "isInitExampleDataRequested": False,
-                    "isInitExampleDataSuccess": False,
-                    "messageText": "database re-initialized (example data skipped)",
-                },
-            )
-        try:
-            run_sql_script_text(db, init_data_script_text)
-            return make_json_response(
-                0,
-                data={
-                    "isInitDbSuccess": True,
-                    "isInitExampleDataRequested": True,
-                    "isInitExampleDataSuccess": True,
-                    "messageText": "database and example data re-initialized",
-                },
-            )
-        except Exception as error:
-            return make_json_response(
-                1,
-                data={
-                    "isInitDbSuccess": True,
-                    "isInitExampleDataRequested": True,
-                    "isInitExampleDataSuccess": False,
-                    "messageText": f"database re-initialized, but example data init failed: {error}",
-                },
-                message=f"database re-initialized, but example data init failed: {error}",
-            )
-    except Exception as error:
-        return make_json_response(-1, message=f"database re-init failed: {error}"), 500
-    finally:
-        if db is not None:
-            db.close()
-
-
-@app.post("/config/database/check")
-@app.post("/api/config/database/check")
-def config_database_check():
-    if connect is None:
-        import_error_text = str(psycopg_import_error) if psycopg_import_error else "unknown import error"
-        return make_json_response(-1, message=f"psycopg is not installed: {import_error_text}"), 500
-    db = None
-    try:
-        db = connect(**active_database_config)
-        db.autocommit = True
-        with closing(db.cursor()) as cursor:
-            check_items = []
-            check_items.append(
-                check_table_has_columns(
-                    cursor,
-                    "metadata",
-                    [
-                        "tag",
-                        "rank",
-                        "valuetype",
-                        "valuetext",
-                        "valuejson",
-                        "valuebytes",
-                        "valueint",
-                        "valueboolean",
-                        "updatedat",
-                        "updatedattz",
-                    ],
-                )
-            )
-            check_items.append(
-                check_table_has_columns(
-                    cursor,
-                    "change_log",
-                    [
-                        "changelogid",
-                        "createdat",
-                        "createdattz",
-                        "commenttext",
-                        "commentjson",
-                    ],
-                )
-            )
-            spaces_id_list = []
-            cursor.execute(
-                """
-                select valueJson
-                from metadata
-                where tag = 'spacesIdList'
-                """
-            )
-            row = cursor.fetchone()
-            if row and row[0] is not None and isinstance(row[0], list):
-                spaces_id_list = [str(item) for item in row[0] if isinstance(item, (str, int))]
-            for space_id in spaces_id_list:
-                if not is_valid_space_id(space_id):
-                    continue
-                check_items.append(
-                    check_table_has_columns(
-                        cursor,
-                        f"space_{space_id}_metadata",
-                        [
-                            "tag",
-                            "rank",
-                            "valuetype",
-                            "valuetext",
-                            "valuejson",
-                            "valuebytes",
-                            "valueint",
-                            "valueboolean",
-                            "updatedat",
-                            "updatedattz",
-                        ],
-                    )
-                )
-                for payload_type in ("text", "bytes", "json"):
-                    check_items.append(
-                        check_table_has_columns(
-                            cursor,
-                            f"space_{space_id}_object_{payload_type}_status",
-                            [
-                                "objectid",
-                                "type",
-                                "isdeleted",
-                                "updatedat",
-                            ],
-                        )
-                    )
-            failed_items = [item for item in check_items if item.get("isOk") is not True]
-            issue_text_list = build_table_issue_text_list(failed_items)
-            failure_message_text = "database schema check failed: " + " | ".join(issue_text_list) if len(issue_text_list) > 0 else "database schema check failed"
-            return make_json_response(
-                0,
-                data={
-                    "isSchemaOk": len(failed_items) == 0,
-                    "tableCheckItems": check_items,
-                    "failedTableCheckItems": failed_items,
-                    "issueTextList": issue_text_list,
-                    "messageText": "database schema ok" if len(failed_items) == 0 else failure_message_text,
-                },
-            )
-    except Exception as error:
-        return make_json_response(-1, message=f"database check failed: {error}"), 500
-    finally:
-        if db is not None:
-            db.close()
-
-
-@app.get("/space/list")
-@app.get("/api/space/list")
-def space_list():
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            spaces_id_list = read_spaces_id_list(cursor)
-            space_item_list = []
-            for space_id in spaces_id_list:
-                space_name = read_space_name(cursor, space_id)
-                display_name = f"{space_name} {space_id}" if space_name else f"ANONY {space_id}"
-                space_item_list.append(
-                    {
-                        "spaceId": space_id,
-                        "name": space_name,
-                        "displayName": display_name,
-                    }
-                )
-        return {
-            "spaces": spaces_id_list,
-            "spaceItems": space_item_list,
-            "spaceNum": len(spaces_id_list),
-        }
-
-    return run_in_transaction(action)
-
-
-@app.get("/space/find-by-name")
-@app.get("/api/space/find-by-name")
-def space_find_by_name():
-    name = str(request.args.get("name") or "").strip()
-    if not name:
-        return make_json_response(-1, message="name is required"), 400
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            spaces_id_list = read_spaces_id_list(cursor)
-            normalized_name = name.strip().lower()
-            for space_id in spaces_id_list:
-                if not is_valid_space_id(space_id):
-                    continue
-                space_name = read_space_name(cursor, space_id)
-                if str(space_name or "").strip().lower() != normalized_name:
-                    continue
-                return {
-                    "spaceId": space_id,
-                    "name": space_name,
-                }
-        raise RuntimeError(f"space not found by name: {name}")
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/create")
-@app.post("/api/space/create")
-def space_create():
-    body = request.get_json(silent=True) or {}
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            spaces_id_list = read_spaces_id_list(cursor)
-
-            space_id = str(body.get("spaceId") or "").strip().lower()
-            if not space_id:
-                for _ in range(20):
-                    candidate = create_random_space_id()
-                    if candidate not in spaces_id_list:
-                        space_id = candidate
-                        break
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if space_id in spaces_id_list:
-                raise RuntimeError(f"space already exists: {space_id}")
-
-            spaces_id_list.append(space_id)
-            spaces_id_list = sorted(set(spaces_id_list))
-            write_spaces_id_list(cursor, spaces_id_list)
-            ensure_space_metadata_table(cursor, space_id)
-            ensure_object_status_table(cursor, space_id, "text")
-            ensure_object_status_table(cursor, space_id, "bytes")
-            ensure_object_status_table(cursor, space_id, "json")
-
-        return {
-            "spaceId": space_id,
-            "spaces": spaces_id_list,
-            "spaceNum": len(spaces_id_list),
-        }
-
-    return run_in_transaction(action)
-
-
-@app.get("/space/metadata/list")
-@app.get("/api/space/metadata/list")
-def space_metadata_list():
-    space_id = str(request.args.get("spaceId") or "").strip().lower()
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            ensure_space_metadata_table(cursor, space_id)
-            cursor.execute(
-                f"""
-                select
-                    tag,
-                    rank,
-                    valueType,
-                    valueText,
-                    valueJson,
-                    valueBytes,
-                    valueInt,
-                    valueBoolean
-                from space_{space_id}_metadata
-                order by rank asc nulls last, tag asc
-                """
-            )
-            row_list = cursor.fetchall() or []
-            metadata_item_list = []
-            for row in row_list:
-                metadata_item_list.append(
-                    {
-                        "tag": row[0],
-                        "rank": row[1],
-                        "valueType": row[2],
-                        "valueText": row[3],
-                        "valueJson": row[4],
-                        "valueBytes": row[5],
-                        "valueInt": row[6],
-                        "valueBoolean": row[7],
-                    }
-                )
-        return {
-            "spaceId": space_id,
-            "items": metadata_item_list,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/metadata/upsert")
-@app.post("/api/space/metadata/upsert")
-def space_metadata_upsert():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    tag = str(body.get("tag") or "").strip()
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if not tag:
-                raise RuntimeError("tag is required")
-            ensure_space_metadata_table(cursor, space_id)
-
-            rank = resolve_space_metadata_rank(cursor, space_id, tag, body.get("rank"))
-
-            value_type = body.get("valueType")
-            value_text = body.get("valueText")
-            value_json = body.get("valueJson")
-            value_bytes = body.get("valueBytes")
-            value_int = body.get("valueInt")
-            value_boolean = body.get("valueBoolean")
-            cursor.execute(
-                f"""
-                insert into space_{space_id}_metadata(
-                    tag,
-                    rank,
-                    valueType,
-                    valueText,
-                    valueJson,
-                    valueBytes,
-                    valueInt,
-                    valueBoolean,
-                    updatedAt
-                )
-                values (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, now())
-                on conflict (tag) do update set
-                    rank = excluded.rank,
-                    valueType = excluded.valueType,
-                    valueText = excluded.valueText,
-                    valueJson = excluded.valueJson,
-                    valueBytes = excluded.valueBytes,
-                    valueInt = excluded.valueInt,
-                    valueBoolean = excluded.valueBoolean,
-                    updatedAt = now()
-                """,
-                (
-                    tag,
-                    rank,
-                    value_type,
-                    value_text,
-                    json.dumps(value_json) if value_json is not None else None,
-                    value_bytes,
-                    value_int,
-                    value_boolean,
-                ),
-            )
-        return {
-            "spaceId": space_id,
-            "tag": tag,
-            "rank": rank,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/metadata/ensure")
-@app.post("/api/space/metadata/ensure")
-def space_metadata_ensure():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    tag = str(body.get("tag") or "").strip()
-    is_overwrite = body.get("isOverwrite")
-    is_overwrite_enabled = True if is_overwrite is None else bool(is_overwrite)
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if not tag:
-                raise RuntimeError("tag is required")
-            ensure_space_metadata_table(cursor, space_id)
-
-            cursor.execute(
-                f"""
-                select tag
-                from space_{space_id}_metadata
-                where tag = %s
-                limit 1
-                """,
-                (tag,),
-            )
-            existing_row = cursor.fetchone()
-            if existing_row and not is_overwrite_enabled:
-                return {
-                    "spaceId": space_id,
-                    "tag": tag,
-                    "isInserted": False,
-                    "isUpdated": False,
-                    "isNoop": True,
-                }
-
-            rank = resolve_space_metadata_rank(cursor, space_id, tag, body.get("rank"))
-
-            value_type = body.get("valueType")
-            value_text = body.get("valueText")
-            value_json = body.get("valueJson")
-            value_bytes = body.get("valueBytes")
-            value_int = body.get("valueInt")
-            value_boolean = body.get("valueBoolean")
-            cursor.execute(
-                f"""
-                insert into space_{space_id}_metadata(
-                    tag,
-                    rank,
-                    valueType,
-                    valueText,
-                    valueJson,
-                    valueBytes,
-                    valueInt,
-                    valueBoolean,
-                    updatedAt
-                )
-                values (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, now())
-                on conflict (tag) do update set
-                    rank = excluded.rank,
-                    valueType = excluded.valueType,
-                    valueText = excluded.valueText,
-                    valueJson = excluded.valueJson,
-                    valueBytes = excluded.valueBytes,
-                    valueInt = excluded.valueInt,
-                    valueBoolean = excluded.valueBoolean,
-                    updatedAt = now()
-                """,
-                (
-                    tag,
-                    rank,
-                    value_type,
-                    value_text,
-                    json.dumps(value_json) if value_json is not None else None,
-                    value_bytes,
-                    value_int,
-                    value_boolean,
-                ),
-            )
-        return {
-            "spaceId": space_id,
-            "tag": tag,
-            "isInserted": existing_row is None,
-            "isUpdated": existing_row is not None,
-            "isNoop": False,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/metadata/delete")
-@app.post("/api/space/metadata/delete")
-def space_metadata_delete():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    tag = str(body.get("tag") or "").strip()
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if not tag:
-                raise RuntimeError("tag is required")
-            ensure_space_metadata_table(cursor, space_id)
-            cursor.execute(
-                f"""
-                delete from space_{space_id}_metadata
-                where tag = %s
-                """,
-                (tag,),
-            )
-        return {
-            "spaceId": space_id,
-            "tag": tag,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/metadata/insert")
-@app.post("/api/space/metadata/insert")
-def space_metadata_insert():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    tag = str(body.get("tag") or "").strip()
-    target_tag = str(body.get("targetTag") or "").strip()
-    position = str(body.get("position") or "tail").strip().lower()
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if not tag:
-                raise RuntimeError("tag is required")
-            if position not in ("above", "below", "tail"):
-                raise RuntimeError("position should be above/below/tail")
-
-            row_list = read_space_metadata_rows(cursor, space_id)
-            if any(row["tag"] == tag for row in row_list):
-                raise RuntimeError(f"tag already exists: {tag}")
-
-            rank_left = None
-            rank_right = None
-
-            if position == "tail" or not target_tag:
-                rank_left = row_list[-1]["rank"] if row_list else None
-                rank_right = None
-            else:
-                target_idx = next((idx for idx, row in enumerate(row_list) if row["tag"] == target_tag), -1)
-                if target_idx < 0:
-                    raise RuntimeError(f"targetTag not found: {target_tag}")
-                if position == "above":
-                    rank_left = row_list[target_idx - 1]["rank"] if target_idx - 1 >= 0 else None
-                    rank_right = row_list[target_idx]["rank"]
-                else:
-                    rank_left = row_list[target_idx]["rank"]
-                    rank_right = row_list[target_idx + 1]["rank"] if target_idx + 1 < len(row_list) else None
-
-            next_rank = lexorank_between(rank_left, rank_right)
-            value_type = body.get("valueType")
-            value_text = body.get("valueText")
-            value_json = body.get("valueJson")
-            value_bytes = body.get("valueBytes")
-            value_int = body.get("valueInt")
-            value_boolean = body.get("valueBoolean")
-
-            cursor.execute(
-                f"""
-                insert into space_{space_id}_metadata(
-                    tag,
-                    rank,
-                    valueType,
-                    valueText,
-                    valueJson,
-                    valueBytes,
-                    valueInt,
-                    valueBoolean,
-                    updatedAt
-                )
-                values (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, now())
-                """,
-                (
-                    tag,
-                    next_rank,
-                    value_type,
-                    value_text,
-                    json.dumps(value_json) if value_json is not None else None,
-                    value_bytes,
-                    value_int,
-                    value_boolean,
-                ),
-            )
-        return {
-            "spaceId": space_id,
-            "tag": tag,
-            "rank": next_rank,
-            "position": position,
-            "targetTag": target_tag,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/metadata/move")
-@app.post("/api/space/metadata/move")
-def space_metadata_move():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    tag = str(body.get("tag") or "").strip()
-    direction = str(body.get("direction") or "").strip().lower()
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if not tag:
-                raise RuntimeError("tag is required")
-            if direction not in ("up", "down"):
-                raise RuntimeError("direction should be up/down")
-
-            row_list = read_space_metadata_rows(cursor, space_id)
-            target_idx = next((idx for idx, row in enumerate(row_list) if row["tag"] == tag), -1)
-            if target_idx < 0:
-                raise RuntimeError(f"tag not found: {tag}")
-
-            if direction == "up":
-                if target_idx <= 0:
-                    return {"spaceId": space_id, "tag": tag, "direction": direction, "isNoop": True}
-                rank_left = row_list[target_idx - 2]["rank"] if target_idx - 2 >= 0 else None
-                rank_right = row_list[target_idx - 1]["rank"]
-                next_rank = lexorank_between(rank_left, rank_right)
-            else:
-                if target_idx >= len(row_list) - 1:
-                    return {"spaceId": space_id, "tag": tag, "direction": direction, "isNoop": True}
-                rank_left = row_list[target_idx + 1]["rank"]
-                rank_right = row_list[target_idx + 2]["rank"] if target_idx + 2 < len(row_list) else None
-                next_rank = lexorank_between(rank_left, rank_right)
-
-            cursor.execute(
-                f"""
-                update space_{space_id}_metadata
-                set rank = %s, updatedAt = now()
-                where tag = %s
-                """,
-                (next_rank, tag),
-            )
-        return {
-            "spaceId": space_id,
-            "tag": tag,
-            "direction": direction,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/delete")
-@app.post("/api/space/delete")
-def space_delete():
-    body = request.get_json(silent=True) or {}
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            spaces_id_list = read_spaces_id_list(cursor)
-            space_id = str(body.get("spaceId") or "").strip().lower()
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if space_id not in spaces_id_list:
-                raise RuntimeError(f"space does not exist: {space_id}")
-
-            spaces_id_list = [item for item in spaces_id_list if item != space_id]
-            write_spaces_id_list(cursor, spaces_id_list)
-            cursor.execute(f"drop table if exists space_{space_id}_metadata")
-            cursor.execute(f"drop table if exists space_{space_id}_object_text_status")
-            cursor.execute(f"drop table if exists space_{space_id}_object_bytes_status")
-            cursor.execute(f"drop table if exists space_{space_id}_object_json_status")
-
-        return {
-            "spaceId": space_id,
-            "spaces": spaces_id_list,
-            "spaceNum": len(spaces_id_list),
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/space/clear")
-@app.post("/api/space/clear")
-def space_clear():
-    body = request.get_json(silent=True) or {}
-
-    def action(db):
-        with closing(db.cursor()) as cursor:
-            spaces_id_list = read_spaces_id_list(cursor)
-            space_id = str(body.get("spaceId") or "").strip().lower()
-            if not is_valid_space_id(space_id):
-                raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
-            if space_id not in spaces_id_list:
-                raise RuntimeError(f"space does not exist: {space_id}")
-
-            ensure_space_metadata_table(cursor, space_id)
-            ensure_object_status_table(cursor, space_id, "text")
-            ensure_object_status_table(cursor, space_id, "bytes")
-            ensure_object_status_table(cursor, space_id, "json")
-
-            cursor.execute(f"delete from space_{space_id}_metadata")
-            deleted_metadata_num = int(cursor.rowcount or 0)
-            cursor.execute(f"delete from space_{space_id}_object_text_status")
-            deleted_text_num = int(cursor.rowcount or 0)
-            cursor.execute(f"delete from space_{space_id}_object_bytes_status")
-            deleted_bytes_num = int(cursor.rowcount or 0)
-            cursor.execute(f"delete from space_{space_id}_object_json_status")
-            deleted_json_num = int(cursor.rowcount or 0)
-
-        return {
-            "spaceId": space_id,
-            "deletedMetadataNum": deleted_metadata_num,
-            "deletedTextNum": deleted_text_num,
-            "deletedBytesNum": deleted_bytes_num,
-            "deletedJsonNum": deleted_json_num,
-            "deletedTotalNum": deleted_metadata_num + deleted_text_num + deleted_bytes_num + deleted_json_num,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.get("/object/list")
-@app.get("/api/object/list")
-def object_list():
-    space_id = str(request.args.get("spaceId") or "").strip().lower()
-    payload_type = str(request.args.get("dataType") or "").strip().lower()
-    search_text = str(request.args.get("searchText") or "").strip()
-    object_type_raw = request.args.get("type")
-    object_type_filter = normalize_object_type_value(object_type_raw, allow_none=True)
-    page_index_raw = str(request.args.get("pageIndex") or "").strip()
-    page_size_raw = str(request.args.get("pageSize") or "").strip()
-    try:
-        page_index = int(page_index_raw) if page_index_raw else 1
-    except Exception:
-        page_index = 1
-    try:
-        page_size = int(page_size_raw) if page_size_raw else 20
-    except Exception:
-        page_size = 20
-    page_index = max(1, page_index)
-    page_size = max(1, min(page_size, 200))
-
-    def action(db):
-        normalized_payload_type = normalize_payload_type(payload_type)
-        with closing(db.cursor()) as cursor:
-            ensure_object_status_table(cursor, space_id, normalized_payload_type)
-            table_name = get_object_table_name(space_id, normalized_payload_type)
-            payload_column_name = get_payload_column_name(normalized_payload_type)
-            query_params = []
-            where_clause = "where isDeleted = false"
-            if search_text:
-                where_clause += " and objectId ilike %s"
-                query_params.append(f"%{search_text}%")
-            if object_type_filter is not None:
-                where_clause += " and type = %s"
-                query_params.append(object_type_filter)
-            cursor.execute(
-                f"""
-                select count(1)
-                from {table_name}
-                {where_clause}
-                """,
-                tuple(query_params),
-            )
-            count_row = cursor.fetchone()
-            total_count = int(count_row[0] if count_row and count_row[0] is not None else 0)
-            offset = (page_index - 1) * page_size
-            cursor.execute(
-                f"""
-                select objectId, {payload_column_name}, type, createdAt, updatedAt
-                from {table_name}
-                {where_clause}
-                order by createdAt desc, objectId desc
-                limit %s offset %s
-                """,
-                tuple(query_params + [page_size, offset]),
-            )
-            row_list = cursor.fetchall() or []
-            item_list = []
-            for row in row_list:
-                row_payload = row[1]
-                value_text = row_payload if normalized_payload_type == "text" else ""
-                value_json = row_payload if normalized_payload_type == "json" else None
-                value_base64 = base64.b64encode(row_payload).decode("utf-8") if normalized_payload_type == "bytes" and row_payload is not None else ""
-                item_list.append(
-                    {
-                        "objectId": str(row[0] or ""),
-                        "dataType": normalized_payload_type,
-                        "type": int(row[2] if row[2] is not None else -1),
-                        "valueText": value_text if value_text is not None else "",
-                        "valueJson": value_json,
-                        "valueBase64": value_base64,
-                        "createdAt": str(row[3] or ""),
-                        "updatedAt": str(row[4] or ""),
-                    }
-                )
-        return {
-            "spaceId": space_id,
-            "dataType": normalized_payload_type,
-            "pageIndex": page_index,
-            "pageSize": page_size,
-            "totalCount": total_count,
-            "items": item_list,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.get("/object/get")
-@app.get("/api/object/get")
-def object_get():
-    space_id = str(request.args.get("spaceId") or "").strip().lower()
-    payload_type = str(request.args.get("dataType") or "").strip().lower()
-    object_id = str(request.args.get("objectId") or "").strip()
-
-    def action(db):
-        normalized_payload_type = normalize_payload_type(payload_type)
-        if not object_id:
-            raise RuntimeError("objectId is required")
-        with closing(db.cursor()) as cursor:
-            ensure_object_status_table(cursor, space_id, normalized_payload_type)
-            table_name = get_object_table_name(space_id, normalized_payload_type)
-            payload_column_name = get_payload_column_name(normalized_payload_type)
-            cursor.execute(
-                f"""
-                select objectId, {payload_column_name}, type, createdAt, updatedAt
-                from {table_name}
-                where objectId = %s and isDeleted = false
-                limit 1
-                """,
-                (object_id,),
-            )
-            row = cursor.fetchone()
-            if not row:
-                raise RuntimeError(f"object not found: {object_id}")
-            row_payload = row[1]
-            return {
-                "spaceId": space_id,
-                "dataType": normalized_payload_type,
-                "objectId": str(row[0] or ""),
-                "type": int(row[2] if row[2] is not None else -1),
-                "valueText": row_payload if normalized_payload_type == "text" and row_payload is not None else "",
-                "valueJson": row_payload if normalized_payload_type == "json" else None,
-                "valueBase64": base64.b64encode(row_payload).decode("utf-8") if normalized_payload_type == "bytes" and row_payload is not None else "",
-                "createdAt": str(row[3] or ""),
-                "updatedAt": str(row[4] or ""),
-            }
-
-    return run_in_transaction(action)
-
-
-@app.post("/object/create")
-@app.post("/api/object/create")
-def object_create():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    payload_type = str(body.get("dataType") or "").strip().lower()
-    object_type_value = normalize_object_type_value(body.get("type"), default_value=-1)
-    created_at_tz = str(body.get("createdAtTz") or "").strip()
-
-    def action(db):
-        normalized_payload_type = normalize_payload_type(payload_type)
-        with closing(db.cursor()) as cursor:
-            ensure_object_status_table(cursor, space_id, normalized_payload_type)
-            table_name = get_object_table_name(space_id, normalized_payload_type)
-            history_table_name = get_object_history_table_name(space_id, normalized_payload_type)
-            payload_column_name = get_payload_column_name(normalized_payload_type)
-            object_id = f"{int(time.time() * 1000)}_{create_random_object_id(6)}"
-            payload_value = None
-            payload_value_placeholder = "%s"
-            if normalized_payload_type == "text":
-                payload_value = body.get("valueText")
-            elif normalized_payload_type == "bytes":
-                value_base64 = parse_base64_payload(body.get("valueBase64"))
-                payload_value = base64.b64decode(value_base64.encode("utf-8")) if value_base64 else b""
-            elif normalized_payload_type == "json":
-                payload_value = json.dumps(body.get("valueJson"))
-                payload_value_placeholder = "%s::jsonb"
-            cursor.execute(
-                f"""
-                select 1
-                from {table_name}
-                where objectId = %s
-                limit 1
-                """,
-                (object_id,),
-            )
-            existing_row = cursor.fetchone()
-            if existing_row:
-                raise RuntimeError(f"object already exists: {object_id}")
-            cursor.execute(
-                f"""
-                insert into {table_name}(objectId, {payload_column_name}, type, isDeleted, createdAt, updatedAt, updatedAtTz)
-                values (%s, {payload_value_placeholder}, %s, false, now(), now(), %s)
-                """,
-                (object_id, payload_value, object_type_value, created_at_tz or None),
-            )
-            cursor.execute(
-                f"""
-                insert into {history_table_name}(objectId, versionNum, {payload_column_name}, isDataDeleted, createdAt)
-                values (%s, %s, {payload_value_placeholder}, false, now())
-                """,
-                (object_id, 1, payload_value),
-            )
-        return {
-            "spaceId": space_id,
-            "dataType": normalized_payload_type,
-            "objectId": object_id,
-            "type": object_type_value,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/object/update")
-@app.post("/api/object/update")
-def object_update():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    payload_type = str(body.get("dataType") or "").strip().lower()
-    object_id = str(body.get("objectId") or "").strip()
-    object_type_value = normalize_object_type_value(body.get("type"), allow_none=True)
-    is_delete_previous_data = body.get("isDeletePreviousData") is True
-    updated_at_tz = str(body.get("updatedAtTz") or "").strip()
-
-    def action(db):
-        normalized_payload_type = normalize_payload_type(payload_type)
-        if not object_id:
-            raise RuntimeError("objectId is required")
-        with closing(db.cursor()) as cursor:
-            ensure_object_status_table(cursor, space_id, normalized_payload_type)
-            table_name = get_object_table_name(space_id, normalized_payload_type)
-            history_table_name = get_object_history_table_name(space_id, normalized_payload_type)
-            payload_column_name = get_payload_column_name(normalized_payload_type)
-            payload_value = None
-            payload_value_placeholder = "%s"
-            if normalized_payload_type == "text":
-                payload_value = body.get("valueText")
-            elif normalized_payload_type == "bytes":
-                value_base64 = parse_base64_payload(body.get("valueBase64"))
-                payload_value = base64.b64decode(value_base64.encode("utf-8")) if value_base64 else b""
-            elif normalized_payload_type == "json":
-                payload_value = json.dumps(body.get("valueJson"))
-                payload_value_placeholder = "%s::jsonb"
-            cursor.execute(
-                f"""
-                select {payload_column_name}
-                from {table_name}
-                where objectId = %s and isDeleted = false
-                limit 1
-                """,
-                (object_id,),
-            )
-            previous_row = cursor.fetchone()
-            if not previous_row:
-                raise RuntimeError(f"object not found: {object_id}")
-            previous_payload_value = previous_row[0]
-            if normalized_payload_type == "json":
-                previous_payload_value = json.dumps(previous_payload_value)
-            cursor.execute(
-                f"""
-                select versionNum
-                from {history_table_name}
-                where objectId = %s
-                order by versionNum desc
-                limit 1
-                """,
-                (object_id,),
-            )
-            version_row = cursor.fetchone()
-            previous_version_num = int(version_row[0]) if version_row and version_row[0] is not None else 1
-            if not version_row:
-                cursor.execute(
-                    f"""
-                    insert into {history_table_name}(objectId, versionNum, {payload_column_name}, isDataDeleted, createdAt)
-                    values (%s, %s, {payload_value_placeholder}, false, now())
-                    """,
-                    (object_id, previous_version_num, previous_payload_value),
-                )
-            next_version_num = previous_version_num + 1
-            cursor.execute(
-                f"""
-                update {table_name}
-                set {payload_column_name} = {payload_value_placeholder},
-                    type = coalesce(%s, type),
-                    isDeleted = false,
-                    updatedAt = now(),
-                    updatedAtTz = %s
-                where objectId = %s
-                """,
-                (payload_value, object_type_value, updated_at_tz or None, object_id),
-            )
-            if cursor.rowcount <= 0:
-                raise RuntimeError(f"object not found: {object_id}")
-            cursor.execute(
-                f"""
-                insert into {history_table_name}(objectId, versionNum, {payload_column_name}, isDataDeleted, createdAt)
-                values (%s, %s, {payload_value_placeholder}, false, now())
-                """,
-                (object_id, next_version_num, payload_value),
-            )
-            if is_delete_previous_data:
-                cursor.execute(
-                    f"""
-                    update {history_table_name}
-                    set {payload_column_name} = null,
-                        isDataDeleted = true
-                    where objectId = %s and versionNum = %s
-                    """,
-                    (object_id, previous_version_num),
-                )
-        return {
-            "spaceId": space_id,
-            "dataType": normalized_payload_type,
-            "objectId": object_id,
-            "type": object_type_value,
-            "isDeletePreviousData": is_delete_previous_data,
-        }
-
-    return run_in_transaction(action)
-
-
-@app.post("/object/delete")
-@app.post("/api/object/delete")
-def object_delete():
-    body = request.get_json(silent=True) or {}
-    space_id = str(body.get("spaceId") or "").strip().lower()
-    payload_type = str(body.get("dataType") or "").strip().lower()
-    object_ids = body.get("objectIds")
-    if not isinstance(object_ids, list):
-        object_ids = []
-    object_id_single = str(body.get("objectId") or "").strip()
-    if object_id_single:
-        object_ids.append(object_id_single)
-    normalized_object_ids = sorted(set(str(item or "").strip() for item in object_ids if str(item or "").strip()))
-
-    def action(db):
-        normalized_payload_type = normalize_payload_type(payload_type)
-        if not normalized_object_ids:
-            raise RuntimeError("objectIds is required")
-        with closing(db.cursor()) as cursor:
-            ensure_object_status_table(cursor, space_id, normalized_payload_type)
-            table_name = get_object_table_name(space_id, normalized_payload_type)
-            cursor.execute(
-                f"""
-                update {table_name}
-                set isDeleted = true,
-                    updatedAt = now()
-                where objectId = any(%s)
-                """,
-                (normalized_object_ids,),
-            )
-        return {
-            "spaceId": space_id,
-            "dataType": normalized_payload_type,
-            "objectIds": normalized_object_ids,
-            "deletedNum": len(normalized_object_ids),
-        }
-
-    return run_in_transaction(action)
+register_service_routes(
+    app,
+    {
+        "make_json_response": make_json_response,
+        "run_in_transaction": run_in_transaction,
+        "find_database_preset_by_key": find_database_preset_by_key,
+        "to_db_config_from_preset": to_db_config_from_preset,
+        "test_database_connection": test_database_connection,
+        "build_database_list_payload": build_database_list_payload,
+        "load_sql_script_text": load_sql_script_text,
+        "run_sql_script_text": run_sql_script_text,
+        "check_table_has_columns": check_table_has_columns,
+        "build_table_issue_text_list": build_table_issue_text_list,
+        "is_valid_space_id": is_valid_space_id,
+        "connect": connect,
+        "psycopg_import_error": psycopg_import_error,
+        "get_current_database_key": get_current_database_key,
+        "set_current_database_key": set_current_database_key,
+        "get_active_database_config": get_active_database_config,
+        "set_active_database_config": set_active_database_config,
+        "get_is_database_switching": get_is_database_switching,
+        "set_is_database_switching": set_is_database_switching,
+    },
+)
+
+register_space_routes(
+    app,
+    {
+        "make_json_response": make_json_response,
+        "run_in_transaction": run_in_transaction,
+        "is_valid_space_id": is_valid_space_id,
+        "create_random_space_id": create_random_space_id,
+        "read_spaces_id_list": read_spaces_id_list,
+        "read_space_name": read_space_name,
+        "write_spaces_id_list": write_spaces_id_list,
+        "ensure_space_metadata_table": ensure_space_metadata_table,
+        "ensure_object_status_table": ensure_object_status_table,
+        "resolve_space_metadata_rank": resolve_space_metadata_rank,
+        "read_space_metadata_rows": read_space_metadata_rows,
+        "lexorank_between": lexorank_between,
+    },
+)
+
+register_object_routes(
+    app,
+    {
+        "run_in_transaction": run_in_transaction,
+        "normalize_payload_type": normalize_payload_type,
+        "normalize_object_type_value": normalize_object_type_value,
+        "ensure_object_status_table": ensure_object_status_table,
+        "get_object_table_name": get_object_table_name,
+        "get_object_history_table_name": get_object_history_table_name,
+        "get_payload_column_name": get_payload_column_name,
+        "parse_base64_payload": parse_base64_payload,
+        "create_ms48_id": create_ms48_id,
+    },
+)
 
 
 def serve_management_page():
