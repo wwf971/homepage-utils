@@ -23,11 +23,11 @@ except Exception as error:
     connect = None
     psycopg_import_error = error
 
-
 ms48_id_lock = Lock()
 ms48_last_timestamp_ms = 0
 ms48_offset = -1
-
+object_type_min_value = -2147483648
+object_type_max_value = 2147483647
 
 def make_json_response(code: int, data: Any = None, message: str = ""):
     response_data = {"code": code}
@@ -341,9 +341,12 @@ def normalize_object_type_value(raw_value: Any, default_value: int = -1, allow_n
     if raw_text == "":
         return None if allow_none else default_value
     try:
-        return int(raw_text)
+        normalized_value = int(raw_text)
     except Exception:
         raise RuntimeError("type should be a signed integer")
+    if normalized_value < object_type_min_value or normalized_value > object_type_max_value:
+        raise RuntimeError(f"type should be within {object_type_min_value}..{object_type_max_value}")
+    return normalized_value
 
 
 def parse_base64_payload(value: Any):

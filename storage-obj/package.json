@@ -1,0 +1,8 @@
+{
+  "name": "storage-obj",
+  "private": true,
+  "scripts": {
+    "test": "bash \"./script/launch-test.sh\"",
+    "test:dry-run": "bash \"./script/launch-test.sh\" --dry-run"
+  }
+}

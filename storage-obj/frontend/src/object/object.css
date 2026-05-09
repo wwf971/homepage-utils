@@ -1,0 +1,184 @@
+.object-panel-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.object-filter-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.object-filter-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.object-filter-data-type-btn {
+  min-width: 52px;
+}
+
+.object-filter-data-type-btn-active {
+  background: #d6e6ff;
+  border-color: #4d7fca;
+  color: #0f2f60;
+}
+
+.object-filter-line-small {
+  font-size: 11px;
+}
+
+.object-filter-search-input {
+  min-width: 180px;
+}
+
+.object-filter-info-item {
+  color: #546888;
+  font-size: 11px;
+}
+
+.object-filter-search-editor {
+  min-width: 220px;
+  min-height: 22px;
+  border: 1px solid #c7d3e8;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: #ffffff;
+  color: #1d2c44;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.object-filter-search-editor:empty::before {
+  content: 'Search text';
+  color: #97a5bc;
+}
+
+.object-filter-search-editor.is-locked {
+  background: #f3f6fb;
+  color: #7e8da5;
+}
+
+.object-buttons-root {
+  padding-top: 1px;
+}
+
+.object-search-result-summary {
+  font-size: 12px;
+  color: #35527e;
+}
+
+.object-table-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.object-table-pagination {
+  align-items: center;
+}
+
+.object-table-pagination-text {
+  font-size: 11px;
+  color: #58709c;
+}
+
+.object-table-loading-wrapper {
+  border: 1px solid #d0d0d0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.object-table-loading-body {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.object-table-loading-text {
+  font-size: 12px;
+  color: #4b628c;
+}
+
+.object-card-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 36, 54, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+}
+
+.object-card-root {
+  width: 640px;
+  max-width: calc(100vw - 12px);
+  background: #ffffff;
+  border: 1px solid #d0d8e8;
+  border-radius: 4px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.object-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.object-card-id-value {
+  color: #9aa5b5;
+}
+
+.object-card-type-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.object-card-type-label {
+  font-size: 11px;
+  color: #45608a;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.object-card-type-input {
+  min-width: 120px;
+}
+
+.object-card-edit-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.object-card-edit-type-option-label {
+  font-size: 11px;
+}
+
+.object-card-input {
+  width: 100%;
+}
+
+.object-card-textarea {
+  min-height: 220px;
+  border: 1px solid #c7d3e8;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: monospace;
+  line-height: 1.4;
+  resize: vertical;
+}

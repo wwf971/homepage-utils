@@ -1,0 +1,47 @@
+.space-info-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.space-metadata-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.space-metadata-row {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.space-metadata-kv {
+  flex: 1;
+}
+
+.space-metadata-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.space-tree-label-root {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.space-tree-label-name {
+  color: #1d2c44;
+}
+
+.space-tree-label-anony {
+  color: #1d2c44;
+  font-style: italic;
+}
+
+.space-tree-label-id {
+  color: #9aa5b5;
+  font-size: 11px;
+}

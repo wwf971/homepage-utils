@@ -1,0 +1,55 @@
+.service-database-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.db-check-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.db-check-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.db-check-desc-text {
+  font-size: 12px;
+  color: #5b6f91;
+}
+
+.db-reinit-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.db-reinit-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.db-reinit-check-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #2a4164;
+}
+
+.db-reinit-desc-text {
+  font-size: 12px;
+  color: #5b6f91;
+}
+
+.db-reinit-message-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
