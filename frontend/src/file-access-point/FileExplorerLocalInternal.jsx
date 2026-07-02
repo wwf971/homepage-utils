@@ -176,11 +176,11 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     // Temporarily hide backdrop to find element underneath
     const backdrop = e.currentTarget;
     backdrop.style.pointerEvents = 'none';
-    const clickedElement = document.elementFromPoint(e.clientX, e.clientY);
+    const clickedEl = document.elementFromPoint(e.clientX, e.clientY);
     backdrop.style.pointerEvents = '';
     
     // Find the file row element
-    const rowEl = clickedElement?.closest('[data-row-id]');
+    const rowEl = clickedEl?.closest('[data-row-id]');
     
     if (rowEl) {
       const clickedRowId = rowEl.getAttribute('data-row-id');
@@ -359,7 +359,7 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
   };
 
   // Custom body component for file icons and styling
-  const getBodyComponent = (colId, rowId) => {
+  const compBodyByColId = (colId, rowId) => {
     const row = rows.find(r => r.id === rowId);
     if (!row) return null;
 
@@ -450,13 +450,20 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
     return null;
   };
 
-  // Handle data change requests from FolderView (column reorder, resize, etc.)
-  const handleDataChangeRequest = (type, params) => {
-    if (type === 'reorder' && params.columnId) {
-      // Column reorder - update the order
-      explorerState.columnsOrder.replace(params.newOrder);
+  const handleFolderEvent = async (eventType, eventData) => {
+    if (eventType === 'colReorder') {
+      explorerState.columnsOrder.replace(eventData.colsOrderNext);
+      return { code: 0 };
     }
-    // Note: We don't persist column widths - they're managed internally by FolderView
+    if (eventType === 'rowClick') {
+      handleRowClick(eventData.rowId);
+      return { code: 0 };
+    }
+    if (eventType === 'rowContextMenu') {
+      handleRowRightClick(eventData.event, eventData.rowId);
+      return { code: 0 };
+    }
+    return { code: 0 };
   };
 
   // Pagination handlers
@@ -549,21 +556,30 @@ const FileExplorerLocalInternal = observer(({ fileAccessPoint }) => {
 
       {/* File Table */}
       <FolderView
-        columns={columns}
-        columnsOrder={explorerState.columnsOrder}
-        columnsSizeInit={explorerState.columnsSize}
-        rows={rows}
-        getBodyComponent={getBodyComponent}
-        onRowClick={handleRowClick}
-        onRowContextMenu={handleRowRightClick}
-        selectedRowId={explorerState.fileSelectedId}
-        allowColumnReorder={true}
-        onDataChangeRequest={handleDataChangeRequest}
-        showStatusBar={true}
-        loading={explorerState.loading}
-        loadingMessage="Loading files..."
-        error={explorerState.error}
-        bodyHeight={Math.min(rows.length * 32 + 40, 500)}
+        data={{
+          columns,
+          colsOrder: explorerState.columnsOrder,
+          rows,
+          rowIdsSelected: explorerState.fileSelectedId ? [explorerState.fileSelectedId] : [],
+          statusBar: {
+            itemCount: rows.length,
+            messageState: explorerState.loading
+              ? { status: 'loading', messageText: 'Loading files...' }
+              : explorerState.error
+                ? { status: 'error', messageText: explorerState.error.message }
+                : null,
+          },
+        }}
+        config={{
+          colSizeById: explorerState.columnsSize,
+          compBodyByColId,
+          isColReorderAllowed: true,
+          isStatusBarVisible: true,
+          bodyHeight: Math.min(rows.length * 32 + 40, 500),
+          isLocked: explorerState.loading,
+          isContextMenuBuiltInDisabled: true,
+        }}
+        onEvent={handleFolderEvent}
       />
 
       {explorerState.menuRowId && (() => {

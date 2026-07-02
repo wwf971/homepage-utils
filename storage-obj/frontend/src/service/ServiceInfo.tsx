@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react-lite'
-import { DbConnectionCard, KeyValues, RefreshIcon, SpinningCircle } from '@wwf971/react-comp-misc'
+import { EndpointCard, KeyValues, RefreshIcon, SpinningCircle } from '@wwf971/react-comp-misc'
 import { useState } from 'react'
 import { appStore } from '../store/appStore'
 import DbCheck from './DbCheck'
@@ -61,43 +61,53 @@ const ServiceInfo = observer(function ServiceInfo({
               messageText: '',
             }
             return (
-              <DbConnectionCard
+              <EndpointCard
                 key={item.key}
-                titleText={item.label}
-                statusTagText={isCurrent ? 'current' : ''}
-                statusMessage={cardMessage.status !== 'idle' ? cardMessage : null}
-                keyValuesData={[
-                  { key: 'key', value: item.key },
-                  { key: 'host', value: item.host },
-                  { key: 'port', value: String(item.port) },
-                  { key: 'database', value: item.databaseName },
-                  { key: 'user', value: item.username },
-                ]}
-                actionItems={[
-                  {
-                    id: 'test',
-                    labelText: isTesting ? 'Testing' : 'Test',
-                    isVisible: true,
-                    isDisabled: isTesting || appStore.isDatabaseSwitching || appStore.isDatabaseLoading || isPanelLocked,
-                  },
-                  {
-                    id: 'switch',
-                    labelText: appStore.isDatabaseSwitching && !isCurrent ? 'Switching' : 'Switch',
-                    isVisible: true,
-                    isDisabled: isCurrent || appStore.isDatabaseSwitching || appStore.isDatabaseLoading || isPanelLocked,
-                  },
-                ]}
-                isLocked={isPanelLocked || appStore.isDatabaseLoading || appStore.isDatabaseSwitching || isTesting}
-                onDismissStatusMessage={() => {
-                  setDatabaseTestMessageByKey((prev) => ({
-                    ...prev,
-                    [item.key]: {
-                      status: 'idle',
-                      messageText: '',
-                    },
-                  }))
+                data={{
+                  id: item.key,
+                  titleText: item.label,
+                  statusTagText: isCurrent ? 'current' : '',
+                  statusMessage: cardMessage.status !== 'idle' ? cardMessage : null,
+                  keyValues: [
+                    { key: 'key', value: item.key },
+                    { key: 'host', value: item.host },
+                    { key: 'port', value: String(item.port) },
+                    { key: 'database', value: item.databaseName },
+                    { key: 'user', value: item.username },
+                  ],
                 }}
-                onAction={async (actionId) => {
+                config={{
+                  isLocked: isPanelLocked || appStore.isDatabaseLoading || appStore.isDatabaseSwitching || isTesting,
+                  actionItems: [
+                    {
+                      id: 'test',
+                      labelText: isTesting ? 'Testing' : 'Test',
+                      isVisible: true,
+                      isDisabled: isTesting || appStore.isDatabaseSwitching || appStore.isDatabaseLoading || isPanelLocked,
+                    },
+                    {
+                      id: 'switch',
+                      labelText: appStore.isDatabaseSwitching && !isCurrent ? 'Switching' : 'Switch',
+                      isVisible: true,
+                      isDisabled: isCurrent || appStore.isDatabaseSwitching || appStore.isDatabaseLoading || isPanelLocked,
+                    },
+                  ],
+                }}
+                onEvent={async (eventType, eventData) => {
+                  if (eventType === 'dismissStatusMessage') {
+                    setDatabaseTestMessageByKey((prev) => ({
+                      ...prev,
+                      [item.key]: {
+                        status: 'idle',
+                        messageText: '',
+                      },
+                    }))
+                    return
+                  }
+                  if (eventType !== 'action') {
+                    return
+                  }
+                  const actionId = `${eventData?.actionId ?? ''}`
                   if (actionId === 'test') {
                     setIsDatabaseTestingByKey((prev) => ({
                       ...prev,

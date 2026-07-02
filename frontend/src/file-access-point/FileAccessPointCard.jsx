@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useAtomValue } from 'jotai';
 import { observer } from 'mobx-react-lite';
-import { KeyValuesComp, JsonCompMobx, TabsOnTop, RefreshIcon, DeleteIcon, EditableValueComp, SelectableValueComp, PanelPopup } from '@wwf971/react-comp-misc';
+import { KeyValuesComp, JsonCompMobx, createJsonOnEventAdapter, TabsOnTop, RefreshIcon, DeleteIcon, EditableValueComp, SelectableValueComp, PanelPopup } from '@wwf971/react-comp-misc';
 import FileExplorerLocalInternal from './FileExplorerLocalInternal';
 import FileExplorerLocalExternal from './FileExplorerLocalExternal';
 import FetchFile from './FetchFile';
@@ -59,6 +59,7 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
     collection,
     observableDoc || {}
   );
+  const handleJsonOnEvent = useMemo(() => createJsonOnEventAdapter(handleChange), [handleChange]);
   
   // Format setting type description
   const getTypeDescription = (type) => {
@@ -623,12 +624,14 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
               </div>
             </div>
             <div className="doc-editor-content">
-              <JsonCompMobx 
-                data={observableDoc} 
-                isEditable={true}
-                isKeyEditable={true}
-                isValueEditable={true}
-                onChange={handleChange}
+              <JsonCompMobx
+                data={observableDoc}
+                config={{
+                  isEditable: true,
+                  isKeyEditable: true,
+                  isValueEditable: true,
+                }}
+                onEvent={handleJsonOnEvent}
               />
             </div>
           </div>

@@ -18,7 +18,7 @@ storage-obj/
     docker.md
     guidance_db_update.md
     id.md
-    object_version.md
+    obj_version.md
     route.md
     space.md
 

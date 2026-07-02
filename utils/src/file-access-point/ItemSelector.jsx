@@ -263,10 +263,16 @@ const ItemSelector = observer(forwardRef(({
     }
   };
   
-  const handleDataChangeRequest = (type, params) => {
-    if (type === 'reorder' && params.columnId) {
-      store.columnsOrder = params.newOrder;
+  const handleFolderEvent = async (eventType, eventData) => {
+    if (eventType === 'colReorder') {
+      store.columnsOrder = eventData.colsOrderNext;
+      return { code: 0 };
     }
+    if (eventType === 'rowInteraction') {
+      store.handleRowInteraction(eventData);
+      return { code: 0 };
+    }
+    return { code: 0 };
   };
   
   // Custom component for name column (with folder icon)
@@ -287,8 +293,8 @@ const ItemSelector = observer(forwardRef(({
     );
   });
   
-  const getBodyComponent = (columnId, rowId) => {
-    if (columnId === 'name') {
+  const compBodyByColId = (colId) => {
+    if (colId === 'name') {
       return NameCellComponent;
     }
     return undefined;
@@ -376,23 +382,31 @@ const ItemSelector = observer(forwardRef(({
       
       {/* File/folder list */}
       <FolderView
-        columns={columns}
-        columnsOrder={store.columnsOrder}
-        columnsSizeInit={store.columnsSize}
-        rows={store.rows}
-        dataStore={store}
-        getRowData={(rowId, colId) => store.getRowData(rowId, colId)}
-        getBodyComponent={getBodyComponent}
-        selectedRowIds={store.selectedRowIds}
-        selectionMode={selectionConfig.mode}
-        onRowInteraction={(event) => store.handleRowInteraction(event)}
-        allowColumnReorder={true}
-        onDataChangeRequest={handleDataChangeRequest}
-        showStatusBar={true}
-        loading={store.loading}
-        loadingMessage="Loading items..."
-        error={store.error}
-        bodyHeight={height}
+        data={{
+          columns,
+          colsOrder: store.columnsOrder,
+          rows: store.rows,
+          rowIdsSelected: store.selectedRowIds,
+          getRowData: (rowId, colId) => store.getRowData(rowId, colId),
+          statusBar: {
+            itemCount: store.rows.length,
+            messageState: store.loading
+              ? { status: 'loading', messageText: 'Loading items...' }
+              : store.error
+                ? { status: 'error', messageText: store.error.message }
+                : null,
+          },
+        }}
+        config={{
+          colSizeById: store.columnsSize,
+          bodyHeight: height,
+          isColReorderAllowed: true,
+          isRowDataObservable: true,
+          compBodyByColId,
+          selectionMode: selectionConfig.mode,
+          isLocked: store.loading,
+        }}
+        onEvent={handleFolderEvent}
       />
       
       {/* Selection info */}

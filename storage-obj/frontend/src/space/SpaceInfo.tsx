@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { KeyValues } from '@wwf971/react-comp-misc'
+import { KeyValues, MetadataKeyValues } from '@wwf971/react-comp-misc'
 import * as ReactCompMisc from '@wwf971/react-comp-misc'
-import KeyValuesComp from '@wwf971/react-comp-misc/KeyValuesComp'
-import { EditableValueComp } from '@wwf971/react-comp-misc'
 import { appStore } from '../store/appStore'
 import './space.css'
 
@@ -65,11 +63,6 @@ const SpaceInfo = observer(function SpaceInfo({
     keyCompName: 'editable',
     valueCompName: 'editable',
   }))
-  const selectedRowIndex = selectedMetadataTag
-    ? metadataRows.findIndex((item) => item.id === selectedMetadataTag)
-    : -1
-  const isMoveUpDisabled = selectedRowIndex <= 0
-  const isMoveDownDisabled = selectedRowIndex < 0 || selectedRowIndex >= metadataRows.length - 1
   const handleMetadataSelectionChange = (nextSelectedMetadataTag: string | null) => {
     if (nextSelectedMetadataTag === null) {
       return
@@ -100,70 +93,6 @@ const SpaceInfo = observer(function SpaceInfo({
     if (result?.isSuccess) {
       setSelectedMetadataTag(null)
     }
-  }
-
-  const EditableMetadataComp = ({ data, field, index }: any) => {
-    const metadataRow = metadataRows[index]
-    const metadataRowId = String(metadataRow?.id || '')
-    return (
-      <EditableValueComp
-        data={String(data || '')}
-        configKey={`${field}_${metadataRowId || index}`}
-        valueType="text"
-        isNotSet={false}
-        index={index}
-        field={field}
-        onUpdate={async (_key, val) => {
-          if (!hasSelectedSpace) {
-            return { code: -1, message: 'invalid row' }
-          }
-          const row = metadataRows.find((item) => item.id === metadataRowId) || metadataRows[index]
-          if (!row) {
-            return { code: -1, message: 'row missing' }
-          }
-          const nextValue = String(val || '')
-          if (field === 'value') {
-            const result = await appStore.requestUpsertSpaceMetadata(spaceId, {
-              tag: row.key,
-              rank: row.rank,
-              valueText: nextValue,
-            })
-            setActionMessage({
-              status: result?.isSuccess ? 'success' : 'error',
-              messageText: result?.messageText || '',
-            })
-            return result?.isSuccess ? { code: 0, message: 'ok' } : { code: -1, message: result?.messageText || 'error' }
-          }
-          if (field === 'key') {
-            const nextTag = nextValue.trim()
-            if (!nextTag || nextTag === row.key) {
-              return { code: 0, message: 'noop' }
-            }
-            const renameResult = await appStore.requestRenameSpaceMetadata(
-              spaceId,
-              row.key,
-              nextTag,
-              row.rank,
-              row.value,
-            )
-            if (!renameResult?.isSuccess) {
-              setActionMessage({
-                status: 'error',
-                messageText: renameResult?.messageText || 'error',
-              })
-              return { code: -1, message: renameResult?.messageText || 'error' }
-            }
-            setSelectedMetadataTag(nextTag)
-            setActionMessage({
-              status: 'success',
-              messageText: renameResult?.messageText || `metadata renamed: ${row.key} to ${nextTag}`,
-            })
-            return { code: 0, message: 'ok' }
-          }
-          return { code: 0, message: 'noop' }
-        }}
-      />
-    )
   }
 
   return (
@@ -261,37 +190,78 @@ const SpaceInfo = observer(function SpaceInfo({
           isEditable={false}
         />
       </div>
-      <div className="frontend-title">Metadata</div>
-      {actionMessage.messageText ? (
-        <div className={`frontend-message-bar status-${actionMessage.status}`}>
-          <div className="frontend-message-content">
-            <span>{actionMessage.messageText}</span>
-            <button
-              type="button"
-              className="frontend-message-dismiss-btn"
-              onClick={() => {
-                setActionMessage({
-                  status: 'idle',
-                  messageText: '',
-                })
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      ) : null}
-      <div
-        className="frontend-actions space-metadata-actions"
-        onMouseDown={(event) => {
-          event.stopPropagation()
+      <MetadataKeyValues
+        data={{
+          titleText: 'Metadata',
+          rows: metadataRows,
+          selectedRowId: selectedMetadataTag,
+          messageState: actionMessage,
         }}
-      >
-        <button
-          className="frontend-btn"
-          type="button"
-          disabled={isLocked || !hasSelectedSpace}
-          onClick={async () => {
+        config={{
+          isLocked: isLocked || !hasSelectedSpace,
+          isEditable: hasSelectedSpace,
+          keyColWidth: '180px',
+        }}
+        onEvent={async (eventType, eventData) => {
+          if (eventType === 'selectedRowIdChange') {
+            handleMetadataSelectionChange(eventData.selectedRowId)
+            return
+          }
+          if (eventType === 'messageDismiss') {
+            setActionMessage({
+              status: 'idle',
+              messageText: '',
+            })
+            return
+          }
+          if (eventType === 'messageStateChange') {
+            setActionMessage(eventData.messageState)
+            return
+          }
+          if (eventType === 'cellUpdate') {
+            const { rowId, field, nextValue } = eventData
+            if (!hasSelectedSpace) {
+              return { code: -1, message: 'invalid row' }
+            }
+            const row = metadataRows.find((item) => item.id === rowId)
+            if (!row) {
+              return { code: -1, message: 'row missing' }
+            }
+            if (field === 'value') {
+              const result = await appStore.requestUpsertSpaceMetadata(spaceId, {
+                tag: row.key,
+                rank: row.rank,
+                valueText: nextValue,
+              })
+              setActionMessage({
+                status: result?.isSuccess ? 'success' : 'error',
+                messageText: result?.messageText || '',
+              })
+              return result?.isSuccess ? { code: 0 } : { code: -1, message: result?.messageText || 'error' }
+            }
+            if (field === 'key') {
+              const nextTag = nextValue.trim()
+              if (!nextTag || nextTag === row.key) {
+                return { code: 0 }
+              }
+              const renameResult = await appStore.requestRenameSpaceMetadata(spaceId, row.key, nextTag, row.rank, row.value)
+              if (!renameResult?.isSuccess) {
+                setActionMessage({
+                  status: 'error',
+                  messageText: renameResult?.messageText || 'error',
+                })
+                return { code: -1, message: renameResult?.messageText || 'error' }
+              }
+              setSelectedMetadataTag(nextTag)
+              setActionMessage({
+                status: 'success',
+                messageText: renameResult?.messageText || `metadata renamed: ${row.key} to ${nextTag}`,
+              })
+              return { code: 0 }
+            }
+            return { code: 0 }
+          }
+          if (eventType === 'addAtEnd') {
             const result = await appStore.requestInsertSpaceMetadata(spaceId, 'tail')
             setActionMessage({
               status: result?.isSuccess ? 'success' : 'error',
@@ -300,15 +270,9 @@ const SpaceInfo = observer(function SpaceInfo({
             if (result?.tag) {
               setSelectedMetadataTag(result.tag)
             }
-          }}
-        >
-          <span>Add at End</span>
-        </button>
-        <button
-          className="frontend-btn"
-          type="button"
-          disabled={isLocked || !hasSelectedSpace || !selectedMetadataTag}
-          onClick={async () => {
+            return
+          }
+          if (eventType === 'addAbove') {
             const result = await appStore.requestInsertSpaceMetadata(spaceId, 'above', selectedMetadataTag || '')
             setActionMessage({
               status: result?.isSuccess ? 'success' : 'error',
@@ -317,15 +281,9 @@ const SpaceInfo = observer(function SpaceInfo({
             if (result?.tag) {
               setSelectedMetadataTag(result.tag)
             }
-          }}
-        >
-          <span>Add Above</span>
-        </button>
-        <button
-          className="frontend-btn"
-          type="button"
-          disabled={isLocked || !hasSelectedSpace || !selectedMetadataTag}
-          onClick={async () => {
+            return
+          }
+          if (eventType === 'addBelow') {
             const result = await appStore.requestInsertSpaceMetadata(spaceId, 'below', selectedMetadataTag || '')
             setActionMessage({
               status: result?.isSuccess ? 'success' : 'error',
@@ -334,51 +292,21 @@ const SpaceInfo = observer(function SpaceInfo({
             if (result?.tag) {
               setSelectedMetadataTag(result.tag)
             }
-          }}
-        >
-          <span>Add Below</span>
-        </button>
-        <button
-          className="frontend-btn"
-          type="button"
-          disabled={isLocked || !hasSelectedSpace || isMoveUpDisabled}
-          onClick={() => handleMoveSelected('up')}
-        >
-          <span>Up</span>
-        </button>
-        <button
-          className="frontend-btn"
-          type="button"
-          disabled={isLocked || !hasSelectedSpace || isMoveDownDisabled}
-          onClick={() => handleMoveSelected('down')}
-        >
-          <span>Down</span>
-        </button>
-        <button
-          className="frontend-btn is-danger"
-          type="button"
-          disabled={isLocked || !hasSelectedSpace || !selectedMetadataTag}
-          onClick={handleDeleteSelectedRow}
-        >
-          <span>Delete</span>
-        </button>
-      </div>
-      <div className="space-metadata-list">
-        <KeyValuesComp
-          data={metadataRows}
-          isEditable={!isLocked && hasSelectedSpace}
-          isKeyEditable={!isLocked && hasSelectedSpace}
-          isValueEditable={!isLocked && hasSelectedSpace}
-          keyColWidth="180px"
-          selectionMode="single"
-          selectedRowId={selectedMetadataTag}
-          onSelectionChange={handleMetadataSelectionChange}
-          getComp={(name) => {
-            if (name === 'editable') return EditableMetadataComp
-            return null
-          }}
-        />
-      </div>
+            return
+          }
+          if (eventType === 'moveUp') {
+            await handleMoveSelected('up')
+            return
+          }
+          if (eventType === 'moveDown') {
+            await handleMoveSelected('down')
+            return
+          }
+          if (eventType === 'delete') {
+            await handleDeleteSelectedRow()
+          }
+        }}
+      />
     </div>
   )
 })

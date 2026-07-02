@@ -16,25 +16,25 @@ import { Menu } from '@wwf971/react-comp-misc';
 const FileMenu = ({ file, position, onClose, onDownload, onShow, onOpenInNewTab, onRename, onContextMenu }) => {
   const menuItems = [
     {
-      type: 'item',
-      name: 'Download',
-      data: { action: 'download', file }
+      id: 'download',
+      label: 'Download',
+      data: { action: 'download', file },
     },
     {
-      type: 'item',
-      name: 'Show',
-      data: { action: 'show', file }
+      id: 'show',
+      label: 'Show',
+      data: { action: 'show', file },
     },
     {
-      type: 'item',
-      name: 'Open in New Tab',
-      data: { action: 'openInNewTab', file }
+      id: 'open-in-new-tab',
+      label: 'Open in New Tab',
+      data: { action: 'openInNewTab', file },
     },
     {
-      type: 'item',
-      name: 'Rename',
-      data: { action: 'rename', file }
-    }
+      id: 'rename',
+      label: 'Rename',
+      data: { action: 'rename', file },
+    },
   ];
 
   const handleItemClick = (item) => {
@@ -62,11 +62,24 @@ const FileMenu = ({ file, position, onClose, onDownload, onShow, onOpenInNewTab,
 
   return (
     <Menu
-      items={menuItems}
-      position={position}
-      onClose={onClose}
-      onItemClick={handleItemClick}
-      onContextMenu={onContextMenu}
+      data={{ items: menuItems }}
+      config={{
+        isOpen: true,
+        posOpen: position,
+      }}
+      onEvent={(eventType, eventData) => {
+        if (eventType === 'closeRequest') {
+          onClose();
+          return;
+        }
+        if (eventType === 'itemClick') {
+          handleItemClick(eventData.item);
+          return;
+        }
+        if (eventType === 'backdropContextMenu' && onContextMenu) {
+          onContextMenu(eventData.event);
+        }
+      }}
     />
   );
 };

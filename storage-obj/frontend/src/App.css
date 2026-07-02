@@ -1,16 +1,23 @@
 .frontend-root {
-  min-height: 100vh;
+  height: 100vh;
   padding: 6px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .frontend-layout {
-  display: flex;
-  gap: 6px;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
-  min-height: calc(100vh - 12px);
+}
+
+.frontend-layout .panel-dual {
+  height: 100%;
+  border-color: #d0d8e8;
+  border-radius: 4px;
 }
 
 .frontend-global-warning-wrap {
@@ -33,14 +40,12 @@
 }
 
 .frontend-sidebar {
-  width: 260px;
-  min-width: 220px;
-  border: 1px solid #d0d8e8;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
   background: #ffffff;
   padding: 4px;
   box-sizing: border-box;
-  overflow: auto;
+  overflow-x: hidden;
 }
 
 /* Tree visual overrides inside sidebar */
@@ -48,6 +53,7 @@
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow-x: hidden;
 }
 
 .frontend-sidebar .tree-view-row.selected {
@@ -77,20 +83,17 @@
 }
 
 .frontend-main {
-  flex: 1;
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-  overflow: auto;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  box-sizing: border-box;
 }
 
 .frontend-main-panel {
   width: 100%;
   min-width: 420px;
   max-width: 100%;
-  border: 1px solid #d0d8e8;
-  border-radius: 4px;
-  background: #ffffff;
+  min-height: 100%;
   padding: 8px;
   display: flex;
   flex-direction: column;

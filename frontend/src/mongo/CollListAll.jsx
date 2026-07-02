@@ -79,11 +79,11 @@ const CollListAll = () => {
     // Temporarily hide backdrop to find element underneath
     const backdrop = e.currentTarget;
     backdrop.style.pointerEvents = 'none';
-    const clickedElement = document.elementFromPoint(e.clientX, e.clientY);
+    const clickedEl = document.elementFromPoint(e.clientX, e.clientY);
     backdrop.style.pointerEvents = '';
     
     // Check if we clicked on a collection tag
-    const collectionTag = clickedElement?.closest('.mongo-tag-clickable');
+    const collectionTag = clickedEl?.closest('.mongo-tag-clickable');
     
     if (collectionTag) {
       // Find the collection name from the tag
@@ -109,10 +109,10 @@ const CollListAll = () => {
   };
 
   const handleMenuItemClick = (item) => {
-    if (item.name === 'Delete' && contextMenu) {
+    if (item.id === 'delete' && contextMenu) {
       setCollectionToDelete(contextMenu.collectionName);
       setShowDeleteConfirm(true);
-    } else if (item.name === 'Index Info' && contextMenu) {
+    } else if (item.id === 'index-info' && contextMenu) {
       setCollectionForIndexInfo(contextMenu.collectionName);
       setShowIndexInfo(true);
     }
@@ -250,14 +250,29 @@ const CollListAll = () => {
 
       {contextMenu && (
         <Menu
-          items={[
-            { type: 'item', name: 'Index Info' },
-            { type: 'item', name: 'Delete' }
-          ]}
-          position={contextMenu.position}
-          onClose={() => setContextMenu(null)}
-          onItemClick={handleMenuItemClick}
-          onContextMenu={handleBackdropContextMenu}
+          data={{
+            items: [
+              { id: 'index-info', label: 'Index Info' },
+              { id: 'delete', label: 'Delete' },
+            ],
+          }}
+          config={{
+            isOpen: true,
+            posOpen: contextMenu.position,
+          }}
+          onEvent={(eventType, eventData) => {
+            if (eventType === 'closeRequest') {
+              setContextMenu(null);
+              return;
+            }
+            if (eventType === 'itemClick') {
+              handleMenuItemClick(eventData.item);
+              return;
+            }
+            if (eventType === 'backdropContextMenu') {
+              handleBackdropContextMenu(eventData.event);
+            }
+          }}
         />
       )}
 

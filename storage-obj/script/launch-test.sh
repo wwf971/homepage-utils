@@ -161,6 +161,7 @@ fi
 echo "launch-test root: $ROOT_DIR"
 echo "DIR_BASE     : $DIR_BASE"
 [[ -n "$TEST_CONDA_ENV" ]] && echo "TEST_CONDA_ENV: $TEST_CONDA_ENV"
+echo "backend port : $BACKEND_PORT"
 [[ -n "$backend_cmd" ]] && echo "backend cmd : $backend_cmd"
 
 if [[ "$is_dry_run" == true ]]; then
@@ -172,6 +173,25 @@ fi
 
 pids=()
 
+print_launch_failure_guidance() {
+  echo ""
+  echo "launch-test failed. quick checks:"
+  echo "  1) confirm conda env and python package install"
+  if [[ -n "$TEST_CONDA_ENV" ]]; then
+    echo "     conda run -n \"$TEST_CONDA_ENV\" python -c \"import flask, psycopg\""
+    echo "     conda run -n \"$TEST_CONDA_ENV\" pip install -r \"$BACKEND_DIR/requirements.txt\""
+  else
+    echo "     python3 -c \"import flask, psycopg\""
+    echo "     python3 -m pip install -r \"$BACKEND_DIR/requirements.txt\""
+  fi
+  echo "  2) confirm database is reachable"
+  echo "     DB_HOST=${DB_HOST:-127.0.0.1} DB_PORT=${DB_PORT:-5432} DB_NAME=${DB_NAME:-postgres}"
+  echo "  3) if port is still occupied, free it manually"
+  echo "     lsof -tiTCP:${BACKEND_PORT} -sTCP:LISTEN | xargs kill"
+  echo "  4) retry backend directly with the same launcher command"
+  echo "     $backend_cmd"
+}
+
 cleanup() {
   local exit_code=$?
   if [[ ${#pids[@]} -gt 0 ]]; then
@@ -180,6 +200,9 @@ cleanup() {
       kill "$pid" >/dev/null 2>&1 || true
     done
     wait >/dev/null 2>&1 || true
+  fi
+  if [[ "$exit_code" -ne 0 && "$is_dry_run" != true ]]; then
+    print_launch_failure_guidance
   fi
   exit "$exit_code"
 }
@@ -194,6 +217,8 @@ free_port_if_needed "$BACKEND_PORT" false
 if [[ -n "$backend_cmd" ]]; then
   bash -lc "$backend_cmd" &
   pids+=("$!")
+  echo "console url  : http://127.0.0.1:${BACKEND_PORT}/service/metadata"
+  echo "health url   : http://127.0.0.1:${BACKEND_PORT}/api/health/ping"
 fi
 
 wait

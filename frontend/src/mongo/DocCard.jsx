@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useAtomValue } from 'jotai';
-import { JsonCompMobx, extractDocId, PanelPopup } from '@wwf971/react-comp-misc';
+import { JsonCompMobx, createJsonOnEventAdapter, extractDocId, PanelPopup } from '@wwf971/react-comp-misc';
 import { useMongoDocEditorMobx } from './mongoEditMobx';
 import { mongoDbSelectedAtom, mongoCollSelectedAtom } from '../remote/dataStore';
 import mongoDocStore from './mongoDocStore';
@@ -35,6 +35,7 @@ const DocCard = observer(({ doc, index, onDelete }) => {
     selectedCollection,
     latestDoc
   );
+  const handleJsonOnEvent = useMemo(() => createJsonOnEventAdapter(handleChange), [handleChange]);
 
   const handleDeleteClick = () => {
     setShowConfirm(true);
@@ -184,12 +185,14 @@ const DocCard = observer(({ doc, index, onDelete }) => {
               </div>
             </div>
             <div className="mongo-doc-editor-content">
-              <JsonCompMobx 
-                data={doc} 
-                isEditable={true}
-                isKeyEditable={true}
-                isValueEditable={true}
-                onChange={handleChange}
+              <JsonCompMobx
+                data={doc}
+                config={{
+                  isEditable: true,
+                  isKeyEditable: true,
+                  isValueEditable: true,
+                }}
+                onEvent={handleJsonOnEvent}
               />
             </div>
           </div>

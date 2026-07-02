@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { PanelDual } from '@wwf971/react-comp-misc'
 import './App.css'
 import { appStore, PAGE_KEY } from './store/appStore'
 import ResourceTree from './ResourceTree'
@@ -142,23 +143,25 @@ const App = observer(() => {
         </div>
       ) : null}
       <div className="frontend-layout">
-        <aside className="frontend-sidebar">
-          <ResourceTree onNavigateToPage={navigateToPage} />
-        </aside>
-        <section className={`frontend-main ${isPanelLocked ? 'is-locked' : ''}`}>
-          <div className="frontend-main-panel">
-            <ResourcePanel
-              pingMessage={pingMessage}
-              isPanelLocked={isPanelLocked}
-              onClickCreateSpace={handleClickCreateSpace}
-              onClickPing={handleClickPing}
-              onClickRefreshDatabases={handleClickRefreshDatabases}
-              onClickSwitchDatabase={handleClickSwitchDatabase}
-              onClickDeleteSpace={handleClickDeleteSpace}
-              onClickClearSpace={handleClickClearSpace}
-            />
+        <PanelDual orientation="vertical" initialWidth={260}>
+          <div className="frontend-sidebar">
+            <ResourceTree onNavigateToPage={navigateToPage} />
           </div>
-        </section>
+          <div className={`frontend-main ${isPanelLocked ? 'is-locked' : ''}`}>
+            <div className="frontend-main-panel">
+              <ResourcePanel
+                pingMessage={pingMessage}
+                isPanelLocked={isPanelLocked}
+                onClickCreateSpace={handleClickCreateSpace}
+                onClickPing={handleClickPing}
+                onClickRefreshDatabases={handleClickRefreshDatabases}
+                onClickSwitchDatabase={handleClickSwitchDatabase}
+                onClickDeleteSpace={handleClickDeleteSpace}
+                onClickClearSpace={handleClickClearSpace}
+              />
+            </div>
+          </div>
+        </PanelDual>
       </div>
     </div>
   )

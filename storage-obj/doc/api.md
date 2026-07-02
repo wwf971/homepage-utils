@@ -15,7 +15,7 @@ All backend endpoints return JSON in this shape:
 Rules:
 - `code = 0` means success.
 - `code < 0` means failure.
-- `data` is optional. Include it only when useful. 
+- `data` is optional. Include it only when useful.
 - `message` is optional. Include it only when useful.
 
 ## Transaction and Rollback Rule
@@ -29,34 +29,106 @@ For database write logic, backend should use this flow:
 
 For read endpoints, keep the same error contract (`code/data/message`) and keep responses concise.
 
+## Route Prefix
+
+Each endpoint below is registered at both `/api/...` and `/...` (same handler, without the `/api` prefix).
+
 ## API Endpoints
 
 IDs should be passed through query params (`GET`) or request body (`POST`), not URL path variables.
 
+### Health
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/objectStorage/health/test` | test PostgreSQL connection |
-| GET | `/objectStorage/space/list` | list all spaces |
-| POST | `/objectStorage/space/create` | create new space and initialize per-space tables |
-| POST | `/objectStorage/space/delete` | delete or disable a space |
-| POST | `/objectStorage/space/metadata/set` | set one space metadata entry |
-| GET | `/objectStorage/space/metadata/get` | get one space metadata entry |
-| GET | `/objectStorage/space/metadata/list` | list space metadata entries |
-| POST | `/objectStorage/metadata/set` | set one global metadata entry |
-| GET | `/objectStorage/metadata/get` | get one global metadata entry |
-| GET | `/objectStorage/metadata/list` | list global metadata entries |
-| POST | `/objectStorage/object/create` | create object first version (history + current + status) |
-| GET | `/objectStorage/object/get` | get current object payload |
-| GET | `/objectStorage/object/status/get` | get object status (`versionIdHead`, `isDeleted`) |
-| POST | `/objectStorage/object/update` | append new version and move HEAD |
-| POST | `/objectStorage/object/delete` | set deleted state and remove current row |
-| POST | `/objectStorage/object/restore` | restore object from HEAD |
-| GET | `/objectStorage/object/version/list` | list history versions |
-| GET | `/objectStorage/object/version/get` | get one history version |
-| POST | `/objectStorage/object/version/checkout` | checkout target history version |
-| POST | `/objectStorage/object/version/rollback` | compatibility alias of checkout |
-| POST | `/objectStorage/object/version/data/delete` | release history payload data only |
-| GET | `/objectStorage/object/list` | list objects by filters and paging |
+| GET | `/api/health/ping` | lightweight liveness check |
+| GET | `/api/health/test` | test PostgreSQL connection |
+
+### Space
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/space/list` | list all spaces |
+| GET | `/api/space/find-by-name` | find one space by `name` query param |
+| POST | `/api/space/create` | create new space and initialize per-space tables |
+| POST | `/api/space/delete` | delete a space and drop its tables |
+| POST | `/api/space/clear` | clear objects and metadata inside one space |
+
+### Space Metadata
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/space/metadata/list` | list metadata entries in one space |
+| POST | `/api/space/metadata/upsert` | insert or update one metadata entry by `tag` |
+| POST | `/api/space/metadata/ensure` | create one metadata entry if missing |
+| POST | `/api/space/metadata/insert` | insert one metadata entry at a rank position |
+| POST | `/api/space/metadata/delete` | delete one metadata entry by `tag` |
+| POST | `/api/space/metadata/move` | move one metadata entry to another rank |
+
+### Global Metadata
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/metadata/list` | list global metadata entries |
+| POST | `/api/metadata/upsert` | insert or update one global metadata entry by `tag` |
+
+Global metadata is stored in the `metadata` table.
+
+### Object
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/object/list` | list objects by filters and paging |
+| GET | `/api/object/get` | get object payload |
+| POST | `/api/object/create` | create object first version (current + history) |
+| POST | `/api/object/update` | update object and append or edit history |
+| POST | `/api/object/delete` | set `isDeleted=true` on current row |
+| POST | `/api/object/restore` | restore deleted object from HEAD |
+
+### Object Metadata
+
+Object metadata uses the same tag/value model as space metadata and global metadata.
+
+System-reserved tags (read from the object status row, not writable via metadata upsert):
+- `versionIdHead`
+- `isDeleted`
+- `type`
+- `editType`
+
+User-defined tags are stored in `space_{spaceId}_object_{dataType}_metadata`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/object/metadata/list` | list metadata entries for one object, including reserved system tags |
+| POST | `/api/object/metadata/upsert` | insert or update one user metadata entry by `tag` |
+| POST | `/api/object/metadata/ensure` | create one user metadata entry if missing |
+| POST | `/api/object/metadata/insert` | insert one user metadata entry at a rank position |
+| POST | `/api/object/metadata/delete` | delete one user metadata entry by `tag` |
+| POST | `/api/object/metadata/move` | move one user metadata entry to another rank |
+
+### Object Version
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/object/version/list` | list history versions of one object |
+| POST | `/api/object/version/checkout` | checkout target history version as current |
+| POST | `/api/object/version/rollback` | compatibility alias of checkout |
+| POST | `/api/object/version/delete-data` | release history data only (`isDataDeleted=true`) |
+
+There is no separate version-get endpoint. Use `GET /api/object/get` with optional `versionId` query param (S3-style).
+
+### Service Admin
+
+Used by the storage-obj frontend for database switching and schema checks.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/config/database/list` | list database presets |
+| POST | `/api/config/database/test` | test one database preset |
+| POST | `/api/config/database/switch` | switch active database |
+| POST | `/api/config/database/reinit` | run init SQL on active database |
+| POST | `/api/config/database/check` | check schema/table shape |
+| POST | `/api/echo` | echo request body for debugging |
 
 ## Request Notes
 
@@ -65,20 +137,52 @@ IDs should be passed through query params (`GET`) or request body (`POST`), not 
   - `spaceId`
   - `dataType` (`text` | `bytes` | `json`)
   - `objectId` (except create when server allocates)
-- `spaceId`, `objectId`, `versionId*` use `ms_48` (`bigint` in DB).
+- `spaceId`, `objectId`, and `versionId` use `ms_48` (`bigint` in DB).
 - Payload fields:
   - text: `valueText`
   - bytes: `valueBase64` (decoded to `bytea` in backend)
   - json: `valueJson`
-- `/object/create` accepts optional `editType` (`0`/`1`/`2`), default `0`.
-- `/object/update` accepts optional nullable `isUpdateVersion`.
+
+### `/api/object/get`
+
+Query params:
+- required: `spaceId`, `dataType`, `objectId`
+- optional: `versionId`
+
+Behavior:
+- without `versionId`: return current checked-out object from current table (`isDeleted=false`)
+- with `versionId`: return one history version from history table
+
+Response includes payload fields (`valueText` / `valueBase64` / `valueJson`), `type`, `editType`, and timestamps. When `versionId` is present, response should also include that `versionId`.
+
+### `/api/object/create`
+
+- accepts optional `editType` (`0`/`1`/`2`), default `0`.
+
+### `/api/object/update`
+
+- accepts optional nullable `isUpdateVersion`.
   - mode `0` (`UPDATE-ONLY`): `null` is treated as `true`; `false` is rejected.
   - mode `1` (`UPDATE-AND-EDIT`): `null` is treated as `false`.
   - mode `2` (`EDIT-ONLY`): `null` is treated as `false`; `true` is rejected.
-- Change comment fields:
+- accepts optional `isDeletePrevVersionData` (`true` only when `isUpdateVersion=true`).
+
+### Metadata write body
+
+Common fields for global/space/object metadata upsert/ensure/insert:
+- required scope fields:
+  - global: none
+  - space: `spaceId`
+  - object: `spaceId`, `dataType`, `objectId`
+- `tag`
+- optional rank/value fields: `rank`, `valueType`, `valueText`, `valueJson`, `valueBytes`, `valueInt`, `valueBoolean`
+
+### Other optional fields
+
+- change comment fields (reserved for future version APIs):
   - `commentText` (nullable)
   - `commentJson` (nullable)
-- Timezone fields where relevant:
+- timezone fields where relevant:
   - `createdAtTz`
   - `updatedAtTz`
   - format `±HH:MM`

@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useStore } from 'jotai';
 import { makeAutoObservable, isObservable, toJS } from 'mobx';
 import { observer } from 'mobx-react-lite';
-import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonCompMobx, TabsOnTop } from '@wwf971/react-comp-misc';
+import { KeyValuesComp, SearchableValueComp, SpinningCircle, EditIcon, PlusIcon, CrossIcon, JsonCompMobx, createJsonOnEventAdapter, TabsOnTop } from '@wwf971/react-comp-misc';
 import { EsDocListAll } from '@wwf971/homepage-utils-utils';
 import { formatTimestamp, getTimezoneInt } from '@wwf971/homepage-utils-utils/utils';
 import { getBackendServerUrl } from '../remote/dataStore';
@@ -108,16 +108,15 @@ const MongoIndexCard = observer(({ index, onUpdate, onDelete, onJsonEdit }) => {
   );
   
   // Wrap handleDocChange to notify parent of updates
-  const handleDocChangeWithNotify = async (path, changeData) => {
+  const handleDocChangeWithNotify = useCallback(async (path, changeData) => {
     const result = await handleDocChange(path, changeData);
-    
+
     if (result.code === 0 && onJsonEdit) {
-      // Fetch the updated document from backend to get the latest state
       try {
         const backendUrl = getBackendServerUrl();
         const response = await fetch(`${backendUrl}/mongo-index/${encodeURIComponent(index.name)}`);
         const fetchResult = await response.json();
-        
+
         if (fetchResult.code === 0) {
           onJsonEdit(fetchResult.data);
         }
@@ -125,9 +124,13 @@ const MongoIndexCard = observer(({ index, onUpdate, onDelete, onJsonEdit }) => {
         console.error('Failed to fetch updated index:', err);
       }
     }
-    
+
     return result;
-  };
+  }, [handleDocChange, index.name, onJsonEdit]);
+  const handleJsonOnEvent = useMemo(
+    () => createJsonOnEventAdapter(handleDocChangeWithNotify),
+    [handleDocChangeWithNotify]
+  );
   
   const handleEditCollectionsClick = () => {
     setEditedCollections([...index.collections]);
@@ -456,12 +459,14 @@ const MongoIndexCard = observer(({ index, onUpdate, onDelete, onJsonEdit }) => {
               </div>
             </div>
             <div className="doc-editor-content">
-              <JsonCompMobx 
-                data={observableIndex} 
-                isEditable={true}
-                isKeyEditable={true}
-                isValueEditable={true}
-                onChange={handleDocChangeWithNotify}
+              <JsonCompMobx
+                data={observableIndex}
+                config={{
+                  isEditable: true,
+                  isKeyEditable: true,
+                  isValueEditable: true,
+                }}
+                onEvent={handleJsonOnEvent}
               />
             </div>
           </div>

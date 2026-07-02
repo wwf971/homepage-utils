@@ -110,7 +110,7 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
   };
 
   const handleMenuItemClick = async (item) => {
-    if (item.name === 'Rebuild') {
+    if (item.id === 'rebuild') {
       const { database, collection } = contextMenu.collection;
       const collKey = `${database}/${collection}`;
       setIsRebuildingCollection(collKey);
@@ -378,12 +378,24 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
 
       {contextMenu && (
         <Menu
-          items={[
-            { type: 'item', name: 'Rebuild' }
-          ]}
-          position={contextMenu.position}
-          onClose={handleMenuClose}
-          onItemClick={handleMenuItemClick}
+          data={{
+            items: [
+              { id: 'rebuild', label: 'Rebuild' },
+            ],
+          }}
+          config={{
+            isOpen: true,
+            posOpen: contextMenu.position,
+          }}
+          onEvent={(eventType, eventData) => {
+            if (eventType === 'closeRequest') {
+              handleMenuClose();
+              return;
+            }
+            if (eventType === 'itemClick') {
+              handleMenuItemClick(eventData.item);
+            }
+          }}
         />
       )}
     </div>

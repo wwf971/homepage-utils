@@ -32,7 +32,7 @@ Short notes:
 ## Document Map
 
 - space concept, metadata semantics, lifecycle flow: `./doc/space.md`
-- object history tree and version operation semantics: `./doc/object_version.md`
+- object history tree and version operation semantics: `./doc/obj_version.md`
 - unified ID design and allocator contract: `./doc/id.md`
 - database schema model and constraints: `./doc/database.md`
 - endpoint model, request notes, response contract: `./doc/api.md`

@@ -84,11 +84,15 @@ const ObjectTable = observer(function ObjectTable({
       {isBodyLoadingOnly ? (
         <div className="object-table-loading-wrapper">
           <FolderHeaderComp
-            columns={columns}
-            columnsOrder={columnsOrder}
-            columnsSizeInit={columnsSize}
-            allowColumnReorder={false}
-            isLastColumnFilled={true}
+            data={{
+              columns,
+              colsOrder: columnsOrder,
+            }}
+            config={{
+              colSizeById: columnsSize,
+              isColReorderAllowed: false,
+              isLastColFilled: true,
+            }}
           />
           <div className="object-table-loading-body">
             <SpinningCircle width={18} height={18} />
@@ -97,29 +101,43 @@ const ObjectTable = observer(function ObjectTable({
         </div>
       ) : (
         <FolderViewComp
-          columns={columns}
-          columnsOrder={columnsOrder}
-          columnsSizeInit={columnsSize}
-          rows={rows}
-          selectionMode="multiple"
-          selectedRowIds={typeState.selectedObjectIdList}
-          onSelectedRowIdsChange={(nextRowIds) => objectStore.setSelectedObjectIdList(spaceId, dataType, nextRowIds)}
-          onRowDoubleClick={(rowId) => onOpenEdit(String(rowId || ''))}
-          bodyHeight={300}
-          showStatusBar={false}
-          listOnly={true}
-          loading={typeState.isListLoading}
-          loadingMessage="Loading"
-          showStatusItemCount={false}
-          isLastColumnFilled={true}
-          onDataChangeRequest={async () => ({ code: 0 })}
-          allowColumnReorder={false}
-          allowRowReorder={false}
-          onRowContextMenu={() => {}}
-          contextMenuItems={[]}
-          onRowInteraction={() => {}}
-          selectedRowId=""
-          isLocked={isLocked}
+          data={{
+            columns,
+            colsOrder: columnsOrder,
+            rows,
+            rowIdsSelected: typeState.selectedObjectIdList,
+            statusBar: {
+              itemCount: rows.length,
+              messageState: typeState.isListLoading
+                ? { status: 'loading', messageText: 'Loading' }
+                : typeState.errorText
+                  ? { status: 'error', messageText: typeState.errorText }
+                  : null,
+            },
+          }}
+          config={{
+            colSizeById: columnsSize,
+            bodyHeight: 300,
+            isListOnly: true,
+            isStatusBarVisible: false,
+            isStatusItemCountVisible: false,
+            isLastColFilled: true,
+            isColReorderAllowed: false,
+            isRowReorderAllowed: false,
+            selectionMode: 'multiple',
+            isLocked: isLocked || typeState.isListLoading,
+          }}
+          onEvent={async (eventType, eventData) => {
+            if (eventType === 'rowIdsSelectedChange') {
+              objectStore.setSelectedObjectIdList(spaceId, dataType, eventData.rowIdsSelected as string[])
+              return { code: 0 }
+            }
+            if (eventType === 'rowDoubleClick') {
+              onOpenEdit(String(eventData.rowId || ''))
+              return { code: 0 }
+            }
+            return { code: 0 }
+          }}
         />
       )}
       {typeState.errorText ? <div className="frontend-error">{typeState.errorText}</div> : null}

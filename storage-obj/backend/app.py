@@ -311,14 +311,14 @@ def normalize_payload_type(data_type_raw: str):
     return data_type
 
 
-def get_object_table_name(space_id: str, data_type: str):
+def get_obj_table_name(space_id: str, data_type: str):
     if not is_valid_space_id(space_id):
         raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
     normalized_data_type = normalize_payload_type(data_type)
     return f"space_{space_id}_object_{normalized_data_type}_status"
 
 
-def get_payload_column_name(data_type: str):
+def get_payload_col_name(data_type: str):
     normalized_data_type = normalize_payload_type(data_type)
     if normalized_data_type == "text":
         return "valueText"
@@ -327,14 +327,14 @@ def get_payload_column_name(data_type: str):
     return "valueJson"
 
 
-def get_object_history_table_name(space_id: str, data_type: str):
+def get_obj_history_table_name(space_id: str, data_type: str):
     if not is_valid_space_id(space_id):
         raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
     normalized_data_type = normalize_payload_type(data_type)
     return f"space_{space_id}_object_{normalized_data_type}_history"
 
 
-def normalize_object_type_value(raw_value: Any, default_value: int = -1, allow_none: bool = False):
+def normalize_obj_type_value(raw_value: Any, default_value: int = -1, allow_none: bool = False):
     if raw_value is None:
         return None if allow_none else default_value
     raw_text = str(raw_value).strip()
@@ -356,10 +356,10 @@ def parse_base64_payload(value: Any):
     return raw_base64.strip()
 
 
-def ensure_object_status_table(cursor, space_id: str, data_type: str):
-    table_name = get_object_table_name(space_id, data_type)
+def ensure_obj_status_table(cursor, space_id: str, data_type: str):
+    table_name = get_obj_table_name(space_id, data_type)
     normalized_data_type = normalize_payload_type(data_type)
-    value_column_name = get_payload_column_name(normalized_data_type)
+    value_column_name = get_payload_col_name(normalized_data_type)
     value_column_sql = "text" if normalized_data_type == "text" else "bytea" if normalized_data_type == "bytes" else "jsonb"
     cursor.execute(
         f"""
@@ -369,6 +369,7 @@ def ensure_object_status_table(cursor, space_id: str, data_type: str):
             type integer not null default -1,
             isDeleted boolean not null default false,
             editType smallint not null default 0,
+            versionNumHead bigint,
             createdAt timestamptz default now(),
             updatedAt timestamptz default now(),
             updatedAtTz varchar(6)
@@ -379,15 +380,17 @@ def ensure_object_status_table(cursor, space_id: str, data_type: str):
     cursor.execute(f"alter table {table_name} add column if not exists type integer not null default -1")
     cursor.execute(f"alter table {table_name} add column if not exists isDeleted boolean not null default false")
     cursor.execute(f"alter table {table_name} add column if not exists editType smallint not null default 0")
+    cursor.execute(f"alter table {table_name} add column if not exists versionNumHead bigint")
     cursor.execute(f"alter table {table_name} add column if not exists createdAt timestamptz default now()")
     cursor.execute(f"alter table {table_name} add column if not exists updatedAt timestamptz default now()")
     cursor.execute(f"alter table {table_name} add column if not exists updatedAtTz varchar(6)")
-    history_table_name = get_object_history_table_name(space_id, normalized_data_type)
+    history_table_name = get_obj_history_table_name(space_id, normalized_data_type)
     cursor.execute(
         f"""
         create table if not exists {history_table_name} (
             objectId text not null,
             versionNum bigint not null,
+            versionNumPrev bigint,
             {value_column_name} {value_column_sql},
             isDataDeleted boolean not null default false,
             createdAt timestamptz default now(),
@@ -396,8 +399,10 @@ def ensure_object_status_table(cursor, space_id: str, data_type: str):
         """
     )
     cursor.execute(f"alter table {history_table_name} add column if not exists {value_column_name} {value_column_sql}")
+    cursor.execute(f"alter table {history_table_name} add column if not exists versionNumPrev bigint")
     cursor.execute(f"alter table {history_table_name} add column if not exists isDataDeleted boolean not null default false")
     cursor.execute(f"alter table {history_table_name} add column if not exists createdAt timestamptz default now()")
+    ensure_obj_metadata_table(cursor, space_id, normalized_data_type)
 
 
 def read_spaces_id_list(cursor):
@@ -487,6 +492,157 @@ def read_space_metadata_rows(cursor, space_id: str):
         }
         for row in row_list
     ]
+
+
+def read_global_metadata_rows(cursor):
+    ensure_metadata_table(cursor)
+    cursor.execute(
+        """
+        select tag, rank
+        from metadata
+        order by rank asc nulls last, tag asc
+        """
+    )
+    row_list = cursor.fetchall() or []
+    return [
+        {
+            "tag": str(row[0] or ""),
+            "rank": str(row[1] or ""),
+        }
+        for row in row_list
+    ]
+
+
+def resolve_global_metadata_rank(cursor, tag: str, requested_rank: str):
+    normalized_requested_rank = str(requested_rank or "").strip().lower()
+    if normalized_requested_rank:
+        return normalized_requested_rank
+    cursor.execute(
+        """
+        select rank
+        from metadata
+        where tag = %s
+        limit 1
+        """,
+        (tag,),
+    )
+    existing_row = cursor.fetchone()
+    existing_rank = str(existing_row[0] or "").strip().lower() if existing_row else ""
+    if existing_rank:
+        return existing_rank
+    cursor.execute(
+        """
+        select rank
+        from metadata
+        where rank is not null and rank <> ''
+        order by rank asc
+        """
+    )
+    rank_row_list = cursor.fetchall() or []
+    rank_text_list = [str(row[0] or "").strip().lower() for row in rank_row_list]
+    return generate_appendable_rank(rank_text_list)
+
+
+def get_obj_metadata_table_name(space_id: str, data_type: str):
+    if not is_valid_space_id(space_id):
+        raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
+    normalized_data_type = normalize_payload_type(data_type)
+    return f"space_{space_id}_object_{normalized_data_type}_metadata"
+
+
+obj_metadata_tags_reserved = frozenset({"versionIdHead", "isDeleted", "type", "editType"})
+
+
+def ensure_obj_metadata_table(cursor, space_id: str, data_type: str):
+    if not is_valid_space_id(space_id):
+        raise RuntimeError("invalid spaceId, expected lowercase 0-9a-z")
+    table_name = get_obj_metadata_table_name(space_id, data_type)
+    cursor.execute(
+        f"""
+        create table if not exists {table_name} (
+            objectId text not null,
+            tag text not null,
+            rank varchar(10),
+            valueType smallint,
+            valueText text,
+            valueJson jsonb,
+            valueBytes bytea,
+            valueInt bigint,
+            valueBoolean boolean,
+            updatedAt timestamptz default now(),
+            updatedAtTz varchar(6),
+            primary key (objectId, tag)
+        )
+        """
+    )
+    cursor.execute(f"alter table {table_name} add column if not exists rank varchar(10)")
+
+
+def read_obj_metadata_rows(cursor, space_id: str, data_type: str, object_id: str):
+    ensure_obj_metadata_table(cursor, space_id, data_type)
+    table_name = get_obj_metadata_table_name(space_id, data_type)
+    cursor.execute(
+        f"""
+        select tag, rank
+        from {table_name}
+        where objectId = %s
+        order by rank asc nulls last, tag asc
+        """,
+        (object_id,),
+    )
+    row_list = cursor.fetchall() or []
+    return [
+        {
+            "tag": str(row[0] or ""),
+            "rank": str(row[1] or ""),
+        }
+        for row in row_list
+    ]
+
+
+def resolve_obj_metadata_rank(cursor, space_id: str, data_type: str, object_id: str, tag: str, requested_rank: str):
+    normalized_requested_rank = str(requested_rank or "").strip().lower()
+    if normalized_requested_rank:
+        return normalized_requested_rank
+    table_name = get_obj_metadata_table_name(space_id, data_type)
+    cursor.execute(
+        f"""
+        select rank
+        from {table_name}
+        where objectId = %s and tag = %s
+        limit 1
+        """,
+        (object_id, tag),
+    )
+    existing_row = cursor.fetchone()
+    existing_rank = str(existing_row[0] or "").strip().lower() if existing_row else ""
+    if existing_rank:
+        return existing_rank
+    cursor.execute(
+        f"""
+        select rank
+        from {table_name}
+        where objectId = %s and rank is not null and rank <> ''
+        order by rank asc
+        """,
+        (object_id,),
+    )
+    rank_row_list = cursor.fetchall() or []
+    rank_text_list = [str(row[0] or "").strip().lower() for row in rank_row_list]
+    return generate_appendable_rank(rank_text_list)
+
+
+def serialize_metadata_item_row(row):
+    return {
+        "tag": row[0],
+        "rank": row[1],
+        "valueType": row[2],
+        "valueText": row[3],
+        "valueJson": row[4],
+        "valueBytes": row[5],
+        "valueInt": row[6],
+        "valueBoolean": row[7],
+    }
 
 
 def generate_appendable_rank(rank_text_list):
@@ -588,6 +744,9 @@ register_service_routes(
         "set_active_database_config": set_active_database_config,
         "get_is_database_switching": get_is_database_switching,
         "set_is_database_switching": set_is_database_switching,
+        "ensure_metadata_table": ensure_metadata_table,
+        "resolve_global_metadata_rank": resolve_global_metadata_rank,
+        "serialize_metadata_item_row": serialize_metadata_item_row,
     },
 )
 
@@ -602,7 +761,7 @@ register_space_routes(
         "read_space_name": read_space_name,
         "write_spaces_id_list": write_spaces_id_list,
         "ensure_space_metadata_table": ensure_space_metadata_table,
-        "ensure_object_status_table": ensure_object_status_table,
+        "ensure_obj_status_table": ensure_obj_status_table,
         "resolve_space_metadata_rank": resolve_space_metadata_rank,
         "read_space_metadata_rows": read_space_metadata_rows,
         "lexorank_between": lexorank_between,
@@ -614,13 +773,20 @@ register_object_routes(
     {
         "run_in_transaction": run_in_transaction,
         "normalize_payload_type": normalize_payload_type,
-        "normalize_object_type_value": normalize_object_type_value,
-        "ensure_object_status_table": ensure_object_status_table,
-        "get_object_table_name": get_object_table_name,
-        "get_object_history_table_name": get_object_history_table_name,
-        "get_payload_column_name": get_payload_column_name,
+        "normalize_obj_type_value": normalize_obj_type_value,
+        "ensure_obj_status_table": ensure_obj_status_table,
+        "ensure_obj_metadata_table": ensure_obj_metadata_table,
+        "get_obj_table_name": get_obj_table_name,
+        "get_obj_metadata_table_name": get_obj_metadata_table_name,
+        "get_obj_history_table_name": get_obj_history_table_name,
+        "get_payload_col_name": get_payload_col_name,
         "parse_base64_payload": parse_base64_payload,
         "create_ms48_id": create_ms48_id,
+        "read_obj_metadata_rows": read_obj_metadata_rows,
+        "resolve_obj_metadata_rank": resolve_obj_metadata_rank,
+        "serialize_metadata_item_row": serialize_metadata_item_row,
+        "obj_metadata_tags_reserved": obj_metadata_tags_reserved,
+        "lexorank_between": lexorank_between,
     },
 )
 

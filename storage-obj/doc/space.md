@@ -42,7 +42,7 @@ Metadata row order is persisted by `rank`:
 
 ## Version Flow
 
-Detailed versioning mechanism is documented in `./object_version.md`.
+Detailed versioning mechanism is documented in `./obj_version.md`.
 
 ### Create object
 

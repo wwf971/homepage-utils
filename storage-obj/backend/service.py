@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from contextlib import closing
 
 from flask import request
@@ -25,6 +26,9 @@ def register_service_routes(app, context: dict):
     set_active_database_config = context["set_active_database_config"]
     get_is_database_switching = context["get_is_database_switching"]
     set_is_database_switching = context["set_is_database_switching"]
+    ensure_metadata_table = context["ensure_metadata_table"]
+    resolve_global_metadata_rank = context["resolve_global_metadata_rank"]
+    serialize_metadata_item_row = context["serialize_metadata_item_row"]
 
     @app.get("/health/test")
     @app.get("/api/health/test")
@@ -325,3 +329,92 @@ def register_service_routes(app, context: dict):
         finally:
             if db is not None:
                 db.close()
+
+    @app.get("/metadata/list")
+    @app.get("/api/metadata/list")
+    def metadata_list():
+        def action(db):
+            with closing(db.cursor()) as cursor:
+                ensure_metadata_table(cursor)
+                cursor.execute(
+                    """
+                    select
+                        tag,
+                        rank,
+                        valueType,
+                        valueText,
+                        valueJson,
+                        valueBytes,
+                        valueInt,
+                        valueBoolean
+                    from metadata
+                    order by rank asc nulls last, tag asc
+                    """
+                )
+                row_list = cursor.fetchall() or []
+                metadata_item_list = [serialize_metadata_item_row(row) for row in row_list]
+            return {
+                "items": metadata_item_list,
+            }
+
+        return run_in_transaction(action)
+
+    @app.post("/metadata/upsert")
+    @app.post("/api/metadata/upsert")
+    def metadata_upsert():
+        body = request.get_json(silent=True) or {}
+        tag = str(body.get("tag") or "").strip()
+
+        def action(db):
+            with closing(db.cursor()) as cursor:
+                if not tag:
+                    raise RuntimeError("tag is required")
+                ensure_metadata_table(cursor)
+                rank = resolve_global_metadata_rank(cursor, tag, body.get("rank"))
+                value_type = body.get("valueType")
+                value_text = body.get("valueText")
+                value_json = body.get("valueJson")
+                value_bytes = body.get("valueBytes")
+                value_int = body.get("valueInt")
+                value_boolean = body.get("valueBoolean")
+                cursor.execute(
+                    """
+                    insert into metadata(
+                        tag,
+                        rank,
+                        valueType,
+                        valueText,
+                        valueJson,
+                        valueBytes,
+                        valueInt,
+                        valueBoolean,
+                        updatedAt
+                    )
+                    values (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, now())
+                    on conflict (tag) do update set
+                        rank = excluded.rank,
+                        valueType = excluded.valueType,
+                        valueText = excluded.valueText,
+                        valueJson = excluded.valueJson,
+                        valueBytes = excluded.valueBytes,
+                        valueInt = excluded.valueInt,
+                        valueBoolean = excluded.valueBoolean,
+                        updatedAt = now()
+                    """,
+                    (
+                        tag,
+                        rank,
+                        value_type,
+                        value_text,
+                        json.dumps(value_json) if value_json is not None else None,
+                        value_bytes,
+                        value_int,
+                        value_boolean,
+                    ),
+                )
+            return {
+                "tag": tag,
+                "rank": rank,
+            }
+
+        return run_in_transaction(action)

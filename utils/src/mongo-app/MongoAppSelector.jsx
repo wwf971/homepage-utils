@@ -327,14 +327,29 @@ const MongoAppSelector = observer(({
 
       {appContextMenuState.position && appContextMenuState.targetApp && (
         <Menu
-          items={[
-            { type: 'item', name: 'Rename', data: { action: 'rename' } },
-            { type: 'item', name: 'Delete', data: { action: 'delete' } },
-          ]}
-          position={appContextMenuState.position}
-          onClose={handleContextMenuClose}
-          onItemClick={handleContextMenuItemClick}
-          onContextMenu={handleMenuBackdropContextMenu}
+          data={{
+            items: [
+              { id: 'rename', label: 'Rename', data: { action: 'rename' } },
+              { id: 'delete', label: 'Delete', data: { action: 'delete' } },
+            ],
+          }}
+          config={{
+            isOpen: true,
+            posOpen: appContextMenuState.position,
+          }}
+          onEvent={(eventType, eventData) => {
+            if (eventType === 'closeRequest') {
+              handleContextMenuClose();
+              return;
+            }
+            if (eventType === 'itemClick') {
+              handleContextMenuItemClick(eventData.item);
+              return;
+            }
+            if (eventType === 'backdropContextMenu') {
+              handleMenuBackdropContextMenu(eventData.event);
+            }
+          }}
         />
       )}
 

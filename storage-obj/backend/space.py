@@ -15,7 +15,7 @@ def register_space_routes(app, context: dict):
     read_space_name = context["read_space_name"]
     write_spaces_id_list = context["write_spaces_id_list"]
     ensure_space_metadata_table = context["ensure_space_metadata_table"]
-    ensure_object_status_table = context["ensure_object_status_table"]
+    ensure_obj_status_table = context["ensure_obj_status_table"]
     resolve_space_metadata_rank = context["resolve_space_metadata_rank"]
     read_space_metadata_rows = context["read_space_metadata_rows"]
     lexorank_between = context["lexorank_between"]
@@ -94,9 +94,9 @@ def register_space_routes(app, context: dict):
                 spaces_id_list = sorted(set(spaces_id_list))
                 write_spaces_id_list(cursor, spaces_id_list)
                 ensure_space_metadata_table(cursor, space_id)
-                ensure_object_status_table(cursor, space_id, "text")
-                ensure_object_status_table(cursor, space_id, "bytes")
-                ensure_object_status_table(cursor, space_id, "json")
+                ensure_obj_status_table(cursor, space_id, "text")
+                ensure_obj_status_table(cursor, space_id, "bytes")
+                ensure_obj_status_table(cursor, space_id, "json")
 
             return {
                 "spaceId": space_id,
@@ -487,6 +487,12 @@ def register_space_routes(app, context: dict):
                 cursor.execute(f"drop table if exists space_{space_id}_object_text_status")
                 cursor.execute(f"drop table if exists space_{space_id}_object_bytes_status")
                 cursor.execute(f"drop table if exists space_{space_id}_object_json_status")
+                cursor.execute(f"drop table if exists space_{space_id}_object_text_history")
+                cursor.execute(f"drop table if exists space_{space_id}_object_bytes_history")
+                cursor.execute(f"drop table if exists space_{space_id}_object_json_history")
+                cursor.execute(f"drop table if exists space_{space_id}_object_text_metadata")
+                cursor.execute(f"drop table if exists space_{space_id}_object_bytes_metadata")
+                cursor.execute(f"drop table if exists space_{space_id}_object_json_metadata")
 
             return {
                 "spaceId": space_id,
@@ -511,9 +517,9 @@ def register_space_routes(app, context: dict):
                     raise RuntimeError(f"space does not exist: {space_id}")
 
                 ensure_space_metadata_table(cursor, space_id)
-                ensure_object_status_table(cursor, space_id, "text")
-                ensure_object_status_table(cursor, space_id, "bytes")
-                ensure_object_status_table(cursor, space_id, "json")
+                ensure_obj_status_table(cursor, space_id, "text")
+                ensure_obj_status_table(cursor, space_id, "bytes")
+                ensure_obj_status_table(cursor, space_id, "json")
 
                 cursor.execute(f"delete from space_{space_id}_metadata")
                 deleted_metadata_num = int(cursor.rowcount or 0)
@@ -523,6 +529,18 @@ def register_space_routes(app, context: dict):
                 deleted_bytes_num = int(cursor.rowcount or 0)
                 cursor.execute(f"delete from space_{space_id}_object_json_status")
                 deleted_json_num = int(cursor.rowcount or 0)
+                cursor.execute(f"delete from space_{space_id}_object_text_history")
+                deleted_text_history_num = int(cursor.rowcount or 0)
+                cursor.execute(f"delete from space_{space_id}_object_bytes_history")
+                deleted_bytes_history_num = int(cursor.rowcount or 0)
+                cursor.execute(f"delete from space_{space_id}_object_json_history")
+                deleted_json_history_num = int(cursor.rowcount or 0)
+                cursor.execute(f"delete from space_{space_id}_object_text_metadata")
+                deleted_text_obj_metadata_num = int(cursor.rowcount or 0)
+                cursor.execute(f"delete from space_{space_id}_object_bytes_metadata")
+                deleted_bytes_obj_metadata_num = int(cursor.rowcount or 0)
+                cursor.execute(f"delete from space_{space_id}_object_json_metadata")
+                deleted_json_obj_metadata_num = int(cursor.rowcount or 0)
 
             return {
                 "spaceId": space_id,
@@ -530,7 +548,24 @@ def register_space_routes(app, context: dict):
                 "deletedTextNum": deleted_text_num,
                 "deletedBytesNum": deleted_bytes_num,
                 "deletedJsonNum": deleted_json_num,
-                "deletedTotalNum": deleted_metadata_num + deleted_text_num + deleted_bytes_num + deleted_json_num,
+                "deletedTextHistoryNum": deleted_text_history_num,
+                "deletedBytesHistoryNum": deleted_bytes_history_num,
+                "deletedJsonHistoryNum": deleted_json_history_num,
+                "deletedTextObjectMetadataNum": deleted_text_obj_metadata_num,
+                "deletedBytesObjectMetadataNum": deleted_bytes_obj_metadata_num,
+                "deletedJsonObjectMetadataNum": deleted_json_obj_metadata_num,
+                "deletedTotalNum": (
+                    deleted_metadata_num
+                    + deleted_text_num
+                    + deleted_bytes_num
+                    + deleted_json_num
+                    + deleted_text_history_num
+                    + deleted_bytes_history_num
+                    + deleted_json_history_num
+                    + deleted_text_obj_metadata_num
+                    + deleted_bytes_obj_metadata_num
+                    + deleted_json_obj_metadata_num
+                ),
             }
 
         return run_in_transaction(action)

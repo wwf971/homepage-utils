@@ -30,10 +30,16 @@
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .space-tree-label-name {
   color: #1d2c44;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .space-tree-label-anony {
@@ -44,4 +50,5 @@
 .space-tree-label-id {
   color: #9aa5b5;
   font-size: 11px;
+  flex-shrink: 0;
 }

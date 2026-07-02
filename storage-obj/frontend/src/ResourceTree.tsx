@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import TreeView from '@wwf971/react-comp-misc/TreeView'
+import { TreeView } from '@wwf971/react-comp-misc'
 import { appStore, PAGE_KEY } from './store/appStore'
 
 type ResourceTreeProps = {
@@ -118,57 +118,64 @@ const ResourceTree = observer(({ onNavigateToPage }: ResourceTreeProps) => {
 
   return (
     <TreeViewComp
-      rootItemIds={treeData.rootItemIds}
-      getItemDataById={(itemId) => treeData.itemDataById[itemId] || null}
-      selectedItemId={appStore.selectedTreeItemId}
-      getItemComp={(itemData) => {
-        if (itemData?.spaceId && !itemData?.pageKey) {
-          return SpaceTreeItemComp
+      data={{
+        itemRootIds: treeData.rootItemIds,
+        itemDataById: treeData.itemDataById,
+        itemSelectedId: appStore.selectedTreeItemId,
+      }}
+      config={{
+        getItemComp: (itemData) => {
+          if (itemData?.spaceId && !itemData?.pageKey) {
+            return SpaceTreeItemComp
+          }
+          return null
+        },
+      }}
+      onEvent={async (eventType, eventData) => {
+        if (eventType === 'toggleExpand') {
+          const itemId = String(eventData?.itemId || '')
+          const nextIsExpanded = eventData?.nextIsExpanded === true
+          setExpandedById((prev) => ({
+            ...prev,
+            [itemId]: nextIsExpanded,
+          }))
+          return { code: 0 }
         }
-        return null
-      }}
-      onDataChangeRequest={async (type, params) => {
-        if (type !== 'toggle-expand') return { code: 0 }
-        const itemId = String(params?.itemId || '')
-        const nextIsExpanded = params?.nextIsExpanded === true
-        setExpandedById((prev) => ({
-          ...prev,
-          [itemId]: nextIsExpanded,
-        }))
-        return { code: 0 }
-      }}
-      onItemClick={(itemId, itemData) => {
-        if (String(itemId) === 'service:metadata') {
+        if (eventType !== 'itemClick') return { code: 0 }
+        const itemId = String(eventData?.itemId || '')
+        const itemData = eventData?.itemData
+        if (itemId === 'service:metadata') {
           onNavigateToPage(PAGE_KEY.metadata)
-          return
+          return { code: 0 }
         }
-        if (String(itemId) === 'service:basic-info') {
+        if (itemId === 'service:basic-info') {
           onNavigateToPage(PAGE_KEY.basicInfo)
-          return
+          return { code: 0 }
         }
-        if (String(itemId) === 'service:database') {
+        if (itemId === 'service:database') {
           onNavigateToPage(PAGE_KEY.database)
-          return
+          return { code: 0 }
         }
-        if (String(itemId) === 'spaces') {
+        if (itemId === 'spaces') {
           onNavigateToPage(PAGE_KEY.spaceOverview)
-          return
+          return { code: 0 }
         }
-        if (String(itemId) === 'spaces:overview') {
+        if (itemId === 'spaces:overview') {
           onNavigateToPage(PAGE_KEY.spaceOverview)
-          return
+          return { code: 0 }
         }
         if (itemData?.pageKey && itemData?.spaceId) {
           const spaceId = String(itemData.spaceId)
           appStore.setSelectedSpaceId(spaceId)
           onNavigateToPage(String(itemData.pageKey), { spaceId })
-          return
+          return { code: 0 }
         }
         if (itemData?.spaceId) {
           const spaceId = String(itemData.spaceId)
           appStore.setSelectedSpaceId(spaceId)
           onNavigateToPage(PAGE_KEY.spaceMetadata, { spaceId })
         }
+        return { code: 0 }
       }}
     />
   )

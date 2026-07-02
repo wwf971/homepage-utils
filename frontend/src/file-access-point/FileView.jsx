@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { makeAutoObservable, isObservable, toJS } from 'mobx';
-import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonCompMobx } from '@wwf971/react-comp-misc';
+import { SpinningCircle, EditableValueComp, KeyValuesComp, JsonCompMobx, createJsonOnEventAdapter } from '@wwf971/react-comp-misc';
 import { formatTimestamp, formatFileSize } from './fileUtils';
 import './initFileStore'; // Initialize fileStore with dependencies
 import { fileStore } from '@wwf971/homepage-utils-utils';
@@ -46,6 +46,7 @@ const FileView = observer(({ file, fileAccessPointId, onClose, onFileUpdate }) =
     'note',
     observableMongoDoc || {}
   );
+  const handleJsonOnEvent = useMemo(() => createJsonOnEventAdapter(handleMongoDocChange), [handleMongoDocChange]);
 
   useEffect(() => {
     const loadFile = async () => {
@@ -374,8 +375,12 @@ const FileView = observer(({ file, fileAccessPointId, onClose, onFileUpdate }) =
             <div className="file-view-mongo-content">
               <JsonCompMobx
                 data={observableMongoDoc}
-                onChange={handleMongoDocChange}
-                isLoading={isUpdating}
+                config={{
+                  isEditable: true,
+                  isKeyEditable: true,
+                  isValueEditable: true,
+                }}
+                onEvent={handleJsonOnEvent}
               />
             </div>
           </div>
