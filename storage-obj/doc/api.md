@@ -79,7 +79,7 @@ Global metadata is stored in the `metadata` table.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/object/list` | list objects by filters and paging |
-| GET | `/api/object/get` | get object payload |
+| GET | `/api/object/get` | get object data |
 | POST | `/api/object/create` | create object first version (current + history) |
 | POST | `/api/object/update` | update object and append or edit history |
 | POST | `/api/object/delete` | set `isDeleted=true` on current row |
@@ -117,6 +117,142 @@ User-defined tags are stored in `space_{spaceId}_object_{dataType}_metadata`.
 
 There is no separate version-get endpoint. Use `GET /api/object/get` with optional `versionId` query param (S3-style).
 
+### Batch Transaction
+
+Batch transaction executes a list of edit ops in order inside one database transaction.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/batch/transaction` | execute ordered edit ops atomically |
+
+Rules:
+- All ops run in the same transaction.
+- Ops run strictly in array order.
+- If any op fails, the whole transaction is rolled back.
+- On rollback, no earlier op in the same batch should be durable.
+- Only write endpoints are allowed in a batch. `GET` endpoints and service-admin endpoints are not allowed.
+- Nested batch calls are not allowed.
+- The batch endpoint should call the same backend business logic as the single-operation endpoints, not duplicate behavior.
+
+Workflow:
+```
+batch_transaction()
+  -> run_in_transaction(action)
+     -> action runs ops
+        -> op fails
+        -> batch.py raises BatchOpError
+     -> run_in_transaction catches error
+     -> db.rollback()
+```
+
+Allowed op endpoints:
+- `/api/metadata/upsert`
+- `/api/space/create`
+- `/api/space/delete`
+- `/api/space/clear`
+- `/api/space/metadata/upsert`
+- `/api/space/metadata/ensure`
+- `/api/space/metadata/insert`
+- `/api/space/metadata/delete`
+- `/api/space/metadata/move`
+- `/api/object/create`
+- `/api/object/update`
+- `/api/object/delete`
+- `/api/object/restore`
+- `/api/object/metadata/upsert`
+- `/api/object/metadata/ensure`
+- `/api/object/metadata/insert`
+- `/api/object/metadata/delete`
+- `/api/object/metadata/move`
+- `/api/object/version/checkout`
+- `/api/object/version/rollback`
+- `/api/object/version/delete-data`
+
+Request body:
+
+```json
+{
+  "ops": [
+    {
+      "opId": "createObject",
+      "endpoint": "/api/object/create",
+      "body": {
+        "spaceId": "abc123",
+        "dataType": "json",
+        "valueJson": {
+          "title": "slide 1"
+        }
+      }
+    },
+    {
+      "opId": "setObjectTitle",
+      "endpoint": "/api/object/metadata/upsert",
+      "body": {
+        "spaceId": "abc123",
+        "dataType": "json",
+        "objectId": "$createObject.data.objectId",
+        "tag": "title",
+        "valueType": 1,
+        "valueText": "slide 1"
+      }
+    }
+  ]
+}
+```
+
+Op fields:
+- `opId`: optional client-chosen identifier. Must be unique inside the batch when present.
+- `endpoint`: required. Use the `/api/...` endpoint string.
+- `body`: required for `POST` ops.
+
+Reference syntax:
+- A string that starts with `$` is resolved from a previous op result.
+- Format: `$opId.data.fieldName`.
+- References can only point to earlier ops.
+- If a reference cannot be resolved, the op fails and the transaction is rolled back.
+
+Success response:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "opNum": 2,
+    "results": [
+      {
+        "opId": "createObject",
+        "code": 0,
+        "data": {
+          "objectId": "1152921504606846976"
+        }
+      },
+      {
+        "opId": "setObjectTitle",
+        "code": 0,
+        "data": {
+          "tag": "title"
+        }
+      }
+    ]
+  }
+}
+```
+
+Failure response:
+
+```json
+{
+  "code": -1,
+  "data": {
+    "opNum": 2,
+    "failedOpIndex": 1,
+    "failedOpId": "setObjectTitle",
+    "isRolledBack": true
+  },
+  "message": "objectId is required"
+}
+```
+
 ### Service Admin
 
 Used by the storage-obj frontend for database switching and schema checks.
@@ -138,7 +274,7 @@ Used by the storage-obj frontend for database switching and schema checks.
   - `dataType` (`text` | `bytes` | `json`)
   - `objectId` (except create when server allocates)
 - `spaceId`, `objectId`, and `versionId` use `ms_48` (`bigint` in DB).
-- Payload fields:
+- Data fields:
   - text: `valueText`
   - bytes: `valueBase64` (decoded to `bytea` in backend)
   - json: `valueJson`
@@ -153,7 +289,7 @@ Behavior:
 - without `versionId`: return current checked-out object from current table (`isDeleted=false`)
 - with `versionId`: return one history version from history table
 
-Response includes payload fields (`valueText` / `valueBase64` / `valueJson`), `type`, `editType`, and timestamps. When `versionId` is present, response should also include that `versionId`.
+Response includes data fields (`valueText` / `valueBase64` / `valueJson`), `type`, `editType`, and timestamps. When `versionId` is present, response should also include that `versionId`.
 
 ### `/api/object/create`
 

@@ -5,12 +5,14 @@ import os
 import random
 import string
 import time
+from contextvars import ContextVar
 from contextlib import closing
 from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
 
 from flask import Flask, jsonify, request, send_from_directory
+from batch import register_batch_routes
 from object import register_object_routes
 from service import register_service_routes
 from space import register_space_routes
@@ -223,10 +225,20 @@ if database_index < 0 or database_index >= len(database_preset_list):
 current_database_key = str(database_preset_list[database_index]["key"])
 active_database_config = to_db_config_from_preset(database_preset_list[database_index])
 is_database_switching = False
+db_transaction_current = ContextVar("db_transaction_current", default=None)
 
 
 def run_in_transaction(action: Callable[[Any], Any]):
+    db_current = db_transaction_current.get()
+    if db_current is not None:
+        try:
+            result = action(db_current)
+            return make_json_response(0, data=result)
+        except Exception as error:
+            error_data = getattr(error, "response_data", None)
+            return make_json_response(-1, data=error_data, message=str(error)), 500
     db = None
+    transaction_token = None
     try:
         if connect is None:
             test_conda_env = os.environ.get("TEST_CONDA_ENV", "").strip()
@@ -243,13 +255,23 @@ def run_in_transaction(action: Callable[[Any], Any]):
             )
         db = connect(**active_database_config)
         db.autocommit = False
+        transaction_token = db_transaction_current.set(db)
+
+        # a series of operations will be executed in this action(db)
+        # if any of them fails, this will be catched as exception, and db.rollback() will be called
         result = action(db)
+
+        db_transaction_current.reset(transaction_token)
+        transaction_token = None
         db.commit()
         return make_json_response(0, data=result)
     except Exception as error:
+        if transaction_token is not None:
+            db_transaction_current.reset(transaction_token)
         if db is not None:
             db.rollback()
-        return make_json_response(-1, message=str(error)), 500
+        error_data = getattr(error, "response_data", None)
+        return make_json_response(-1, data=error_data, message=str(error)), 500
     finally:
         if db is not None:
             db.close()
@@ -787,6 +809,13 @@ register_object_routes(
         "serialize_metadata_item_row": serialize_metadata_item_row,
         "obj_metadata_tags_reserved": obj_metadata_tags_reserved,
         "lexorank_between": lexorank_between,
+    },
+)
+
+register_batch_routes(
+    app,
+    {
+        "run_in_transaction": run_in_transaction,
     },
 )
 
