@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from 'mobx'
+import { computeObjectContentByteSize } from './objectContentSize'
 
 export type ObjectPayloadType = 'text' | 'bytes' | 'json'
 
@@ -15,6 +16,7 @@ export type ObjectRowItem = {
   dataType: ObjectPayloadType
   type: number
   editType: number
+  contentByteSize: number
   valuePreview: string
   valueText: string
   valueJson: unknown
@@ -108,9 +110,19 @@ function createSpaceState(): SpaceState {
 class ObjectStore {
   stateBySpaceId: Record<string, SpaceState> = {}
   requestCount = 0
+  toolbarMainScrollLeft = 0
+  toolbarPaginationScrollLeft = 0
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true })
+  }
+
+  setToolbarMainScrollLeft(scrollLeft: number) {
+    this.toolbarMainScrollLeft = Math.max(0, scrollLeft)
+  }
+
+  setToolbarPaginationScrollLeft(scrollLeft: number) {
+    this.toolbarPaginationScrollLeft = Math.max(0, scrollLeft)
   }
 
   getSpaceState(spaceId: string) {
@@ -287,6 +299,11 @@ class ObjectStore {
           dataType,
           type: Number.isFinite(Number(itemRaw.type)) ? Math.floor(Number(itemRaw.type)) : -1,
           editType: Number.isFinite(Number(itemRaw.editType)) ? Math.floor(Number(itemRaw.editType)) : 0,
+          contentByteSize: computeObjectContentByteSize(dataType, {
+            valueText: itemRaw.valueText === undefined || itemRaw.valueText === null ? '' : String(itemRaw.valueText),
+            valueBase64: itemRaw.valueBase64 === undefined || itemRaw.valueBase64 === null ? '' : String(itemRaw.valueBase64),
+            valueJson: itemRaw.valueJson,
+          }),
           valuePreview: toValuePreview(dataType, itemRaw as Record<string, unknown>),
           valueText: itemRaw.valueText === undefined || itemRaw.valueText === null ? '' : String(itemRaw.valueText),
           valueJson: itemRaw.valueJson,

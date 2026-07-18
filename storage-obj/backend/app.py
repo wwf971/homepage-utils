@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from flask import Flask, jsonify, request, send_from_directory
 from batch import register_batch_routes
+from config_loader import build_database_preset_list_from_config, load_project_config
 from object import register_object_routes
 from service import register_service_routes
 from space import register_space_routes
@@ -95,6 +96,11 @@ def load_database_preset_list():
                         preset_list.append(normalize_database_preset(raw_item, f"db_{idx + 1}"))
         except Exception:
             preset_list = []
+    if not preset_list:
+        yaml_preset_list = build_database_preset_list_from_config(load_project_config(get_dir_base()))
+        for idx, raw_item in enumerate(yaml_preset_list):
+            if isinstance(raw_item, dict):
+                preset_list.append(normalize_database_preset(raw_item, f"db_{idx + 1}"))
     if not preset_list:
         default_db_config = get_db_config()
         preset_list = [

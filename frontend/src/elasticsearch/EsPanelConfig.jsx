@@ -160,7 +160,7 @@ export const ConfigPanel = () => {
             {appConfig.length === 0 && !configError ? (
               <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
             ) : (
-              <KeyValues data={appConfig} isEditable={false} />
+              <KeyValues data={{ rows: appConfig }} config={{ isEditable: false }} />
             )}
           </div>
         </TabsOnTop.Tab>
@@ -190,10 +190,12 @@ export const ConfigPanel = () => {
               Click the edit icon to modify values. Changes are saved locally.
             </p>
             <KeyValuesComp 
-              data={localConfigWithComp} 
-              isEditable={false}
-              alignColumn={true}
-              keyColWidth="min"
+              data={{ rows: localConfigWithComp }} 
+              config={{
+                isEditable: false,
+                alignCol: true,
+                keyColWidth: 'min',
+              }}
             />
           </div>
         </TabsOnTop.Tab>
@@ -222,7 +224,7 @@ export const ConfigPanel = () => {
             <p className="config-hint">
               This shows the final configuration after merging all layers.
             </p>
-            <KeyValues data={computedConfig} isEditable={false} />
+            <KeyValues data={{ rows: computedConfig }} config={{ isEditable: false }} />
           </div>
         </TabsOnTop.Tab>
       </TabsOnTop>

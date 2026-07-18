@@ -26,6 +26,9 @@ class AppStore {
   isDbSchemaChecking = false
   isDbSchemaWarningVisible = false
   dbSchemaWarningText = ''
+  globalMessageStatus: 'idle' | 'loading' | 'success' | 'error' = 'idle'
+  globalMessageText = ''
+  globalMessageScrollLeft = 0
   cacheByKey: Record<string, Record<string, unknown>> = {}
   currentPageKey: string = PAGE_KEY.metadata
   currentRoutePath: string = PAGE_ROUTE_PATH_BY_KEY[PAGE_KEY.metadata]
@@ -123,6 +126,33 @@ class AppStore {
 
   get globalDbSchemaWarningText() {
     return this.dbSchemaWarningText
+  }
+
+  get globalMessageBarState() {
+    if (this.isDbSchemaWarningVisible) {
+      return {
+        status: 'error',
+        messageText: this.dbSchemaWarningText,
+      }
+    }
+    return {
+      status: this.globalMessageStatus,
+      messageText: this.globalMessageText,
+    }
+  }
+
+  setGlobalMessage(status: 'idle' | 'loading' | 'success' | 'error', messageText: string) {
+    this.globalMessageStatus = status
+    this.globalMessageText = messageText
+  }
+
+  dismissGlobalMessage() {
+    this.globalMessageStatus = 'idle'
+    this.globalMessageText = ''
+  }
+
+  setGlobalMessageScrollLeft(scrollLeft: number) {
+    this.globalMessageScrollLeft = Math.max(0, scrollLeft)
   }
 
   clearCache() {

@@ -4,17 +4,36 @@
   gap: 4px;
 }
 
-.object-filter-root {
+.object-panel-root .message-bar-root {
+  flex-shrink: 0;
+}
+
+.object-toolbar-rows {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.object-filter-line {
+.object-toolbar-row {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.object-toolbar-track {
+  width: max-content;
+  max-width: none;
   display: flex;
   align-items: center;
+  gap: 8px;
+  will-change: transform;
+}
+
+.object-toolbar-group {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .object-filter-data-type-btn {
@@ -27,45 +46,39 @@
   color: #0f2f60;
 }
 
-.object-filter-line-small {
-  font-size: 11px;
-}
-
-.object-filter-search-input {
-  min-width: 180px;
-}
-
 .object-filter-info-item {
   color: #546888;
   font-size: 11px;
 }
 
 .object-filter-search-editor {
-  min-width: 220px;
-  min-height: 22px;
+  min-width: 180px;
+  height: 24px;
+  box-sizing: border-box;
   border: 1px solid #c7d3e8;
   border-radius: 3px;
-  padding: 2px 6px;
+  padding: 0 6px;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1;
   background: #ffffff;
   color: #1d2c44;
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
 }
 
 .object-filter-search-editor:empty::before {
   content: 'Search text';
   color: #97a5bc;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
 }
 
 .object-filter-search-editor.is-locked {
   background: #f3f6fb;
   color: #7e8da5;
-}
-
-.object-buttons-root {
-  padding-top: 1px;
 }
 
 .object-search-result-summary {
@@ -74,13 +87,12 @@
 }
 
 .object-table-root {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.object-table-pagination {
-  align-items: center;
+  width: 100%;
+  min-width: 0;
 }
 
 .object-table-pagination-text {
@@ -88,19 +100,16 @@
   color: #58709c;
 }
 
-.object-table-loading-wrapper {
-  border: 1px solid #d0d0d0;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.object-table-loading-body {
-  min-height: 300px;
+.object-table-loading-overlay {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  background: rgba(255, 255, 255, 0.72);
+  pointer-events: none;
 }
 
 .object-table-loading-text {
@@ -178,7 +187,11 @@
   border-radius: 3px;
   padding: 4px 6px;
   font-size: 12px;
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.4;
   resize: vertical;
+}
+
+.object-card-textarea-json {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, Helvetica, sans-serif;
 }

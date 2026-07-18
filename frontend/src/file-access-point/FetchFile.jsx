@@ -272,11 +272,13 @@ const FetchFile = observer(({ fileAccessPointId }) => {
           <div className="fetch-file-metadata">
             <h5>Metadata</h5>
             <KeyValuesComp
-              data={metadataItems}
-              isEditable={false}
-              isValueEditable={false}
-              alignColumn={true}
-              keyColWidth="min"
+              data={{ rows: metadataItems }}
+              config={{
+                isEditable: false,
+                isValueEditable: false,
+                alignCol: true,
+                keyColWidth: 'min',
+              }}
             />
           </div>
         </div>

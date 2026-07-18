@@ -1,8 +1,8 @@
 /build/
-/config/config.0.js
+/config/config.0.yaml
 /frontend/node_modules/
 /frontend/dist/
 /backend/.venv/
 /backend/__pycache__/
 /script/deploy*
-/migration
+/migration/

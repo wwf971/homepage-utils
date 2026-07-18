@@ -266,13 +266,14 @@ const MongoIndexDashboard = ({ index, onRebuildingChange }) => {
       {stats && (
         <div className="mongo-index-dashboard-stats">
           <KeyValues
-            data={[
-              { key: 'ES Index Name', value: stats.esIndexName },
-              { key: 'MongoDB Doc Num', value: stats.totalMongoDocsCount },
-              { key: 'ES Index Doc Num', value: stats.esDocsCount }
-            ]}
-            isEditable={false}
-            keyColWidth="min"
+            data={{
+              rows: [
+                { key: 'ES Index Name', value: stats.esIndexName },
+                { key: 'MongoDB Doc Num', value: stats.totalMongoDocsCount },
+                { key: 'ES Index Doc Num', value: stats.esDocsCount }
+              ],
+            }}
+            config={{ isEditable: false, keyColWidth: 'min' }}
           />
 
           {stats.collections && stats.collections.length > 0 && (

@@ -374,10 +374,12 @@ const RemoteConfig = () => {
       <div className="remote-config-settings">
         <h4>Remote Config Settings:</h4>
         <KeyValuesComp
-          data={settingsData}
-          isEditable={false}
-          alignColumn={true}
-          keyColWidth="min"
+          data={{ rows: settingsData }}
+          config={{
+            isEditable: false,
+            alignCol: true,
+            keyColWidth: 'min',
+          }}
         />
 
         {settings.enabled && (
@@ -506,10 +508,12 @@ const RemoteConfig = () => {
           </div>
           
           <KeyValuesComp
-            data={remoteConfigData}
-            isEditable={false}
-            alignColumn={true}
-            keyColWidth="min"
+            data={{ rows: remoteConfigData }}
+            config={{
+              isEditable: false,
+              alignCol: true,
+              keyColWidth: 'min',
+            }}
           />
         </div>
       </div>

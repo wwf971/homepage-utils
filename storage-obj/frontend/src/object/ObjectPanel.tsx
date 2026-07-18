@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import ObjectFilter from './ObjectFilter'
-import ObjectButtons from './ObjectButtons'
+import { MessageBar } from '@wwf971/react-comp-misc'
+import ObjectToolbar from './ObjectToolbar'
 import ObjectTable from './ObjectTable'
 import ObjectCard from './ObjectCard'
 import { objectStore, type ObjectPayloadType } from './objectStore'
@@ -69,36 +69,38 @@ const ObjectPanel = observer(function ObjectPanel({
     <div className="object-panel-root">
       <div className="frontend-title">Objects</div>
       <div className="frontend-subtitle">space: {spaceId}</div>
-      {messageState.messageText ? (
-        <div className={`frontend-message-bar status-${messageState.status}`}>
-          <div className="frontend-message-content">
-            <span>{messageState.messageText}</span>
-            <button
-              type="button"
-              className="frontend-message-dismiss-btn"
-              onClick={() => setMessageState({ status: 'idle', messageText: '' })}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      ) : null}
-      <ObjectFilter
+      <MessageBar
+        data={{
+          messageState,
+          idleText: 'ready',
+        }}
+        config={{
+          isPersistent: true,
+        }}
+        onEvent={(eventType) => {
+          if (eventType === 'dismissMessageRequest') {
+            setMessageState({
+              status: 'idle',
+              messageText: '',
+            })
+          }
+        }}
+      />
+      <ObjectToolbar
         spaceId={spaceId}
         dataType={dataType}
         isLocked={isLocked}
         onRequestRefresh={requestRefresh}
-      />
-      <ObjectButtons
-        spaceId={spaceId}
-        dataType={dataType}
-        isLocked={isLocked}
         onRequestDelete={async () => {
           const result = await objectStore.requestDeleteSelectedObjects(spaceId, dataType)
           setMessageState({
             status: result?.isSuccess ? 'success' : 'error',
             messageText: result?.messageText || '',
           })
+        }}
+        onRequestPageChange={async (nextPageIndex) => {
+          objectStore.setPageIndex(spaceId, dataType, nextPageIndex)
+          await objectStore.requestListCurrentPage(spaceId, dataType)
         }}
       />
       {isSearchMode ? (
@@ -112,10 +114,6 @@ const ObjectPanel = observer(function ObjectPanel({
         isLocked={isLocked}
         onOpenEdit={(objectId) => {
           objectStore.openEditCard(spaceId, dataType, objectId)
-        }}
-        onRequestPageChange={async (nextPageIndex) => {
-          objectStore.setPageIndex(spaceId, dataType, nextPageIndex)
-          await objectStore.requestListCurrentPage(spaceId, dataType)
         }}
       />
       <ObjectCard

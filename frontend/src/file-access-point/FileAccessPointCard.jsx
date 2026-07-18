@@ -472,10 +472,12 @@ const FileAccessPointCard = observer(({ fileAccessPointId, database, collection,
                 </button>
               </div>
               <KeyValuesComp
-                data={cardData}
-                isEditable={false}
-                alignColumn={true}
-                keyColWidth="min"
+                data={{ rows: cardData }}
+                config={{
+                  isEditable: false,
+                  alignCol: true,
+                  keyColWidth: 'min',
+                }}
               />
               
               <div style={{ 

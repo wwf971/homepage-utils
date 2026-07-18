@@ -10,17 +10,17 @@ The backend supports runtime database switching through:
 The switch endpoint validates connectivity to the target database first (`select 1`).  
 When that succeeds, backend updates the active DB config used by each request transaction.
 
-### Config Source: `config.js` and `config.0.js`
+### Config Source: `config.yaml` and `config.0.yaml`
 
-Database presets are authored in `config/config.js`, and can be overridden in local `config/config.0.js`.
+Database presets are authored in `config/config.yaml`, and can be overridden in local `config/config.0.yaml`.
 
-- `config.js` loads `config.0.js` when present.
+- `config_loader.py` loads and merges both files.
 - The merged config exposes:
-  - `DATABASE_LIST`
-  - `DATABASE_INDEX`
-  - `DATABASE_CURRENT`
+  - `config_dbs`
+  - `database_index`
+  - current database preset derived from the list and index
 
-At launch time, `script/launch-test.sh` reads merged config values with Node and injects these env vars:
+At launch time, `script/launch-test.sh` reads merged config values with Python and injects these env vars:
 
 - `DATABASE_LIST_JSON`
 - `DATABASE_INDEX`

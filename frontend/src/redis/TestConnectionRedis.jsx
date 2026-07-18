@@ -78,7 +78,7 @@ export const TestConnectionRedis = () => {
         {config.length === 0 ? (
           <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
         ) : (
-          <KeyValues data={config} isEditable={false} />
+          <KeyValues data={{ rows: config }} config={{ isEditable: false }} />
         )}
       </div>
       

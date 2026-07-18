@@ -327,11 +327,17 @@ const MongoIndexCard = observer(({ index, onUpdate, onDelete, onJsonEdit }) => {
         </div>
       ) : (
         <KeyValuesComp
-          data={collectionsData}
-          onChangeAttempt={isEditingCollections ? handleCollectionChange : undefined}
-          isKeyEditable={isEditingCollections}
-          isValueEditable={isEditingCollections}
-          keyColWidth="min"
+          data={{ rows: collectionsData }}
+          config={{
+            isKeyEditable: isEditingCollections,
+            isValueEditable: isEditingCollections,
+            keyColWidth: 'min',
+          }}
+          onEvent={(eventType, eventData) => {
+            if (eventType === 'cellUpdate' && isEditingCollections) {
+              handleCollectionChange(eventData.rowIndex, eventData.field, eventData.nextValue);
+            }
+          }}
         />
       )}
       

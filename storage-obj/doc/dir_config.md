@@ -23,8 +23,8 @@ storage-obj/
     space.md
 
   config/
-    config.js
-    config.0.js
+    config.yaml
+    config.0.yaml
 
   backend/
     __pycache__/

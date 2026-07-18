@@ -7,7 +7,6 @@ import ObjectPanel from './object/ObjectPanel'
 import { appStore, PAGE_KEY } from './store/appStore'
 
 type ResourcePanelProps = {
-  pingMessage: { status: string; messageText: string }
   isPanelLocked: boolean
   onClickCreateSpace: () => Promise<void> | void
   onClickPing: () => void
@@ -24,7 +23,6 @@ type ResourcePanelProps = {
 }
 
 const ResourcePanel = observer(function ResourcePanel({
-  pingMessage,
   isPanelLocked,
   onClickCreateSpace,
   onClickPing,
@@ -44,10 +42,12 @@ const ResourcePanel = observer(function ResourcePanel({
       </div>
       <div className="frontend-kv">
         <KeyValues
-          data={[
-            { key: 'spaceNum', value: String(appStore.spaces.length) },
-          ]}
-          isEditable={false}
+          data={{
+            rows: [
+              { key: 'spaceNum', value: String(appStore.spaces.length) },
+            ],
+          }}
+          config={{ isEditable: false }}
         />
       </div>
     </>
@@ -76,7 +76,6 @@ const ResourcePanel = observer(function ResourcePanel({
     return (
       <ServiceInfo
         mode="metadata"
-        pingMessage={pingMessage}
         isPanelLocked={isPanelLocked}
         onClickPing={onClickPing}
         onClickRefreshDatabases={onClickRefreshDatabases}
@@ -88,7 +87,6 @@ const ResourcePanel = observer(function ResourcePanel({
     return (
       <ServiceInfo
         mode="basic-info"
-        pingMessage={pingMessage}
         isPanelLocked={isPanelLocked}
         onClickPing={onClickPing}
         onClickRefreshDatabases={onClickRefreshDatabases}
@@ -100,7 +98,6 @@ const ResourcePanel = observer(function ResourcePanel({
     return (
       <ServiceInfo
         mode="database"
-        pingMessage={pingMessage}
         isPanelLocked={isPanelLocked}
         onClickPing={onClickPing}
         onClickRefreshDatabases={onClickRefreshDatabases}

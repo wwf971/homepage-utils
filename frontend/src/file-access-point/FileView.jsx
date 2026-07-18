@@ -344,11 +344,13 @@ const FileView = observer(({ file, fileAccessPointId, onClose, onFileUpdate }) =
               )}
             </div>
             <KeyValuesComp
-              data={metadataItems}
-              isEditable={false}
-              isValueEditable={false}
-              alignColumn={true}
-              keyColWidth="min"
+              data={{ rows: metadataItems }}
+              config={{
+                isEditable: false,
+                isValueEditable: false,
+                alignCol: true,
+                keyColWidth: 'min',
+              }}
             />
           </div>
         )}

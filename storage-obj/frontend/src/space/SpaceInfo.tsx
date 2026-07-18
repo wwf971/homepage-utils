@@ -183,11 +183,13 @@ const SpaceInfo = observer(function SpaceInfo({
       ) : null}
       <div className="frontend-kv">
         <KeyValues
-          data={[
-            { key: 'spaceId', value: hasSelectedSpace ? spaceId : '-' },
-            { key: 'deletable', value: hasSelectedSpace ? 'yes' : 'no' },
-          ]}
-          isEditable={false}
+          data={{
+            rows: [
+              { key: 'spaceId', value: hasSelectedSpace ? spaceId : '-' },
+              { key: 'deletable', value: hasSelectedSpace ? 'yes' : 'no' },
+            ],
+          }}
+          config={{ isEditable: false }}
         />
       </div>
       <MetadataKeyValues

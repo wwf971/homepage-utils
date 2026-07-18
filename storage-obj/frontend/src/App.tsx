@@ -1,20 +1,16 @@
 import { useEffect, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { PanelDual } from '@wwf971/react-comp-misc'
+import { MessageBar, PanelDual } from '@wwf971/react-comp-misc'
 import './App.css'
 import { appStore, PAGE_KEY } from './store/appStore'
 import ResourceTree from './ResourceTree'
 import ResourcePanel from './ResourcePanel'
 
-const App = observer(() => {
+const App = observer(function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const [isLocked, setIsLocked] = useState(false)
-  const [pingMessage, setPingMessage] = useState({
-    status: 'idle',
-    messageText: '',
-  })
 
   useEffect(() => {
     appStore.requestBootstrap()
@@ -26,20 +22,24 @@ const App = observer(() => {
 
   const isBusy = appStore.isSpacesLoading || appStore.isSpaceCreating || appStore.isSpaceDeleting || appStore.isSpaceClearing
   const isPanelLocked = isLocked || isBusy
+
+  const navigateToPage = (pageKey: string, params: { spaceId?: string } = {}) => {
+    appStore.setCurrentPageKey(pageKey, params)
+    const routePath = appStore.getRoutePathByPageKey(pageKey, params)
+    const currentRouteUrl = `${location.pathname}${location.search || ''}`
+    if (routePath !== currentRouteUrl) {
+      navigate(routePath)
+    }
+  }
+
   const handleClickPing = async () => {
     if (isPanelLocked) {
       return
     }
     setIsLocked(true)
-    setPingMessage({
-      status: 'loading',
-      messageText: 'Running ping test',
-    })
+    appStore.setGlobalMessage('loading', 'Running ping test')
     const result = await appStore.requestPing()
-    setPingMessage({
-      status: result?.isSuccess ? 'success' : 'error',
-      messageText: result?.messageText || '',
-    })
+    appStore.setGlobalMessage(result?.isSuccess ? 'success' : 'error', result?.messageText || '')
     setIsLocked(false)
   }
 
@@ -48,10 +48,7 @@ const App = observer(() => {
       return
     }
     const result = await appStore.requestCreateSpace()
-    setPingMessage({
-      status: result?.isSuccess ? 'success' : 'error',
-      messageText: result?.messageText || '',
-    })
+    appStore.setGlobalMessage(result?.isSuccess ? 'success' : 'error', result?.messageText || '')
     navigate(appStore.currentRoutePath)
   }
 
@@ -60,10 +57,7 @@ const App = observer(() => {
       return
     }
     const result = await appStore.requestLoadDatabases()
-    setPingMessage({
-      status: result?.isSuccess ? 'success' : 'error',
-      messageText: result?.messageText || '',
-    })
+    appStore.setGlobalMessage(result?.isSuccess ? 'success' : 'error', result?.messageText || '')
   }
 
   const handleClickSwitchDatabase = async (databaseKey: string) => {
@@ -71,15 +65,9 @@ const App = observer(() => {
       return
     }
     setIsLocked(true)
-    setPingMessage({
-      status: 'loading',
-      messageText: `Switching database: ${databaseKey}`,
-    })
+    appStore.setGlobalMessage('loading', `Switching database: ${databaseKey}`)
     const result = await appStore.requestSwitchDatabase(databaseKey)
-    setPingMessage({
-      status: result?.isSuccess ? 'success' : 'error',
-      messageText: result?.messageText || '',
-    })
+    appStore.setGlobalMessage(result?.isSuccess ? 'success' : 'error', result?.messageText || '')
     setIsLocked(false)
     navigate(appStore.currentRoutePath)
   }
@@ -92,10 +80,7 @@ const App = observer(() => {
       }
     }
     const result = await appStore.requestDeleteSpace(spaceId)
-    setPingMessage({
-      status: result?.isSuccess ? 'success' : 'error',
-      messageText: result?.messageText || '',
-    })
+    appStore.setGlobalMessage(result?.isSuccess ? 'success' : 'error', result?.messageText || '')
     navigate(appStore.currentRoutePath)
     return result
   }
@@ -108,40 +93,53 @@ const App = observer(() => {
       }
     }
     const result = await appStore.requestClearSpace(spaceId)
-    setPingMessage({
-      status: result?.isSuccess ? 'success' : 'error',
-      messageText: result?.messageText || '',
-    })
+    appStore.setGlobalMessage(result?.isSuccess ? 'success' : 'error', result?.messageText || '')
     return result
   }
 
-  const navigateToPage = (pageKey: string, params: { spaceId?: string } = {}) => {
-    appStore.setCurrentPageKey(pageKey, params)
-    const routePath = appStore.getRoutePathByPageKey(pageKey, params)
-    const currentRouteUrl = `${location.pathname}${location.search || ''}`
-    if (routePath !== currentRouteUrl) {
-      navigate(routePath)
-    }
-  }
+  const globalMessageContentItems = appStore.isGlobalDbSchemaWarningVisible
+    ? [
+        { id: 'message', type: 'text' as const, text: appStore.globalDbSchemaWarningText },
+        {
+          id: 'gotoMetadata',
+          type: 'button' as const,
+          text: 'Go To Service Metadata',
+          eventType: 'gotoMetadataRequest',
+        },
+      ]
+    : undefined
 
   return (
     <div className="frontend-root">
-      {appStore.isGlobalDbSchemaWarningVisible ? (
-        <div className="frontend-global-warning-wrap">
-          <div className="frontend-global-warning-bar">
-            <span>{appStore.globalDbSchemaWarningText}</span>
-            <button
-              type="button"
-              className="frontend-message-dismiss-btn"
-              onClick={() => {
-                navigateToPage(PAGE_KEY.metadata)
-              }}
-            >
-              Go To Service Metadata
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <div className="frontend-global-message-wrap">
+        <MessageBar
+          data={{
+            messageState: appStore.globalMessageBarState,
+            idleText: 'ready',
+            contentItems: globalMessageContentItems,
+          }}
+          config={{
+            isPersistent: true,
+            isOneLine: true,
+            heightSize: 'sm',
+            scrollLeft: appStore.globalMessageScrollLeft,
+            isBusy: appStore.isBootstrapping || appStore.isDbSchemaChecking,
+          }}
+          onEvent={(eventType, eventData) => {
+            if (eventType === 'dismissMessageRequest') {
+              if (!appStore.isGlobalDbSchemaWarningVisible) {
+                appStore.dismissGlobalMessage()
+              }
+            }
+            if (eventType === 'scrollLeftChangeRequest') {
+              appStore.setGlobalMessageScrollLeft(Number(eventData?.scrollLeft ?? 0))
+            }
+            if (eventType === 'gotoMetadataRequest') {
+              navigateToPage(PAGE_KEY.metadata)
+            }
+          }}
+        />
+      </div>
       <div className="frontend-layout">
         <PanelDual orientation="vertical" initialWidth={260}>
           <div className="frontend-sidebar">
@@ -150,7 +148,6 @@ const App = observer(() => {
           <div className={`frontend-main ${isPanelLocked ? 'is-locked' : ''}`}>
             <div className="frontend-main-panel">
               <ResourcePanel
-                pingMessage={pingMessage}
                 isPanelLocked={isPanelLocked}
                 onClickCreateSpace={handleClickCreateSpace}
                 onClickPing={handleClickPing}

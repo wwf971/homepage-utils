@@ -278,11 +278,13 @@ const BackendServerConfig = () => {
       <div className="section-title">Backend Server Configuration</div>
       <div className="config-section">
         <KeyValuesComp 
-          data={configData} 
-          isEditable={false}
-          alignColumn={true}
-          keyColWidth="min"
-          getComp={getConfigValueComp}
+          data={{ rows: configData }} 
+          config={{
+            isEditable: false,
+            alignCol: true,
+            keyColWidth: 'min',
+            compResolveFn: getConfigValueComp,
+          }}
         />
         
         <div className="config-note">

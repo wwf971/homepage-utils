@@ -80,7 +80,7 @@ export const TestConnectionRabbitMQ = () => {
         {config.length === 0 ? (
           <div className="test-loading">Loading configuration...</div>
         ) : (
-          <KeyValues data={config} isEditable={false} />
+          <KeyValues data={{ rows: config }} config={{ isEditable: false }} />
         )}
       </div>
       

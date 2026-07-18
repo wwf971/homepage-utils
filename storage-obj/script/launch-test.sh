@@ -15,34 +15,34 @@ DB_PASSWORD=""
 DATABASE_LIST_JSON=""
 DATABASE_INDEX=""
 
-if [[ -f "$ROOT_DIR/config/config.js" ]]; then
-  TEST_CONDA_ENV="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(config.TEST_CONDA_ENV ?? '')" 2>/dev/null || true
-  )"
-  BACKEND_PORT="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(String(config.BACKEND_PORT ?? ''))" 2>/dev/null || true
-  )"
-  DB_HOST="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(config.DB_HOST ?? '')" 2>/dev/null || true
-  )"
-  DB_PORT="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(String(config.DB_PORT ?? ''))" 2>/dev/null || true
-  )"
-  DB_NAME="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(config.DB_NAME ?? '')" 2>/dev/null || true
-  )"
-  DB_USER="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(config.DB_USER ?? '')" 2>/dev/null || true
-  )"
-  DB_PASSWORD="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(config.DB_PASSWORD ?? '')" 2>/dev/null || true
-  )"
-  DATABASE_LIST_JSON="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(JSON.stringify(config.DATABASE_LIST ?? []))" 2>/dev/null || true
-  )"
-  DATABASE_INDEX="$(
-    cd "$ROOT_DIR" && node --input-type=module -e "import config from './config/config.js'; process.stdout.write(String(config.DATABASE_INDEX ?? '0'))" 2>/dev/null || true
-  )"
+if [[ -f "$ROOT_DIR/config/config.yaml" ]]; then
+  while IFS= read -r config_line; do
+    [[ -z "$config_line" ]] && continue
+    eval "$config_line"
+  done < <(
+    python3 - <<'PY' "$ROOT_DIR"
+import shlex
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(sys.argv[1]) / "backend"))
+from config_loader import resolve_launch_config
+
+config = resolve_launch_config(Path(sys.argv[1]))
+for key in (
+    "TEST_CONDA_ENV",
+    "BACKEND_PORT",
+    "DB_HOST",
+    "DB_PORT",
+    "DB_NAME",
+    "DB_USER",
+    "DB_PASSWORD",
+    "DATABASE_LIST_JSON",
+    "DATABASE_INDEX",
+):
+    print(f"{key}={shlex.quote(str(config.get(key, '')))}")
+PY
+  )
 fi
 
 is_dry_run=false

@@ -224,11 +224,17 @@ const MongoDocSearch = observer(({ dbName, collName }) => {
           </div>
           
           <KeyValuesComp 
-            data={dataWithComp}
-            onChangeAttempt={handleFilterChange}
-            isKeyEditable={true}
-            isValueEditable={true}
-            keyColWidth="150px"
+            data={{ rows: dataWithComp }}
+            config={{
+              isKeyEditable: true,
+              isValueEditable: true,
+              keyColWidth: '150px',
+            }}
+            onEvent={(eventType, eventData) => {
+              if (eventType === 'cellUpdate') {
+                handleFilterChange(eventData.rowIndex, eventData.field, eventData.nextValue);
+              }
+            }}
           />
           
           <div style={{ 

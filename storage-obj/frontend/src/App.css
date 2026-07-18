@@ -20,23 +20,16 @@
   border-radius: 4px;
 }
 
-.frontend-global-warning-wrap {
+.frontend-global-message-wrap {
   width: 100%;
   max-width: 1180px;
-  margin: 0 auto 6px auto;
+  margin: 0 auto 4px auto;
+  flex-shrink: 0;
 }
 
-.frontend-global-warning-bar {
-  border: 1px solid #f2c2c2;
-  background: #fff2f2;
-  color: #8c2a2a;
-  border-radius: 4px;
-  padding: 4px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 12px;
+.frontend-global-message-wrap .message-bar-root {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .frontend-sidebar {

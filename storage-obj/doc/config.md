@@ -1,59 +1,52 @@
 ## Config Convention
 
-This config design avoids committing private local values into git while keeping local testing convenient. It uses a two-layer architecture: tracked default config in `config/config.js`, and gitignored local override config in `config/config.0.js`.
+This config design avoids committing private local values into git while keeping local testing convenient. It uses a two-layer architecture: tracked default config in `config/config.yaml`, and gitignored local override config in `config/config.0.yaml`.
 
-- `config/config.js` contains example/default values and is tracked.
-- `config/config.0.js` contains real local values, is excluded by `.gitignore`.
-- `config.js` should try importing `config.0.js` and override defaults when available.
-- backend/frontend scripts can read from `config.js` (or mirrored environment variables).
+- `config/config.yaml` contains example/default values and is tracked.
+- `config/config.0.yaml` contains real local values, is excluded by `.gitignore`.
+- `backend/config_loader.py` loads `config.yaml` first, then deep-merges `config.0.yaml` when it exists.
+- backend and launch scripts read merged config through `config_loader.py` (or mirrored environment variables).
 
-### Override mechanism (`config.0.js` -> `config.js`)
+### Override mechanism (`config.0.yaml` -> `config.yaml`)
 
-`config.js` should export defaults first, then merge `config.0.js` when it exists.
+`config_loader.py` loads defaults first, then merges `config.0.yaml` when it exists.
 
 Example pattern:
 
-```javascript
-// config/config.js
-const baseConfig = {
-  PORT: 7001,
-  DB_HOST: '127.0.0.1',
-  DB_PORT: 5432,
-  DB_NAME: 'object_storage',
-  DB_USER: 'postgres',
-  DB_PASSWORD: 'postgres',
-  DATABASE_LIST: [],
-  DATABASE_INDEX: 0,
-}
+```yaml
+# config/config.yaml
+dir_base: "."
+backend_port: 5107
+test_conda_env: ""
+database_index: 0
 
-let localOverride = {}
-try {
-  localOverride = (await import('./config.0.js')).default || {}
-} catch {
-  localOverride = {}
-}
-
-const mergedConfig = {
-  ...baseConfig,
-  ...localOverride,
-}
-
-mergedConfig.DATABASE_CURRENT =
-  mergedConfig.DATABASE_LIST?.[mergedConfig.DATABASE_INDEX] || null
-
-export default mergedConfig
+config_dbs:
+  local:
+    label: local
+    host: 127.0.0.1
+    port: 5432
+    database_name: postgres
+    username: postgres
+    password: postgres
 ```
 
-```javascript
-// config/config.0.js (gitignored local file)
-export default {
-  DB_HOST: '10.0.0.8',
-  DB_NAME: 'object_storage_local',
-  DATABASE_INDEX: 1,
-}
+```yaml
+# config/config.0.yaml (gitignored local file)
+database_index: 1
+
+config_dbs:
+  raspi5-ubuntu:
+    label: raspi5-ubuntu
+    host: 192.168.1.32
+    port: 5432
+    database_name: app_db
+    username: wwf194
+    password: example_password
 ```
 
 Merge result behavior:
-- keys not present in `config.0.js` keep defaults from `config.js`
-- keys present in `config.0.js` override defaults
-- callers always import from `config/config.js` only
+- keys not present in `config.0.yaml` keep defaults from `config.yaml`
+- keys present in `config.0.yaml` override defaults (nested dicts are deep-merged)
+- `config_dbs` preset order follows keys in `config.0.yaml` first, then keys only in `config.yaml`
+- optional `database_preset_order` in either file can set explicit preset order
+- callers use `load_project_config()` or `resolve_launch_config()` only

@@ -8,7 +8,6 @@ import './service.css'
 
 type ServiceInfoProps = {
   mode: 'metadata' | 'basic-info' | 'database'
-  pingMessage: { status: string; messageText: string }
   isPanelLocked: boolean
   onClickPing: () => void
   onClickRefreshDatabases: () => void
@@ -22,7 +21,6 @@ type CardMessage = {
 
 const ServiceInfo = observer(function ServiceInfo({
   mode,
-  pingMessage,
   isPanelLocked,
   onClickPing,
   onClickRefreshDatabases,
@@ -36,7 +34,7 @@ const ServiceInfo = observer(function ServiceInfo({
       <>
         <div className="frontend-title">Basic Info</div>
         <div className="frontend-kv">
-          <KeyValues data={appStore.projectInfo} isEditable={false} />
+          <KeyValues data={{ rows: appStore.projectInfo }} config={{ isEditable: false }} />
         </div>
       </>
     )
@@ -153,12 +151,6 @@ const ServiceInfo = observer(function ServiceInfo({
     <>
       <div className="frontend-title">{appStore.titleText}</div>
       <div className="frontend-subtitle">{appStore.subtitleText}</div>
-      {pingMessage.status !== 'idle' ? (
-        <div className={`frontend-message-bar status-${pingMessage.status}`}>
-          {pingMessage.status === 'loading' ? <SpinningCircle width={12} height={12} /> : null}
-          <span>{pingMessage.messageText}</span>
-        </div>
-      ) : null}
       <div className="frontend-actions">
         <button
           className="frontend-btn"

@@ -163,7 +163,7 @@ export const RabbitMQConfig = () => {
             {(!Array.isArray(appConfig) || appConfig.length === 0) && !configError ? (
               <div style={{ padding: '12px', color: '#666' }}>Loading configuration...</div>
             ) : (
-              <KeyValues data={Array.isArray(appConfig) ? appConfig : []} isEditable={false} />
+              <KeyValues data={{ rows: Array.isArray(appConfig) ? appConfig : [] }} config={{ isEditable: false }} />
             )}
           </div>
         </TabsOnTop.Tab>
@@ -193,10 +193,12 @@ export const RabbitMQConfig = () => {
               Click the edit icon to modify values. Changes are saved locally.
             </p>
             <KeyValuesComp 
-              data={localConfigWithComp} 
-              isEditable={false}
-              alignColumn={true}
-              keyColWidth="min"
+              data={{ rows: localConfigWithComp }} 
+              config={{
+                isEditable: false,
+                alignCol: true,
+                keyColWidth: 'min',
+              }}
             />
           </div>
         </TabsOnTop.Tab>
@@ -225,7 +227,7 @@ export const RabbitMQConfig = () => {
             <p className="config-hint">
               This shows the final configuration after merging all layers.
             </p>
-            <KeyValues data={Array.isArray(computedConfig) ? computedConfig : []} isEditable={false} />
+            <KeyValues data={{ rows: Array.isArray(computedConfig) ? computedConfig : [] }} config={{ isEditable: false }} />
           </div>
         </TabsOnTop.Tab>
       </TabsOnTop>
