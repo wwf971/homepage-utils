@@ -2,11 +2,15 @@ import { makeAutoObservable } from 'mobx'
 import { serviceStore } from './serviceStore'
 import { spaceStore } from '../space/spaceStore'
 import { objectStore } from '../object/objectStore'
+import { storageEndpointStore } from './storageEndpointStore'
 
 export const PAGE_KEY = {
   metadata: 'metadata',
   basicInfo: 'basic-info',
   database: 'database',
+  storageEndpointOverview: 'storage-endpoint-overview',
+  storageEndpointConfig: 'storage-endpoint-config',
+  storageEndpointSpaces: 'storage-endpoint-spaces',
   spaceOverview: 'space-overview',
   spaceMetadata: 'space-metadata',
   spaceObjects: 'space-objects',
@@ -16,9 +20,12 @@ const PAGE_ROUTE_PATH_BY_KEY: Record<string, string> = {
   [PAGE_KEY.metadata]: '/service/metadata',
   [PAGE_KEY.basicInfo]: '/service/basic-info',
   [PAGE_KEY.database]: '/service/database',
-  [PAGE_KEY.spaceOverview]: '/spaces',
-  [PAGE_KEY.spaceMetadata]: '/spaces',
-  [PAGE_KEY.spaceObjects]: '/spaces',
+  [PAGE_KEY.storageEndpointOverview]: '/storage-endpoints',
+  [PAGE_KEY.storageEndpointConfig]: '/storage-endpoints/endpoint',
+  [PAGE_KEY.storageEndpointSpaces]: '/storage-endpoints/endpoint',
+  [PAGE_KEY.spaceOverview]: '/storage-endpoints/endpoint',
+  [PAGE_KEY.spaceMetadata]: '/storage-endpoints/endpoint',
+  [PAGE_KEY.spaceObjects]: '/storage-endpoints/endpoint',
 }
 
 class AppStore {
@@ -73,6 +80,26 @@ class AppStore {
     return spaceStore.isSpacesLoading
   }
 
+  get isStorageEndpointsLoading() {
+    return storageEndpointStore.isLoading
+  }
+
+  get storageEndpointItems() {
+    return storageEndpointStore.items
+  }
+
+  get selectedStorageEndpointKey() {
+    return storageEndpointStore.selectedOrDefaultKey
+  }
+
+  get defaultStorageEndpointKey() {
+    return storageEndpointStore.defaultKey
+  }
+
+  get selectedStorageEndpointType() {
+    return storageEndpointStore.selectedItem?.type || ''
+  }
+
   get isSpaceCreating() {
     return spaceStore.isSpaceCreating
   }
@@ -102,14 +129,14 @@ class AppStore {
   }
 
   get errorText() {
-    return spaceStore.errorText || serviceStore.errorText
+    return storageEndpointStore.errorText || spaceStore.errorText || serviceStore.errorText
   }
 
   get projectInfo() {
     return [
       { key: 'service', value: 'storage-obj' },
       { key: 'frontend', value: 'vite + react + mobx' },
-      { key: 'backend', value: 'flask + postgresql' },
+      { key: 'backend', value: 'flask + postgresql + aws s3' },
       { key: 'dirBase', value: 'serves build from DIR_BASE/build' },
       { key: 'requests', value: String(serviceStore.requestCount + spaceStore.requestCount) },
       { key: 'ping', value: serviceStore.pingText },
@@ -167,21 +194,48 @@ class AppStore {
     return spaceStore.spaceItems.find((item) => item.spaceId === spaceStore.selectedSpaceId) || null
   }
 
-  getRoutePathByPageKey(pageKey: string, params: { spaceId?: string } = {}) {
+  getRoutePathByPageKey(pageKey: string, params: { spaceId?: string; storageEndpointKey?: string } = {}) {
     const basePath = PAGE_ROUTE_PATH_BY_KEY[pageKey] || PAGE_ROUTE_PATH_BY_KEY[PAGE_KEY.metadata]
-    if (pageKey === PAGE_KEY.spaceMetadata || pageKey === PAGE_KEY.spaceObjects) {
-      const spaceId = String(params.spaceId || spaceStore.selectedSpaceId || '').trim()
-      if (spaceId) {
-        const panelName = pageKey === PAGE_KEY.spaceObjects ? 'objects' : 'metadata'
-        return `${basePath}?spaceId=${encodeURIComponent(spaceId)}&panel=${panelName}`
+    const storageEndpointKey = String(params.storageEndpointKey || storageEndpointStore.selectedOrDefaultKey || '').trim()
+    if (
+      pageKey === PAGE_KEY.storageEndpointConfig
+      || pageKey === PAGE_KEY.storageEndpointSpaces
+      || pageKey === PAGE_KEY.spaceOverview
+      || pageKey === PAGE_KEY.spaceMetadata
+      || pageKey === PAGE_KEY.spaceObjects
+    ) {
+      const searchParams = new URLSearchParams()
+      if (storageEndpointKey) {
+        searchParams.set('storageEndpointKey', storageEndpointKey)
       }
+      if (pageKey === PAGE_KEY.storageEndpointConfig) {
+        searchParams.set('panel', 'config')
+      } else if (pageKey === PAGE_KEY.storageEndpointSpaces || pageKey === PAGE_KEY.spaceOverview) {
+        searchParams.set('panel', 'spaces')
+      }
+      if (pageKey === PAGE_KEY.spaceMetadata || pageKey === PAGE_KEY.spaceObjects) {
+        const spaceId = String(params.spaceId || spaceStore.selectedSpaceId || '').trim()
+        if (spaceId) {
+          searchParams.set('spaceId', spaceId)
+          searchParams.set('panel', pageKey === PAGE_KEY.spaceObjects ? 'objects' : 'metadata')
+        }
+      }
+      const searchText = searchParams.toString()
+      return searchText ? `${basePath}?${searchText}` : basePath
     }
     return basePath
   }
 
   getPageKeyByRoute(pathname: string, search: string) {
-    if (pathname === '/spaces') {
+    if (pathname === '/storage-endpoints') {
+      return PAGE_KEY.storageEndpointOverview
+    }
+    if (pathname === '/storage-endpoints/endpoint') {
       const searchParams = new URLSearchParams(search || '')
+      const storageEndpointKey = String(searchParams.get('storageEndpointKey') || '').trim()
+      if (storageEndpointKey) {
+        storageEndpointStore.setSelectedKey(storageEndpointKey)
+      }
       const spaceId = String(searchParams.get('spaceId') || '').trim()
       if (spaceId) {
         spaceStore.setSelectedSpaceId(spaceId)
@@ -192,10 +246,18 @@ class AppStore {
         return PAGE_KEY.spaceMetadata
       }
       spaceStore.setSelectedSpaceId('')
-      return PAGE_KEY.spaceOverview
+      const panelName = String(searchParams.get('panel') || 'config').trim()
+      return panelName === 'spaces' ? PAGE_KEY.storageEndpointSpaces : PAGE_KEY.storageEndpointConfig
     }
     const entry = Object.entries(PAGE_ROUTE_PATH_BY_KEY).find(([key, path]) => {
-      if (key === PAGE_KEY.spaceOverview || key === PAGE_KEY.spaceMetadata || key === PAGE_KEY.spaceObjects) {
+      if (
+        key === PAGE_KEY.storageEndpointOverview
+        || key === PAGE_KEY.storageEndpointConfig
+        || key === PAGE_KEY.storageEndpointSpaces
+        || key === PAGE_KEY.spaceOverview
+        || key === PAGE_KEY.spaceMetadata
+        || key === PAGE_KEY.spaceObjects
+      ) {
         return false
       }
       return path === pathname
@@ -203,9 +265,12 @@ class AppStore {
     return (entry?.[0] as string) || PAGE_KEY.metadata
   }
 
-  setCurrentPageKey(pageKey: string, params: { spaceId?: string } = {}) {
+  setCurrentPageKey(pageKey: string, params: { spaceId?: string; storageEndpointKey?: string } = {}) {
     const safePageKey = PAGE_ROUTE_PATH_BY_KEY[pageKey] ? pageKey : PAGE_KEY.metadata
-    if (safePageKey === PAGE_KEY.spaceOverview) {
+    if (params.storageEndpointKey) {
+      storageEndpointStore.setSelectedKey(params.storageEndpointKey)
+    }
+    if (safePageKey === PAGE_KEY.spaceOverview || safePageKey === PAGE_KEY.storageEndpointSpaces) {
       spaceStore.setSelectedSpaceId('')
     }
     if ((safePageKey === PAGE_KEY.spaceMetadata || safePageKey === PAGE_KEY.spaceObjects) && params.spaceId) {
@@ -216,7 +281,18 @@ class AppStore {
   }
 
   setCurrentRoutePath(pathname: string, search: string) {
+    const previousStorageEndpointKey = storageEndpointStore.selectedOrDefaultKey
     const pageKey = this.getPageKeyByRoute(pathname, search)
+    if (
+      previousStorageEndpointKey
+      && previousStorageEndpointKey !== storageEndpointStore.selectedOrDefaultKey
+      && storageEndpointStore.items.length > 0
+    ) {
+      this.clearCache()
+      spaceStore.clearSpaceData()
+      objectStore.clearAllState()
+      void this.requestLoadSpaces()
+    }
     this.currentRoutePath = this.getRoutePathByPageKey(pageKey)
     this.currentPageKey = pageKey
   }
@@ -231,14 +307,25 @@ class AppStore {
     if (this.currentPageKey === PAGE_KEY.database) {
       return 'service:database'
     }
-    if (this.currentPageKey === PAGE_KEY.spaceOverview) {
-      return 'spaces:overview'
+    if (this.currentPageKey === PAGE_KEY.storageEndpointOverview) {
+      return 'storage-endpoints:overview'
+    }
+    const endpointKey = storageEndpointStore.selectedOrDefaultKey
+    if (this.currentPageKey === PAGE_KEY.storageEndpointConfig) {
+      return endpointKey ? `storage-endpoint:${endpointKey}:config` : 'storage-endpoints'
+    }
+    if (this.currentPageKey === PAGE_KEY.storageEndpointSpaces || this.currentPageKey === PAGE_KEY.spaceOverview) {
+      return endpointKey ? `storage-endpoint:${endpointKey}:spaces` : 'storage-endpoints'
     }
     if (this.currentPageKey === PAGE_KEY.spaceMetadata) {
-      return spaceStore.selectedSpaceId ? `space:${spaceStore.selectedSpaceId}:metadata` : 'spaces'
+      return spaceStore.selectedSpaceId && endpointKey
+        ? `storage-endpoint:${endpointKey}:space:${spaceStore.selectedSpaceId}:metadata`
+        : 'storage-endpoints'
     }
     if (this.currentPageKey === PAGE_KEY.spaceObjects) {
-      return spaceStore.selectedSpaceId ? `space:${spaceStore.selectedSpaceId}:objects` : 'spaces'
+      return spaceStore.selectedSpaceId && endpointKey
+        ? `storage-endpoint:${endpointKey}:space:${spaceStore.selectedSpaceId}:objects`
+        : 'storage-endpoints'
     }
     return 'service'
   }
@@ -255,8 +342,42 @@ class AppStore {
     return serviceStore.requestDbTestByDatabaseKey(databaseKey, timeoutMs)
   }
 
+  async requestS3AccessTest(timeoutMs = 10000) {
+    return serviceStore.requestS3AccessTest(timeoutMs)
+  }
+
   async requestLoadDatabases() {
     return serviceStore.requestLoadDatabases()
+  }
+
+  async requestLoadStorageEndpoints() {
+    return storageEndpointStore.requestLoad()
+  }
+
+  async selectStorageEndpoint(storageEndpointKey: string) {
+    const normalizedKey = String(storageEndpointKey || '').trim()
+    if (!normalizedKey || normalizedKey === storageEndpointStore.selectedOrDefaultKey) {
+      return
+    }
+    storageEndpointStore.setSelectedKey(normalizedKey)
+    this.clearCache()
+    spaceStore.clearSpaceData()
+    objectStore.clearAllState()
+    await this.requestLoadSpaces()
+    await this.refreshDatabaseSchemaWarning()
+  }
+
+  async requestSetDefaultStorageEndpoint(storageEndpointKey: string) {
+    const result = await storageEndpointStore.requestSetDefault(storageEndpointKey)
+    if (!result?.isSuccess) {
+      return result
+    }
+    this.clearCache()
+    spaceStore.clearSpaceData()
+    objectStore.clearAllState()
+    await this.requestLoadSpaces()
+    await this.refreshDatabaseSchemaWarning()
+    return result
   }
 
   async requestLoadSpaces() {
@@ -366,6 +487,14 @@ class AppStore {
   }
 
   async refreshDatabaseSchemaWarning() {
+    if (this.selectedStorageEndpointType !== 'postgres') {
+      this.isDbSchemaWarningVisible = false
+      this.dbSchemaWarningText = ''
+      return {
+        isSuccess: true,
+        messageText: 'database schema check not applicable',
+      }
+    }
     this.isDbSchemaChecking = true
     try {
       const result = await this.requestCheckDatabaseSchema()
@@ -388,6 +517,7 @@ class AppStore {
     }
     this.isBootstrapping = true
     try {
+      await this.requestLoadStorageEndpoints()
       await this.requestLoadDatabases()
       await this.requestPing()
       await this.requestDbTest()

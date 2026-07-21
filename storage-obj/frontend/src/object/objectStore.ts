@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import { computeObjectContentByteSize } from './objectContentSize'
+import { withStorageEndpointBody, withStorageEndpointSearchParams } from '../store/storageEndpointStore'
 
 export type ObjectPayloadType = 'text' | 'bytes' | 'json'
 
@@ -276,7 +277,7 @@ class ObjectStore {
       typeState.errorText = ''
     })
     try {
-      const searchParams = new URLSearchParams()
+      const searchParams = withStorageEndpointSearchParams()
       searchParams.set('spaceId', normalizedSpaceId)
       searchParams.set('dataType', dataType)
       searchParams.set('pageIndex', String(pageIndex))
@@ -386,7 +387,7 @@ class ObjectStore {
       const editTypeValue = Number.isFinite(input.editType) ? Math.floor(Number(input.editType)) : 0
       const data = await this.requestJson('/api/object/create', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId,
           dataType,
           type: typeValue,
@@ -394,7 +395,7 @@ class ObjectStore {
           valueText: dataType === 'text' ? String(input.valueText || '') : undefined,
           valueBase64: dataType === 'bytes' ? String(input.valueBase64 || '') : undefined,
           valueJson,
-        }),
+        })),
       })
       runInAction(() => {
         typeState.pageIndex = 1
@@ -431,7 +432,7 @@ class ObjectStore {
       const editTypeValue = Number.isFinite(input.editType) ? Math.floor(Number(input.editType)) : 0
       await this.requestJson('/api/object/update', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId,
           dataType,
           objectId,
@@ -440,7 +441,7 @@ class ObjectStore {
           valueText: dataType === 'text' ? String(input.valueText || '') : undefined,
           valueBase64: dataType === 'bytes' ? String(input.valueBase64 || '') : undefined,
           valueJson,
-        }),
+        })),
       })
       typeState.rowIdsByPage = {}
       await this.requestListCurrentPage(spaceId, dataType, { forceReload: true })
@@ -472,11 +473,11 @@ class ObjectStore {
     try {
       await this.requestJson('/api/object/delete', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId,
           dataType,
           objectIds: objectIdList,
-        }),
+        })),
       })
       runInAction(() => {
         typeState.selectedObjectIdList = []

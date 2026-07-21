@@ -5,6 +5,7 @@ import ObjectToolbar from './ObjectToolbar'
 import ObjectTable from './ObjectTable'
 import ObjectCard from './ObjectCard'
 import { objectStore, type ObjectPayloadType } from './objectStore'
+import { storageEndpointStore } from '../store/storageEndpointStore'
 import './object.css'
 
 type ObjectPanelProps = {
@@ -18,9 +19,10 @@ const ObjectPanel = observer(function ObjectPanel({
     status: 'idle',
     messageText: '',
   })
-  const latestSpaceIdRef = useRef('')
+  const latestContextKeyRef = useRef('')
   const dataType = objectStore.getCurrentPayloadType(spaceId)
   const typeState = objectStore.getSpaceTypeState(spaceId, dataType)
+  const storageEndpointKey = storageEndpointStore.selectedOrDefaultKey
 
   const requestRefresh = async () => {
     const result = await objectStore.requestListCurrentPage(spaceId, dataType, { forceReload: true })
@@ -34,24 +36,25 @@ const ObjectPanel = observer(function ObjectPanel({
     if (!spaceId) {
       return
     }
-    const isSwitchingSpace = latestSpaceIdRef.current !== spaceId
-    latestSpaceIdRef.current = spaceId
+    const contextKey = `${storageEndpointKey}:${spaceId}`
+    const isSwitchingContext = latestContextKeyRef.current !== contextKey
+    latestContextKeyRef.current = contextKey
     const currentRows = objectStore.getCurrentPageRows(spaceId, dataType)
     const hasCurrentRows = currentRows.length > 0
-    if (isSwitchingSpace || !hasCurrentRows) {
+    if (isSwitchingContext || !hasCurrentRows) {
       objectStore.startListLoading(spaceId, dataType, true)
       objectStore.requestListCurrentPage(spaceId, dataType, { forceReload: true })
     } else {
       objectStore.requestListCurrentPage(spaceId, dataType)
     }
-    if (isSwitchingSpace) {
+    if (isSwitchingContext) {
       ;(['text', 'bytes', 'json'] as ObjectPayloadType[])
         .filter((itemType) => itemType !== dataType)
         .forEach((itemType) => {
           objectStore.requestListCurrentPage(spaceId, itemType)
         })
     }
-  }, [spaceId, dataType])
+  }, [spaceId, dataType, storageEndpointKey])
 
   if (!spaceId || !typeState) {
     return (
@@ -68,7 +71,9 @@ const ObjectPanel = observer(function ObjectPanel({
   return (
     <div className="object-panel-root">
       <div className="frontend-title">Objects</div>
-      <div className="frontend-subtitle">space: {spaceId}</div>
+      <div className="frontend-subtitle">
+        endpoint: {storageEndpointKey || '-'}, space: {spaceId}
+      </div>
       <MessageBar
         data={{
           messageState,

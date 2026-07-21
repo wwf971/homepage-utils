@@ -178,6 +178,37 @@ export class ServiceStore {
     }
   }
 
+  async requestS3AccessTest(timeoutMs = 10000) {
+    const normalizedTimeoutMs = Number.isFinite(timeoutMs)
+      ? Math.max(1000, Math.min(30000, Math.floor(timeoutMs)))
+      : 10000
+    const abortController = new AbortController()
+    const timeoutHandle = window.setTimeout(() => {
+      abortController.abort()
+    }, normalizedTimeoutMs + 1000)
+    try {
+      const data = await this.requestJson('/api/config/s3/test', {
+        method: 'POST',
+        body: JSON.stringify({
+          timeoutSeconds: Math.max(1, Math.floor(normalizedTimeoutMs / 1000)),
+        }),
+        signal: abortController.signal,
+      })
+      return {
+        isSuccess: true,
+        messageText: `S3 read/write verified: ${String(data.bucketName || '')}/${String(data.objectKey || '')}`,
+      }
+    } catch (error: unknown) {
+      const isTimeoutError = error instanceof DOMException && error.name === 'AbortError'
+      return {
+        isSuccess: false,
+        messageText: isTimeoutError ? `S3 access test timeout (${normalizedTimeoutMs}ms)` : String(error),
+      }
+    } finally {
+      window.clearTimeout(timeoutHandle)
+    }
+  }
+
   async requestLoadDatabases() {
     if (this.isDatabaseLoading) {
       return { isSuccess: false, messageText: 'database list is loading' }

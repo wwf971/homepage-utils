@@ -29,6 +29,13 @@ def register_service_routes(app, context: dict):
     ensure_metadata_table = context["ensure_metadata_table"]
     resolve_global_metadata_rank = context["resolve_global_metadata_rank"]
     serialize_metadata_item_row = context["serialize_metadata_item_row"]
+    get_dir_base = context["get_dir_base"]
+    load_aws_s3_config = context["load_aws_s3_config"]
+    test_s3_read_write_access = context["test_s3_read_write_access"]
+    find_storage_endpoint_by_key = context["find_storage_endpoint_by_key"]
+    set_runtime_storage_endpoint_key = context["set_runtime_storage_endpoint_key"]
+    build_storage_endpoint_list_data = context["build_storage_endpoint_list_data"]
+    to_db_config_from_storage_endpoint = context["to_db_config_from_storage_endpoint"]
 
     @app.get("/health/test")
     @app.get("/api/health/test")
@@ -94,6 +101,78 @@ def register_service_routes(app, context: dict):
             )
         except Exception as error:
             return make_json_response(-1, message=f"database test failed: {error}"), 500
+
+    @app.post("/config/s3/test")
+    @app.post("/api/config/s3/test")
+    def config_s3_test():
+        body = request.get_json(silent=True) or {}
+        timeout_seconds_raw = body.get("timeoutSeconds")
+        try:
+            timeout_seconds = int(timeout_seconds_raw) if timeout_seconds_raw is not None else 10
+        except Exception:
+            timeout_seconds = 10
+        timeout_seconds = max(1, min(timeout_seconds, 30))
+
+        try:
+            s3_config = load_aws_s3_config(get_dir_base())
+            if not str(s3_config.get("bucket_name") or "").strip():
+                return make_json_response(-1, message="aws_s3 bucket_name is required"), 400
+            test_result = test_s3_read_write_access(s3_config, timeout_seconds=timeout_seconds)
+            return make_json_response(
+                0,
+                data={
+                    **test_result,
+                    "timeoutSeconds": timeout_seconds,
+                },
+            )
+        except Exception as error:
+            return make_json_response(-1, message=f"S3 access test failed: {error}"), 500
+
+    @app.get("/config/storage-endpoint/list")
+    @app.get("/api/config/storage-endpoint/list")
+    def config_storage_endpoint_list():
+        return make_json_response(0, data=build_storage_endpoint_list_data())
+
+    @app.post("/config/storage-endpoint/test")
+    @app.post("/api/config/storage-endpoint/test")
+    def config_storage_endpoint_test():
+        body = request.get_json(silent=True) or {}
+        endpoint_key = str(body.get("storageEndpointKey") or "").strip()
+        endpoint_item = find_storage_endpoint_by_key(endpoint_key)
+        if endpoint_item is None:
+            return make_json_response(-1, message=f"storage endpoint key not found: {endpoint_key}"), 404
+        try:
+            timeout_seconds = max(1, min(int(body.get("timeoutSeconds") or 10), 30))
+        except Exception:
+            timeout_seconds = 10
+        try:
+            if endpoint_item["type"] == "postgres":
+                test_result = test_database_connection(
+                    to_db_config_from_storage_endpoint(endpoint_item),
+                    timeout_seconds=timeout_seconds,
+                )
+            else:
+                test_result = test_s3_read_write_access(endpoint_item, timeout_seconds=timeout_seconds)
+            return make_json_response(
+                0,
+                data={
+                    **test_result,
+                    "storageEndpointKey": endpoint_key,
+                    "timeoutSeconds": timeout_seconds,
+                },
+            )
+        except Exception as error:
+            return make_json_response(-1, message=f"storage endpoint test failed: {error}"), 500
+
+    @app.post("/config/storage-endpoint/default/set")
+    @app.post("/api/config/storage-endpoint/default/set")
+    def config_storage_endpoint_default_set():
+        body = request.get_json(silent=True) or {}
+        endpoint_key = str(body.get("storageEndpointKey") or "").strip()
+        if find_storage_endpoint_by_key(endpoint_key) is None:
+            return make_json_response(-1, message=f"storage endpoint key not found: {endpoint_key}"), 404
+        set_runtime_storage_endpoint_key(endpoint_key)
+        return make_json_response(0, data=build_storage_endpoint_list_data())
 
     @app.post("/echo")
     @app.post("/api/echo")

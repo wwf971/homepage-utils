@@ -123,6 +123,44 @@ def build_database_preset_list_from_config(config: dict[str, Any]):
     return preset_list
 
 
+def build_storage_endpoint_registry_from_config(config: dict[str, Any]):
+    config_dbs = config.get("config_dbs") if isinstance(config.get("config_dbs"), dict) else {}
+    endpoint_items = config.get("storage_endpoints") if isinstance(config.get("storage_endpoints"), dict) else {}
+    registry: dict[str, dict[str, Any]] = {}
+    default_keys: list[str] = []
+    for endpoint_key_raw, raw_item in endpoint_items.items():
+        if not isinstance(raw_item, dict):
+            continue
+        endpoint_key = str(endpoint_key_raw).strip()
+        if not endpoint_key:
+            continue
+        endpoint_type_raw = str(raw_item.get("type") or "").strip().lower()
+        endpoint_type = "postgres" if endpoint_type_raw in ("from_config_dbs", "postgres") else endpoint_type_raw
+        if endpoint_type not in ("postgres", "s3_aws"):
+            raise ValueError(f"unsupported storage endpoint type: {endpoint_type_raw}")
+        endpoint_item = dict(raw_item)
+        endpoint_item["key"] = endpoint_key
+        endpoint_item["label"] = str(raw_item.get("label") or endpoint_key).strip() or endpoint_key
+        endpoint_item["type"] = endpoint_type
+        endpoint_item["is_default"] = raw_item.get("is_default") is True
+        if endpoint_type_raw == "from_config_dbs":
+            config_db_name = str(raw_item.get("config_db_name") or "").strip()
+            config_db = config_dbs.get(config_db_name)
+            if not config_db_name or not isinstance(config_db, dict):
+                raise ValueError(f"config_db_name not found for storage endpoint {endpoint_key}: {config_db_name}")
+            endpoint_item = _deep_merge(config_db, endpoint_item)
+            endpoint_item["key"] = endpoint_key
+            endpoint_item["label"] = str(raw_item.get("label") or config_db.get("label") or endpoint_key).strip()
+            endpoint_item["type"] = "postgres"
+            endpoint_item["config_db_name"] = config_db_name
+        registry[endpoint_key] = endpoint_item
+        if endpoint_item["is_default"]:
+            default_keys.append(endpoint_key)
+    if len(default_keys) != 1:
+        raise ValueError(f"exactly one storage endpoint must have is_default: true; found {len(default_keys)}")
+    return registry, default_keys[0]
+
+
 def resolve_launch_config(dir_base: Path):
     config = load_project_config(dir_base)
     preset_list = build_database_preset_list_from_config(config)

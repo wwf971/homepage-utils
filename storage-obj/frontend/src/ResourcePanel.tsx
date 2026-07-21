@@ -4,6 +4,7 @@ import { KeyValues } from '@wwf971/react-comp-misc'
 import ServiceInfo from './service/ServiceInfo'
 import SpaceInfo from './space/SpaceInfo'
 import ObjectPanel from './object/ObjectPanel'
+import StorageEndpointPanel from './storage-endpoint/StorageEndpointPanel'
 import { appStore, PAGE_KEY } from './store/appStore'
 
 type ResourcePanelProps = {
@@ -33,8 +34,10 @@ const ResourcePanel = observer(function ResourcePanel({
 }: ResourcePanelProps) {
   const SpaceOverviewPanel = () => (
     <>
-      <div className="frontend-title">OverView</div>
-      <div className="frontend-subtitle">Create new spaces and view overall counts.</div>
+      <div className="frontend-title">Spaces</div>
+      <div className="frontend-subtitle">
+        Create spaces in storage endpoint {appStore.selectedStorageEndpointKey || '-'}.
+      </div>
       <div className="frontend-actions">
         <button className="frontend-btn" type="button" onClick={onClickCreateSpace} disabled={isPanelLocked}>
           <span>Create Space</span>
@@ -45,6 +48,7 @@ const ResourcePanel = observer(function ResourcePanel({
           data={{
             rows: [
               { key: 'spaceNum', value: String(appStore.spaces.length) },
+              { key: 'storageEndpointKey', value: appStore.selectedStorageEndpointKey || '-' },
             ],
           }}
           config={{ isEditable: false }}
@@ -61,7 +65,8 @@ const ResourcePanel = observer(function ResourcePanel({
     '/service/metadata',
     '/service/basic-info',
     '/service/database',
-    '/spaces',
+    '/storage-endpoints',
+    '/storage-endpoints/endpoint',
     '/',
   ].includes(location.pathname)
 
@@ -106,10 +111,17 @@ const ResourcePanel = observer(function ResourcePanel({
     )
   }
 
-  if (location.pathname === '/spaces') {
+  if (location.pathname === '/storage-endpoints') {
+    return <StorageEndpointPanel mode="overview" isLocked={isPanelLocked} />
+  }
+
+  if (location.pathname === '/storage-endpoints/endpoint') {
+    if (appStore.currentPageKey === PAGE_KEY.storageEndpointConfig) {
+      return <StorageEndpointPanel mode="config" isLocked={isPanelLocked} />
+    }
     const isSpaceMetadataSelected = appStore.currentPageKey === PAGE_KEY.spaceMetadata
     const isSpaceObjectsSelected = appStore.currentPageKey === PAGE_KEY.spaceObjects
-    const isSpacePanelSelected = isSpaceMetadataSelected || isSpaceObjectsSelected || selectedTreeItemId.startsWith('space:')
+    const isSpacePanelSelected = isSpaceMetadataSelected || isSpaceObjectsSelected || selectedTreeItemId.includes(':space:')
     if (isSpacePanelSelected) {
       if (isSpaceObjectsSelected || selectedTreeItemId.endsWith(':objects')) {
         return (

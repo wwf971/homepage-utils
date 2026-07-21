@@ -1,41 +1,46 @@
 # Backend Mechanisms
 
-## Database Switching
+## Storage Endpoint Resolution
 
-The backend supports runtime database switching through:
+Each data request resolves one storage endpoint:
 
-- `GET /api/config/database/list`
-- `POST /api/config/database/switch`
+```text
+read storageEndpointKey from query or request body
+  -> if present, find that configured endpoint
+  -> otherwise, use runtime default endpoint
+  -> if missing, return HTTP 404
+  -> dispatch to PostgreSQL or AWS S3
+```
 
-The switch endpoint validates connectivity to the target database first (`select 1`).  
-When that succeeds, backend updates the active DB config used by each request transaction.
+PostgreSQL requests run in a transaction connected to the selected endpoint.
 
-### Config Source: `config.yaml` and `config.0.yaml`
+S3 requests use `S3StorageBackend` in `backend/s3_utils.py`. S3 functions are centralized there.
 
-Database presets are authored in `config/config.yaml`, and can be overridden in local `config/config.0.yaml`.
+## Runtime Default
 
-- `config_loader.py` loads and merges both files.
-- The merged config exposes:
-  - `config_dbs`
-  - `database_index`
-  - current database preset derived from the list and index
+`POST /api/config/storage-endpoint/default/set` changes the endpoint used when later requests omit `storageEndpointKey`.
 
-At launch time, `script/launch-test.sh` reads merged config values with Python and injects these env vars:
+This change is in memory. Restarting the backend restores the endpoint marked `is_default: true` in merged YAML config.
 
-- `DATABASE_LIST_JSON`
-- `DATABASE_INDEX`
-- and the current `DB_*` fallback values
+## Endpoint Test
 
-Backend reads `DATABASE_LIST_JSON` and `DATABASE_INDEX` on startup to build switchable preset options.  
-If these env vars are missing, backend falls back to one default preset from `DB_*`.
+`POST /api/config/storage-endpoint/test` dispatches by endpoint type:
 
-### Frontend Reload After Switch
+- PostgreSQL executes `select 1`.
+- S3 writes, reads, compares, and deletes one temporary object.
 
-After switch success, frontend store:
+Credentials are never included in endpoint list or test responses.
 
-- flushes cache
-- clears service/space in-memory state
-- reloads service health (`ping`, `db test`)
-- reloads spaces (and metadata if needed by route)
+## Frontend Endpoint Change
 
-This prevents stale data from previous database context.
+After selecting another endpoint, the frontend:
+
+- clears space and object state
+- reloads spaces from the selected endpoint
+- sends `storageEndpointKey` with space and object requests
+
+This prevents data from different endpoints from sharing frontend state.
+
+## Legacy Database Admin APIs
+
+The `/api/config/database/*` APIs remain for compatibility and database-specific administration. Storage endpoint APIs are the common interface for endpoint listing, testing, and default selection.

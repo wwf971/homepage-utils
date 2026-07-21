@@ -1,0 +1,31 @@
+.storage-endpoint-panel-root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.storage-endpoint-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.storage-endpoint-tree-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.storage-endpoint-tree-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-endpoint-tree-default {
+  color: #1b7a2f;
+  font-size: 11px;
+  font-weight: 700;
+}

@@ -20,10 +20,13 @@ const App = observer(function App() {
     appStore.setCurrentRoutePath(location.pathname, location.search)
   }, [location.pathname, location.search])
 
-  const isBusy = appStore.isSpacesLoading || appStore.isSpaceCreating || appStore.isSpaceDeleting || appStore.isSpaceClearing
+  const isBusy = appStore.isStorageEndpointsLoading || appStore.isSpacesLoading || appStore.isSpaceCreating || appStore.isSpaceDeleting || appStore.isSpaceClearing
   const isPanelLocked = isLocked || isBusy
 
-  const navigateToPage = (pageKey: string, params: { spaceId?: string } = {}) => {
+  const navigateToPage = (
+    pageKey: string,
+    params: { spaceId?: string; storageEndpointKey?: string } = {},
+  ) => {
     appStore.setCurrentPageKey(pageKey, params)
     const routePath = appStore.getRoutePathByPageKey(pageKey, params)
     const currentRouteUrl = `${location.pathname}${location.search || ''}`

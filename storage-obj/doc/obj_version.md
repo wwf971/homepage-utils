@@ -23,7 +23,7 @@ Example:
 
 `*` means current HEAD.
 
-Per payload type (`text`, `bytes`, `json`), object versioning uses three table groups under one space:
+Per data type (`text`, `bytes`, `json`), object versioning uses three table groups under one space:
 
 - current table: `space_{spaceId}_object_*`
 - history table: `space_{spaceId}_object_*_history`
@@ -38,7 +38,7 @@ Per payload type (`text`, `bytes`, `json`), object versioning uses three table g
 - `objectId`
 - `versionId`
 - `versionIdPrev` (nullable for first version)
-- payload column (`valueText` or `valueBytes` or `valueJson`)
+- object data column (`valueText` or `valueBytes` or `valueJson`)
 - `isDataDeleted`
 - change and time fields
 
@@ -55,7 +55,7 @@ Primary key is (`objectId`, `versionId`).
 
 ### Current table
 
-`space_{spaceId}_object_*` materializes the payload of current HEAD:
+`space_{spaceId}_object_*` materializes the object data of current HEAD:
 
 - one row per non-deleted object
 - `versionId` column should equal `status.versionIdHead`
@@ -66,7 +66,7 @@ Primary key is (`objectId`, `versionId`).
 
 1. Allocate initial `versionId`.
 2. Insert first history row (`versionIdPrev = null`).
-3. Insert current row with same payload and version.
+3. Insert current row with the same object data and version.
 4. Insert status row: `versionIdHead = <initial version>`, `isDeleted = false`.
 
 ### Update object
@@ -78,7 +78,7 @@ Write behavior is selected by `status.editType`.
 1. Read `versionIdHead` from status.
 2. Allocate new `versionId`.
 3. Insert new history row with `versionIdPrev = oldHead`.
-4. Upsert current row to new payload and `versionId = newVersion`.
+4. Upsert current row to new object data and `versionId = newVersion`.
 5. Update status row: `versionIdHead = newVersion`, `isDeleted = false`.
 
 Old history rows are never modified.
@@ -119,7 +119,7 @@ Checkout means moving current HEAD pointer to an existing history node.
 
 1. Read target history row by (`objectId`, `targetVersionId`).
 2. Update status row: `versionIdHead = targetVersionId`, `isDeleted = false`.
-3. Upsert current row using target payload and `versionId = targetVersionId`.
+3. Upsert current row using target object data and `versionId = targetVersionId`.
 
 `rollback` is an alias name for this checkout behavior.
 
@@ -131,7 +131,7 @@ Delete representation is split between status and current tables:
   - `isDeleted = true`
   - `versionIdHead` keeps its value (unless policy introduces explicit delete marker versions)
 - in current table (`space_{spaceId}_object_*`):
-  - row is removed (no current payload row for deleted objects)
+  - row is removed (no current data row for deleted objects)
 - in history table (`space_{spaceId}_object_*_history`):
   - existing history rows stay unchanged
 
@@ -143,17 +143,17 @@ So a deleted object is represented by:
 ### Restore object
 
 1. Read `versionIdHead` from status.
-2. Read corresponding history payload.
+2. Read corresponding history data.
 3. Set `isDeleted = false`.
-4. Re-materialize current row with that HEAD version payload.
+4. Re-materialize current row with that HEAD version data.
 
 ## History Payload Release
 
-History trace can be retained while releasing payload data for specific old versions.
+History trace can be retained while releasing object data for specific old versions.
 
 In `space_{spaceId}_object_*_history`:
-- set payload column to `null`
+- set object data column to `null`
 - set `isDataDeleted = true`
 - keep `objectId`, `versionId`, `versionIdPrev`, and audit fields unchanged
 
-This preserves the topology of the version tree even when some payloads are removed.
+This preserves the topology of the version tree even when some version data is removed.

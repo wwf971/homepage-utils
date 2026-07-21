@@ -37,6 +37,23 @@ Each endpoint below is registered at both `/api/...` and `/...` (same handler, w
 
 IDs should be passed through query params (`GET`) or request body (`POST`), not URL path variables.
 
+### Storage Endpoint
+
+Every space, object, version, and metadata request accepts an optional storage endpoint selector:
+
+- `GET`: `storageEndpointKey` query parameter
+- `POST`: `storageEndpointKey` request body field
+
+When omitted, the runtime default endpoint is used. An unknown key returns HTTP 404 and `code = -1`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/config/storage-endpoint/list` | list safe endpoint information and runtime default |
+| POST | `/api/config/storage-endpoint/test` | test one PostgreSQL or S3 endpoint |
+| POST | `/api/config/storage-endpoint/default/set` | change runtime default endpoint |
+
+Refer to [storage_endpoint.md](./storage_endpoint.md) for the semantic model.
+
 ### Health
 
 | Method | Endpoint | Description |
@@ -50,8 +67,8 @@ IDs should be passed through query params (`GET`) or request body (`POST`), not 
 |--------|----------|-------------|
 | GET | `/api/space/list` | list all spaces |
 | GET | `/api/space/find-by-name` | find one space by `name` query param |
-| POST | `/api/space/create` | create new space and initialize per-space tables |
-| POST | `/api/space/delete` | delete a space and drop its tables |
+| POST | `/api/space/create` | create a new space |
+| POST | `/api/space/delete` | delete a space and its data |
 | POST | `/api/space/clear` | clear objects and metadata inside one space |
 
 ### Space Metadata
@@ -133,6 +150,7 @@ Rules:
 - Only write endpoints are allowed in a batch. `GET` endpoints and service-admin endpoints are not allowed.
 - Nested batch calls are not allowed.
 - The batch endpoint should call the same backend business logic as the single-operation endpoints, not duplicate behavior.
+- Batch transaction is supported only by PostgreSQL endpoints. S3 endpoints return an unsupported error.
 
 Workflow:
 ```
@@ -255,16 +273,37 @@ Failure response:
 
 ### Service Admin
 
-Used by the storage-obj frontend for database switching and schema checks.
+Storage endpoint APIs are the common admin interface. Database APIs remain for PostgreSQL-specific compatibility and schema administration.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/config/storage-endpoint/list` | list storage endpoints |
+| POST | `/api/config/storage-endpoint/test` | test one storage endpoint |
+| POST | `/api/config/storage-endpoint/default/set` | change runtime default endpoint |
 | GET | `/api/config/database/list` | list database presets |
 | POST | `/api/config/database/test` | test one database preset |
 | POST | `/api/config/database/switch` | switch active database |
 | POST | `/api/config/database/reinit` | run init SQL on active database |
 | POST | `/api/config/database/check` | check schema/table shape |
+| POST | `/api/config/s3/test` | compatibility test for the default or first S3 endpoint |
 | POST | `/api/echo` | echo request body for debugging |
+
+### `/api/config/storage-endpoint/test`
+
+Request body:
+
+```json
+{
+  "storageEndpointKey": "s3_aws_note",
+  "timeoutSeconds": 10
+}
+```
+
+For PostgreSQL, the endpoint executes `select 1`.
+
+For S3, it writes one temporary object under `{path_prefix}/__test__/read-write/`, reads and verifies it, then deletes it.
+
+`timeoutSeconds` is limited to 1 through 30. Credentials are not returned.
 
 ## Request Notes
 
@@ -273,7 +312,8 @@ Used by the storage-obj frontend for database switching and schema checks.
   - `spaceId`
   - `dataType` (`text` | `bytes` | `json`)
   - `objectId` (except create when server allocates)
-- `spaceId`, `objectId`, and `versionId` use `ms_48` (`bigint` in DB).
+- IDs are represented as strings in HTTP responses.
+- ID allocation details can differ by endpoint implementation. Refer to [id.md](./id.md).
 - Data fields:
   - text: `valueText`
   - bytes: `valueBase64` (decoded to `bytea` in backend)

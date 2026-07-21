@@ -13,8 +13,13 @@ from typing import Any, Callable
 
 from flask import Flask, jsonify, request, send_from_directory
 from batch import register_batch_routes
-from config_loader import build_database_preset_list_from_config, load_project_config
+from config_loader import (
+    build_database_preset_list_from_config,
+    build_storage_endpoint_registry_from_config,
+    load_project_config,
+)
 from object import register_object_routes
+from s3_utils import dispatch_s3_request, load_aws_s3_config, test_s3_read_write_access
 from service import register_service_routes
 from space import register_space_routes
 from utils import lexorank_between, lexorank_initial
@@ -130,6 +135,16 @@ def to_db_config_from_preset(preset_item: dict[str, Any]):
     }
 
 
+def to_db_config_from_storage_endpoint(endpoint_item: dict[str, Any]):
+    return {
+        "host": str(endpoint_item.get("host") or endpoint_item.get("ip") or "127.0.0.1"),
+        "port": int(endpoint_item.get("port") or 5432),
+        "dbname": str(endpoint_item.get("database_name") or endpoint_item.get("databaseName") or "postgres"),
+        "user": str(endpoint_item.get("username") or "postgres"),
+        "password": str(endpoint_item.get("password") or "postgres"),
+    }
+
+
 def build_database_list_payload():
     return [
         {
@@ -220,6 +235,9 @@ def build_table_issue_text_list(failed_items: list[dict]):
 
 
 database_preset_list = load_database_preset_list()
+project_config = load_project_config(get_dir_base())
+storage_endpoint_registry, startup_storage_endpoint_key = build_storage_endpoint_registry_from_config(project_config)
+runtime_storage_endpoint_key = startup_storage_endpoint_key
 database_index_raw = os.environ.get("DATABASE_INDEX", "0")
 try:
     database_index = int(database_index_raw)
@@ -235,10 +253,35 @@ db_transaction_current = ContextVar("db_transaction_current", default=None)
 
 
 def run_in_transaction(action: Callable[[Any], Any]):
+    body = request.get_json(silent=True) if request.method == "POST" else None
+    requested_endpoint_key = str(
+        request.args.get("storageEndpointKey")
+        or ((body or {}).get("storageEndpointKey") if isinstance(body, dict) else "")
+        or runtime_storage_endpoint_key
+    ).strip()
+    endpoint_item = storage_endpoint_registry.get(requested_endpoint_key)
+    if endpoint_item is None:
+        return make_json_response(-1, message=f"storage endpoint key not found: {requested_endpoint_key}"), 404
     db_current = db_transaction_current.get()
     if db_current is not None:
         try:
             result = action(db_current)
+            return make_json_response(0, data=result)
+        except Exception as error:
+            error_data = getattr(error, "response_data", None)
+            return make_json_response(-1, data=error_data, message=str(error)), 500
+    if endpoint_item["type"] == "s3_aws":
+        if request.path in ("/batch/transaction", "/api/batch/transaction"):
+            return make_json_response(-1, message="batch transaction is not supported for S3 storage endpoints"), 400
+        try:
+            result = dispatch_s3_request(
+                endpoint_item,
+                request.path,
+                body if isinstance(body, dict) else {},
+                request.args.to_dict(),
+                create_ms48_id,
+                lexorank_between,
+            )
             return make_json_response(0, data=result)
         except Exception as error:
             error_data = getattr(error, "response_data", None)
@@ -259,7 +302,7 @@ def run_in_transaction(action: Callable[[Any], Any]):
                 "psycopg is not installed. import error: "
                 f"{import_error_text}. run: pip install -r backend/requirements.txt"
             )
-        db = connect(**active_database_config)
+        db = connect(**to_db_config_from_storage_endpoint(endpoint_item))
         db.autocommit = False
         transaction_token = db_transaction_current.set(db)
 
@@ -748,6 +791,49 @@ def set_is_database_switching(value: bool):
     is_database_switching = value
 
 
+def find_storage_endpoint_by_key(endpoint_key: str):
+    return storage_endpoint_registry.get(str(endpoint_key or "").strip())
+
+
+def get_runtime_storage_endpoint_key():
+    return runtime_storage_endpoint_key
+
+
+def set_runtime_storage_endpoint_key(endpoint_key: str):
+    global runtime_storage_endpoint_key
+    runtime_storage_endpoint_key = endpoint_key
+
+
+def build_storage_endpoint_list_data():
+    items = []
+    for endpoint_key, endpoint_item in storage_endpoint_registry.items():
+        item = {
+            "key": endpoint_key,
+            "label": endpoint_item["label"],
+            "type": endpoint_item["type"],
+            "isDefault": endpoint_key == runtime_storage_endpoint_key,
+        }
+        if endpoint_item["type"] == "postgres":
+            item.update(
+                {
+                    "host": str(endpoint_item.get("host") or endpoint_item.get("ip") or "127.0.0.1"),
+                    "port": int(endpoint_item.get("port") or 5432),
+                    "databaseName": str(endpoint_item.get("database_name") or endpoint_item.get("databaseName") or "postgres"),
+                    "username": str(endpoint_item.get("username") or "postgres"),
+                }
+            )
+        else:
+            item.update(
+                {
+                    "bucketName": str(endpoint_item.get("bucket_name") or ""),
+                    "regionName": str(endpoint_item.get("region_name") or ""),
+                    "pathPrefix": str(endpoint_item.get("path_prefix") or "").strip().strip("/"),
+                }
+            )
+        items.append(item)
+    return {"defaultKey": runtime_storage_endpoint_key, "items": items}
+
+
 app = Flask(__name__)
 
 register_service_routes(
@@ -775,6 +861,14 @@ register_service_routes(
         "ensure_metadata_table": ensure_metadata_table,
         "resolve_global_metadata_rank": resolve_global_metadata_rank,
         "serialize_metadata_item_row": serialize_metadata_item_row,
+        "get_dir_base": get_dir_base,
+        "load_aws_s3_config": load_aws_s3_config,
+        "test_s3_read_write_access": test_s3_read_write_access,
+        "find_storage_endpoint_by_key": find_storage_endpoint_by_key,
+        "get_runtime_storage_endpoint_key": get_runtime_storage_endpoint_key,
+        "set_runtime_storage_endpoint_key": set_runtime_storage_endpoint_key,
+        "build_storage_endpoint_list_data": build_storage_endpoint_list_data,
+        "to_db_config_from_storage_endpoint": to_db_config_from_storage_endpoint,
     },
 )
 

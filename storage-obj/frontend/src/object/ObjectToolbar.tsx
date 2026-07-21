@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { observer } from 'mobx-react-lite'
 import { objectStore, type ObjectPayloadType } from './objectStore'
 
@@ -43,7 +43,6 @@ const ObjectToolbar = observer(function ObjectToolbar({
   onRequestPageChange,
 }: ObjectToolbarProps) {
   const typeState = objectStore.getSpaceTypeState(spaceId, dataType)
-  const searchEditorRef = useRef<HTMLDivElement | null>(null)
   const mainViewportRef = useRef<HTMLDivElement | null>(null)
   const mainTrackRef = useRef<HTMLDivElement | null>(null)
   const paginationViewportRef = useRef<HTMLDivElement | null>(null)
@@ -54,19 +53,6 @@ const ObjectToolbar = observer(function ObjectToolbar({
   const isSearchSupported = dataType === 'text' || dataType === 'json'
   const selectedObjectNum = typeState.selectedObjectIdList.length
   const totalPageCount = objectStore.getTotalPageCount(spaceId, dataType)
-  useEffect(() => {
-    if (!isSearchSupported) {
-      return
-    }
-    const targetEl = searchEditorRef.current
-    if (!targetEl) {
-      return
-    }
-    const nextValue = typeState.searchInputText
-    if ((targetEl.textContent || '') !== nextValue) {
-      targetEl.textContent = nextValue
-    }
-  }, [isSearchSupported, typeState.searchInputText])
 
   return (
     <div className="object-toolbar-rows">
@@ -106,13 +92,22 @@ const ObjectToolbar = observer(function ObjectToolbar({
           <div className="object-toolbar-group">
             {isSearchSupported ? (
               <>
-                <div
-                  ref={searchEditorRef}
-                  className={`object-filter-search-editor ${isLocked ? 'is-locked' : ''}`}
-                  contentEditable={!isLocked}
-                  suppressContentEditableWarning={true}
-                  onInput={(event) => {
-                    objectStore.setSearchInputText(spaceId, dataType, event.currentTarget.textContent || '')
+                <input
+                  type="text"
+                  className={`object-filter-search-input ${isLocked ? 'is-locked' : ''}`}
+                  value={typeState.searchInputText}
+                  placeholder="Search text"
+                  disabled={isLocked}
+                  onChange={(event) => {
+                    objectStore.setSearchInputText(spaceId, dataType, event.target.value)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' || isLocked) {
+                      return
+                    }
+                    event.preventDefault()
+                    objectStore.applySearchText(spaceId, dataType)
+                    onRequestRefresh()
                   }}
                 />
                 <button

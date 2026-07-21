@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from 'mobx'
+import { withStorageEndpointBody, withStorageEndpointSearchParams } from '../store/storageEndpointStore'
 
 type JsonValue = Record<string, unknown>
 
@@ -93,7 +94,8 @@ export class SpaceStore {
       this.isSpacesLoading = true
     })
     try {
-      const data = await this.requestJson('/api/space/list')
+      const searchParams = withStorageEndpointSearchParams()
+      const data = await this.requestJson(`/api/space/list?${searchParams.toString()}`)
       const spaces = Array.isArray(data.spaces) ? data.spaces.map((item) => String(item)) : []
       const spaceItems = Array.isArray(data.spaceItems)
         ? data.spaceItems.map((item) => ({
@@ -135,7 +137,10 @@ export class SpaceStore {
       this.isSpaceCreating = true
     })
     try {
-      const data = await this.requestJson('/api/space/create', { method: 'POST', body: JSON.stringify({}) })
+      const data = await this.requestJson('/api/space/create', {
+        method: 'POST',
+        body: JSON.stringify(withStorageEndpointBody()),
+      })
       const spaces = Array.isArray(data.spaces) ? data.spaces.map((item) => String(item)) : []
       const spaceId = String(data.spaceId || '')
       runInAction(() => {
@@ -184,7 +189,10 @@ export class SpaceStore {
       this.isSpaceDeleting = true
     })
     try {
-      const data = await this.requestJson('/api/space/delete', { method: 'POST', body: JSON.stringify({ spaceId }) })
+      const data = await this.requestJson('/api/space/delete', {
+        method: 'POST',
+        body: JSON.stringify(withStorageEndpointBody({ spaceId })),
+      })
       const spaces = Array.isArray(data.spaces) ? data.spaces.map((item) => String(item)) : []
       runInAction(() => {
         this.spaces = spaces
@@ -223,7 +231,7 @@ export class SpaceStore {
     try {
       const data = await this.requestJson('/api/space/clear', {
         method: 'POST',
-        body: JSON.stringify({ spaceId: normalizedSpaceId }),
+        body: JSON.stringify(withStorageEndpointBody({ spaceId: normalizedSpaceId })),
       })
       runInAction(() => {
         this.spaceMetadataItems = []
@@ -256,7 +264,9 @@ export class SpaceStore {
       return { isSuccess: true, messageText: 'space metadata cleared' }
     }
     try {
-      const data = await this.requestJson(`/api/space/metadata/list?spaceId=${encodeURIComponent(normalizedSpaceId)}`)
+      const searchParams = withStorageEndpointSearchParams()
+      searchParams.set('spaceId', normalizedSpaceId)
+      const data = await this.requestJson(`/api/space/metadata/list?${searchParams.toString()}`)
       const items = Array.isArray(data.items)
         ? data.items.map((item) => ({
           tag: String(item.tag || ''),
@@ -297,7 +307,7 @@ export class SpaceStore {
       }
       await this.requestJson('/api/space/metadata/upsert', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(withStorageEndpointBody(body)),
       })
       await this.requestLoadSpaceMetadata(normalizedSpaceId)
       await this.requestLoadSpaces()
@@ -323,20 +333,20 @@ export class SpaceStore {
     try {
       await this.requestJson('/api/space/metadata/upsert', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId: normalizedSpaceId,
           tag: normalizedToTag,
           rank: String(rank || ''),
           valueType: 1,
           valueText: String(valueText || ''),
-        }),
+        })),
       })
       await this.requestJson('/api/space/metadata/delete', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId: normalizedSpaceId,
           tag: normalizedFromTag,
-        }),
+        })),
       })
       await this.requestLoadSpaceMetadata(normalizedSpaceId)
       await this.requestLoadSpaces()
@@ -375,14 +385,14 @@ export class SpaceStore {
     try {
       await this.requestJson('/api/space/metadata/insert', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId: normalizedSpaceId,
           tag: newTag,
           valueType: 1,
           valueText: '',
           position,
           targetTag: String(targetTag || '').trim(),
-        }),
+        })),
       })
       await this.requestLoadSpaceMetadata(normalizedSpaceId)
       return { isSuccess: true, messageText: `metadata inserted: ${newTag}`, tag: newTag }
@@ -403,10 +413,10 @@ export class SpaceStore {
     try {
       await this.requestJson('/api/space/metadata/delete', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId: normalizedSpaceId,
           tag: normalizedTag,
-        }),
+        })),
       })
       await this.requestLoadSpaceMetadata(normalizedSpaceId)
       await this.requestLoadSpaces()
@@ -428,11 +438,11 @@ export class SpaceStore {
     try {
       await this.requestJson('/api/space/metadata/move', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(withStorageEndpointBody({
           spaceId: normalizedSpaceId,
           tag: normalizedTag,
           direction,
-        }),
+        })),
       })
       await this.requestLoadSpaceMetadata(normalizedSpaceId)
       return { isSuccess: true, messageText: `metadata moved ${direction}: ${normalizedTag}` }

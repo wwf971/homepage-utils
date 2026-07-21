@@ -50,3 +50,40 @@ Merge result behavior:
 - `config_dbs` preset order follows keys in `config.0.yaml` first, then keys only in `config.yaml`
 - optional `database_preset_order` in either file can set explicit preset order
 - callers use `load_project_config()` or `resolve_launch_config()` only
+
+## Storage Endpoints
+
+`storage_endpoints` defines the available object storage backends.
+
+```yaml
+storage_endpoints:
+  postgres_local:
+    label: PostgreSQL local
+    type: from_config_dbs
+    config_db_name: local
+    is_default: true
+
+  s3_aws_note:
+    label: AWS S3
+    type: s3_aws
+    bucket_name: example-bucket
+    region_name: ap-northeast-1
+    access_key_id: ""
+    secret_access_key: ""
+    session_token: ""
+    path_prefix: main-note
+```
+
+- the map key is the storage endpoint key used by APIs
+- exactly one endpoint has `is_default: true`
+- `from_config_dbs` reads PostgreSQL connection values from `config_dbs`
+- `s3_aws` contains one S3 bucket connection
+- `bucket_name` is required for S3 operations.
+- `region_name` should match the bucket region.
+- `path_prefix` is normalized without leading or trailing `/`.
+- explicit credentials are optional when an IAM role or the standard AWS credential chain is available.
+- real credentials belong only in gitignored `config/config.0.yaml`.
+
+Nested endpoint fields are deep-merged between the tracked and local config layers. Using the same endpoint key in both files overrides only the specified local fields.
+
+Refer to [storage_endpoint.md](./storage_endpoint.md) for endpoint behavior.

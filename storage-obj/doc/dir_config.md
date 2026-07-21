@@ -1,83 +1,56 @@
-## Directory Structure
-
-`ddl` means Data Definition Language: SQL files that define and evolve table structures.
+# Directory Structure
 
 ```text
 storage-obj/
-  .gitignore
-
   README.md
-  doc-recover.txt
-
-  doc/
-    api.md
-    backend.md
-    config.md
-    database.md
-    dir_config.md
-    docker.md
-    guidance_db_update.md
-    id.md
-    obj_version.md
-    route.md
-    space.md
 
   config/
     config.yaml
     config.0.yaml
 
   backend/
-    __pycache__/
     app.py
-    requirements.txt
-    utils.py
+    service.py
+    space.py
+    object.py
+    obj_metadata.py
+    s3_utils.py
+    config_loader.py
 
-  frontend/
-    eslint.config.js
-    index.html
-    package.json
-    pnpm-lock.yaml
-    public/
-      favicon.svg
-      icons.svg
-    src/
-      App.tsx
-      App.css
-      ResourceTree.tsx
-      index.css
-      main.tsx
-      assets/
-        hero.png
-      service/
-        ServiceInfo.tsx
-        service.css
-      space/
-        SpaceInfo.tsx
-        space.css
-      store/
-        appStore.ts
-        serviceStore.ts
-        spaceStore.ts
-      types/
-        react-comp-misc.d.ts
-    tsconfig.app.json
-    tsconfig.json
-    tsconfig.node.json
-    vite.config.ts
+  frontend/src/
+    App.tsx
+    ResourceTree.tsx
+    ResourcePanel.tsx
+    storage-endpoint/
+    service/
+    space/
+    object/
+    store/
+
+  doc/
+    storage-obj.md
+    storage_endpoint.md
+    backend_s3.md
+    space.md
+    object.md
+    object_metadata.md
+    obj_version.md
+    api.md
+    config.md
+    backend.md
+    database.md
+    id.md
 
   database/
     init_db.sql
     init_data_example.sql
 
-  build/
-    index.html
-    favicon.svg
-    icons.svg
-    assets/
-      index-*.css
-      index-*.js
-
   script/
     launch-test.sh
 ```
+
+- `config/config.yaml` contains tracked defaults.
+- `config/config.0.yaml` contains local overrides and credentials.
+- `backend/s3_utils.py` centralizes AWS S3 operations.
+- `build/` contains generated frontend output.
 

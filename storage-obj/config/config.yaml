@@ -11,3 +11,19 @@ config_dbs:
     database_name: postgres
     username: postgres
     password: postgres
+
+storage_endpoints:
+  postgres_local:
+    label: PostgreSQL local
+    type: from_config_dbs
+    config_db_name: local
+    is_default: true
+  s3_aws_note:
+    label: AWS S3
+    type: s3_aws
+    bucket_name: ""
+    region_name: ""
+    access_key_id: ""
+    secret_access_key: ""
+    session_token: ""
+    path_prefix: ""

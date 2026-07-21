@@ -1,8 +1,9 @@
 # Space Concept
 
-`space` is the top-level isolation unit in object storage.
+`space` is an isolation unit inside one storage endpoint.
 
-- each space has independent object tables and its own metadata table
+- each storage endpoint has its own spaces
+- each space has independent objects and metadata
 - access control and lifecycle are evaluated per space
 - `spaceId` is an identity key only (human display name is metadata)
 
@@ -40,38 +41,8 @@ Metadata row order is persisted by `rank`:
 - implementation is in `backend/utils.py`
 - backend returns rows sorted by `rank`
 
-## Version Flow
+## Objects
 
-Detailed versioning mechanism is documented in `./obj_version.md`.
+Refer to [object.md](./object.md) for object identity and current state.
 
-### Create object
-
-1. Allocate initial version.
-2. Insert version row into `space_{spaceId}_object_*_history`.
-3. Insert same version into `space_{spaceId}_object_*` (current table).
-4. Insert or update `space_{spaceId}_object_*_status` with:
-   - `versionIdHead = <new version>`
-   - `isDeleted = false`
-
-### Update object
-
-1. Read current HEAD from status table.
-2. Allocate a new version.
-3. Insert new history row.
-4. Upsert current row to new version payload.
-5. Update status row (`versionIdHead`, `isDeleted = false`).
-
-### Delete object (soft delete)
-
-1. Set `isDeleted = true` in status table.
-2. Keep `versionIdHead` as current policy head.
-3. Remove row from current table.
-
-### Rollback or checkout
-
-1. Read target history version.
-2. Set `versionIdHead = targetVersionId`.
-3. Set `isDeleted = false`.
-4. Materialize target payload into current table.
-
-Rollback is checkout of an existing history node to current.
+Refer to [obj_version.md](./obj_version.md) for version behavior.

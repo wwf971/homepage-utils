@@ -55,13 +55,13 @@ Tables:
 
 #### Current object tables (`space_{spaceId}_object_*`)
 
-Current tables contain checked-out HEAD payload for non-deleted objects.
+Current tables contain checked-out HEAD data for non-deleted objects.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `objectId` | `bigint` PK | ms_48 ID |
 | `versionId` | `bigint` | current HEAD version |
-| payload | typed column | `valueText` or `valueBytes` or `valueJson` |
+| object data | typed column | `valueText` or `valueBytes` or `valueJson` |
 | `changeLogId` | `bigint` FK | -> `change_log.changeLogId` |
 | `createdAt` | `timestamptz` | |
 | `createdAtTz` | `varchar(6)` | |
@@ -77,7 +77,7 @@ History tables are append-only.
 | `objectId` | `bigint` | |
 | `versionId` | `bigint` | ms_48 version ID |
 | `versionIdPrev` | `bigint` | nullable |
-| payload | typed column | nullable payload |
+| object data | typed column | nullable object data |
 | `isDataDeleted` | `boolean` | default `false` |
 | `changeLogId` | `bigint` FK | -> `change_log.changeLogId` |
 | `createdAt` | `timestamptz` | |
@@ -86,8 +86,8 @@ History tables are append-only.
 Primary key:
 - (`objectId`, `versionId`)
 
-When releasing history payload:
-- set payload to `null`
+When releasing history data:
+- set object data to `null`
 - set `isDataDeleted = true`
 - keep trace fields unchanged
 

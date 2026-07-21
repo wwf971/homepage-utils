@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite'
 import { KeyValues, MetadataKeyValues } from '@wwf971/react-comp-misc'
 import * as ReactCompMisc from '@wwf971/react-comp-misc'
 import { appStore } from '../store/appStore'
+import { storageEndpointStore } from '../store/storageEndpointStore'
 import './space.css'
 
 type SpaceInfoProps = {
@@ -34,26 +35,37 @@ const SpaceInfo = observer(function SpaceInfo({
     status: 'idle',
     messageText: '',
   })
+  const [isMetadataRequestPending, setIsMetadataRequestPending] = useState(false)
+  const [isMetadataLoading, setIsMetadataLoading] = useState(false)
+  const [isSpaceActionPending, setIsSpaceActionPending] = useState(false)
+  const storageEndpointKey = storageEndpointStore.selectedOrDefaultKey
+  const isMetadataOperating = isMetadataRequestPending || isMetadataLoading || isSpaceActionPending
+  const isControlsLocked = isLocked || !hasSelectedSpace || isMetadataOperating
 
   useEffect(() => {
     if (!hasSelectedSpace) {
       return
     }
     ;(async () => {
-      const result = await appStore.requestLoadSpaceMetadata(spaceId)
-      if (result?.isSuccess) {
-        setActionMessage({
-          status: 'idle',
-          messageText: '',
-        })
-      } else {
-        setActionMessage({
-          status: 'error',
-          messageText: result?.messageText || 'failed to load metadata',
-        })
+      setIsMetadataLoading(true)
+      try {
+        const result = await appStore.requestLoadSpaceMetadata(spaceId)
+        if (result?.isSuccess) {
+          setActionMessage({
+            status: 'idle',
+            messageText: '',
+          })
+        } else {
+          setActionMessage({
+            status: 'error',
+            messageText: result?.messageText || 'failed to load metadata',
+          })
+        }
+      } finally {
+        setIsMetadataLoading(false)
       }
     })()
-  }, [hasSelectedSpace, spaceId])
+  }, [hasSelectedSpace, spaceId, storageEndpointKey])
 
   const metadataRows = appStore.spaceMetadataItems.map((item) => ({
     id: item.tag,
@@ -105,7 +117,7 @@ const SpaceInfo = observer(function SpaceInfo({
         <button
           className="frontend-btn is-danger"
           type="button"
-          disabled={isLocked || !hasSelectedSpace}
+          disabled={isControlsLocked}
           onClick={() => {
             setIsConfirmClearVisible(true)
           }}
@@ -115,7 +127,7 @@ const SpaceInfo = observer(function SpaceInfo({
         <button
           className="frontend-btn is-danger"
           type="button"
-          disabled={isLocked || !hasSelectedSpace}
+          disabled={isControlsLocked}
           onClick={() => {
             setIsConfirmDeleteVisible(true)
           }}
@@ -125,13 +137,18 @@ const SpaceInfo = observer(function SpaceInfo({
         <button
           className="frontend-btn"
           type="button"
-          disabled={isLocked || !hasSelectedSpace}
+          disabled={isControlsLocked}
           onClick={async () => {
-            const result = await appStore.requestLoadSpaceMetadata(spaceId)
-            setActionMessage({
-              status: result?.isSuccess ? 'success' : 'error',
-              messageText: result?.messageText || '',
-            })
+            setIsMetadataLoading(true)
+            try {
+              const result = await appStore.requestLoadSpaceMetadata(spaceId)
+              setActionMessage({
+                status: result?.isSuccess ? 'success' : 'error',
+                messageText: result?.messageText || '',
+              })
+            } finally {
+              setIsMetadataLoading(false)
+            }
           }}
         >
           <span>Refresh Metadata</span>
@@ -151,11 +168,16 @@ const SpaceInfo = observer(function SpaceInfo({
             if (!hasSelectedSpace) {
               return
             }
-            const result = await onClearSpace(spaceId)
-            setActionMessage({
-              status: result?.isSuccess ? 'success' : 'error',
-              messageText: result?.messageText || '',
-            })
+            setIsSpaceActionPending(true)
+            try {
+              const result = await onClearSpace(spaceId)
+              setActionMessage({
+                status: result?.isSuccess ? 'success' : 'error',
+                messageText: result?.messageText || '',
+              })
+            } finally {
+              setIsSpaceActionPending(false)
+            }
           }}
         />
       ) : null}
@@ -173,11 +195,16 @@ const SpaceInfo = observer(function SpaceInfo({
             if (!hasSelectedSpace) {
               return
             }
-            const result = await onDeleteSpace(spaceId)
-            setActionMessage({
-              status: result?.isSuccess ? 'success' : 'error',
-              messageText: result?.messageText || '',
-            })
+            setIsSpaceActionPending(true)
+            try {
+              const result = await onDeleteSpace(spaceId)
+              setActionMessage({
+                status: result?.isSuccess ? 'success' : 'error',
+                messageText: result?.messageText || '',
+              })
+            } finally {
+              setIsSpaceActionPending(false)
+            }
           }}
         />
       ) : null}
@@ -186,6 +213,7 @@ const SpaceInfo = observer(function SpaceInfo({
           data={{
             rows: [
               { key: 'spaceId', value: hasSelectedSpace ? spaceId : '-' },
+              { key: 'storageEndpointKey', value: storageEndpointStore.selectedOrDefaultKey || '-' },
               { key: 'deletable', value: hasSelectedSpace ? 'yes' : 'no' },
             ],
           }}
@@ -200,11 +228,16 @@ const SpaceInfo = observer(function SpaceInfo({
           messageState: actionMessage,
         }}
         config={{
-          isLocked: isLocked || !hasSelectedSpace,
+          isLocked: isControlsLocked,
           isEditable: hasSelectedSpace,
           keyColWidth: '180px',
+          requestTimeoutMs: 15000,
         }}
         onEvent={async (eventType, eventData) => {
+          if (eventType === 'requestStateChange') {
+            setIsMetadataRequestPending(eventData?.isPending === true)
+            return
+          }
           if (eventType === 'selectedRowIdChange') {
             handleMetadataSelectionChange(eventData.selectedRowId)
             return
